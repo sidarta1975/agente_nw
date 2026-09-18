@@ -1,0 +1,25 @@
+agrupamento:
+  cosseno_mesmo_assunto: 0.82     # calibrar no brief 007
+  cosseno_republicacao: 0.94
+  divergencia_minima_fonte_independente: 0.30
+  janela_dias: 7
+  itens_para_dividir: 12
+qualificacao:
+  substancial_minimo: 0.6
+  conversavel_minimo: 0.6
+  teto_por_dia: 40
+conector:
+  adjacencia_minima: 0.55         # calibrar no brief 009
+  conversavel_viavel: 0.8         # calibrar no brief 009
+  peso_aderencia_contato: 50
+  peso_aderencia_usuario: 30
+  peso_conversavel: 20
+  peso_nivel: {dominio: 1.0, interesse: 0.7, curiosidade: 0.4}
+  candidatos_por_contato: 10
+  itens_no_menu: 5
+coleta:
+  teaser_minimo_caracteres: 400
+  dias_max_primeira_aparicao: 7
+  retencao_texto_dias: 90
+  intervalo_google_news_segundos: 2
+  dias_alerta_feed_vazio: 2

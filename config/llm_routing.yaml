@@ -1,0 +1,15 @@
+perfil_ativo: air16
+perfis:
+  air16:
+    embeddings:
+      modelo: bge-m3
+    tarefas:
+      qualificar:            {modelo: qwen3:4b, num_ctx: 2048, temperature: 0.2, format: json, think: false}
+      rotular:               {modelo: qwen3:4b, num_ctx: 2048, temperature: 0.2, format: json, think: false}
+      cartao:                {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.3, format: json, think: false}
+      cruzar_por_que:        {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.3, format: json, think: false}
+      extrair_de_texto:      {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.2, format: json, think: false}
+      prerotular_calibracao: {modelo: qwen3:8b, num_ctx: 2048, temperature: 0.1, format: json, think: false}
+    nova_tentativa:
+      temperature: 0.1
+      maximo: 1
