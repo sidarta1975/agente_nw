@@ -17,7 +17,10 @@ from agente_nw.nucleo.database import backup, conexao
 from agente_nw.nucleo.database.queries import perfil_tema, perfis, sistema
 from agente_nw.nucleo.database.queries import temas as queries_temas
 from agente_nw.nucleo.modelos.configuracao import TemasArquivo
-from agente_nw.perfil import extrator
+from agente_nw.perfil import agenda_google_csv, agenda_macos, extrator
+from agente_nw.perfil.importador import importar as importar_contatos
+from agente_nw.perfil.lacunas import ORDEM_IMPACTO, campos_faltando
+from agente_nw.perfil.normalizacao import telefone_e164
 from config.container import (
     RAIZ,
     banco,
@@ -32,10 +35,6 @@ from config.container import (
 MODELOS_OBRIGATORIOS: list[str] = ["qwen3:4b", "bge-m3", "qwen3:8b"]
 
 COMANDOS_RESERVADOS: dict[str, int] = {
-    "importar-agenda": 5,
-    "ficha": 5,
-    "ativar": 5,
-    "confirmar-tags": 5,
     "ciclo": 12,
     "exportar-menu": 11,
     "ler-marcacoes": 11,
@@ -298,6 +297,134 @@ def processar_fila_cmd() -> int:
     return 0
 
 
+def importar_agenda_cmd(fonte: str, arquivo: str | None) -> int:
+    if fonte == "macos":
+        if not agenda_macos.solicitar_permissao():
+            print(
+                "FALHA: permissão de acesso à agenda negada. Libere manualmente em "
+                "Ajustes do Sistema → Privacidade e Segurança → Contatos."
+            )
+            return 1
+        contatos = agenda_macos.ler_contatos()
+    elif fonte == "csv":
+        if not arquivo:
+            print("FALHA: --arquivo é obrigatório com --fonte csv")
+            return 1
+        caminho = Path(arquivo)
+        if not caminho.exists():
+            print(f"FALHA: {caminho} não existe")
+            return 1
+        contatos = agenda_google_csv.ler_contatos(caminho)
+    else:
+        print(f"FALHA: fonte desconhecida '{fonte}' — use 'macos' ou 'csv'")
+        return 1
+
+    resumo = importar_contatos(contatos, banco())
+    print(f"Contatos lidos: {resumo.contatos_lidos}")
+    print(f"Contatos ignorados (sem nome nem telefone/e-mail): {resumo.contatos_ignorados}")
+    print(f"Perfis criados: {resumo.perfis_criados}")
+    print(f"Perfis atualizados: {resumo.perfis_atualizados}")
+    print(f"Tags vinculadas: {resumo.tags_vinculadas}")
+    print(f"Notas enfileiradas para extração: {resumo.notas_enfileiradas}")
+    return 0
+
+
+def ficha_cmd(telefone: str) -> int:
+    telefone_normalizado = telefone_e164(telefone)
+    conn = banco()
+    perfil = perfis.obter_por_telefone_ou_email(conn, telefone_normalizado, None)
+    if perfil is None:
+        print(f"FALHA: nenhum contato encontrado com o telefone '{telefone}'")
+        return 1
+    assert perfil.id is not None
+
+    print(f"Nome: {perfil.nome}")
+    lacunas = set(campos_faltando(perfil))
+    for campo in ORDEM_IMPACTO:
+        valor = getattr(perfil, campo)
+        print(f"  {campo}: (vazio)" if campo in lacunas else f"  {campo}: {valor}")
+    print(f"Ativo: {'sim' if perfil.ativo else 'não'}")
+    print(f"Gerar agora: {'sim' if perfil.gerar_agora else 'não'}")
+
+    tags = perfil_tema.listar_por_perfil(conn, perfil.id)
+    confirmadas = [tag for tag in tags if tag.confirmado]
+    nao_confirmadas = [tag for tag in tags if not tag.confirmado]
+
+    if confirmadas:
+        print("Tags confirmadas:")
+        for tag in confirmadas:
+            tema = queries_temas.obter_por_id(conn, tag.tema_id)
+            nome_tema = tema.nome if tema is not None else f"tema #{tag.tema_id}"
+            print(f"  - {nome_tema}")
+
+    if nao_confirmadas:
+        print("Tags não confirmadas:")
+        for indice, tag in enumerate(nao_confirmadas, start=1):
+            tema = queries_temas.obter_por_id(conn, tag.tema_id)
+            nome_tema = tema.nome if tema is not None else f"tema #{tag.tema_id}"
+            print(f"  {indice}. {nome_tema}")
+
+    return 0
+
+
+def ativar_cmd(telefone: str) -> int:
+    telefone_normalizado = telefone_e164(telefone)
+    conn = banco()
+    perfil = perfis.obter_por_telefone_ou_email(conn, telefone_normalizado, None)
+    if perfil is None:
+        print(f"FALHA: nenhum contato encontrado com o telefone '{telefone}'")
+        return 1
+    assert perfil.id is not None
+
+    perfis.ativar(conn, perfil.id)
+    conn.commit()
+    print(f"{perfil.nome} ativado.")
+    return 0
+
+
+def confirmar_tags_cmd(telefone: str, todas: bool, ids: str | None) -> int:
+    telefone_normalizado = telefone_e164(telefone)
+    conn = banco()
+    perfil = perfis.obter_por_telefone_ou_email(conn, telefone_normalizado, None)
+    if perfil is None:
+        print(f"FALHA: nenhum contato encontrado com o telefone '{telefone}'")
+        return 1
+    assert perfil.id is not None
+
+    tags = perfil_tema.listar_por_perfil(conn, perfil.id)
+    nao_confirmadas = [tag for tag in tags if not tag.confirmado]
+    if not nao_confirmadas:
+        print("Nenhuma tag pendente de confirmação.")
+        return 0
+
+    if todas:
+        indices = list(range(1, len(nao_confirmadas) + 1))
+    elif ids:
+        indices = []
+        for pedaco in ids.split(","):
+            pedaco = pedaco.strip()
+            if pedaco.isdigit():
+                indices.append(int(pedaco))
+            else:
+                print(f"AVISO: índice inválido ignorado: '{pedaco}'")
+    else:
+        print("FALHA: use --todas ou --ids")
+        return 1
+
+    confirmadas = 0
+    for indice in indices:
+        if indice < 1 or indice > len(nao_confirmadas):
+            print(f"AVISO: índice {indice} fora do intervalo (1 a {len(nao_confirmadas)}), ignorado")
+            continue
+        tag = nao_confirmadas[indice - 1]
+        perfil_tema.confirmar(conn, perfil.id, tag.tema_id)
+        confirmadas += 1
+
+    conn.commit()
+    print(f"{confirmadas} tag(s) confirmada(s).")
+    return 0
+
+
 def _comando_reservado(nome: str, brief: int) -> int:
     print(f"'{nome}' disponível a partir do brief {brief:03d}")
     return 0
@@ -325,6 +452,22 @@ def _montar_parser() -> argparse.ArgumentParser:
     restaurar_backup_parser.add_argument("arquivo")
     restaurar_backup_parser.add_argument("--confirmo", action="store_true")
 
+    importar_agenda_parser = subparsers.add_parser("importar-agenda")
+    importar_agenda_parser.add_argument("--fonte", required=True, choices=["macos", "csv"])
+    importar_agenda_parser.add_argument("--arquivo")
+
+    ficha_parser = subparsers.add_parser("ficha")
+    ficha_parser.add_argument("telefone")
+
+    ativar_parser = subparsers.add_parser("ativar")
+    ativar_parser.add_argument("telefone")
+
+    confirmar_tags_parser = subparsers.add_parser("confirmar-tags")
+    confirmar_tags_parser.add_argument("telefone")
+    grupo_confirmar = confirmar_tags_parser.add_mutually_exclusive_group()
+    grupo_confirmar.add_argument("--todas", action="store_true")
+    grupo_confirmar.add_argument("--ids")
+
     for nome in COMANDOS_RESERVADOS:
         subparsers.add_parser(nome)
 
@@ -351,6 +494,14 @@ def main(argv: list[str] | None = None) -> int:
         return copiar_banco(args.destino)
     if args.comando == "restaurar-backup":
         return restaurar_backup(args.arquivo, args.confirmo)
+    if args.comando == "importar-agenda":
+        return importar_agenda_cmd(args.fonte, args.arquivo)
+    if args.comando == "ficha":
+        return ficha_cmd(args.telefone)
+    if args.comando == "ativar":
+        return ativar_cmd(args.telefone)
+    if args.comando == "confirmar-tags":
+        return confirmar_tags_cmd(args.telefone, args.todas, args.ids)
     if args.comando in COMANDOS_RESERVADOS:
         return _comando_reservado(args.comando, COMANDOS_RESERVADOS[args.comando])
 

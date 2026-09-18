@@ -25,6 +25,11 @@ def obter_por_nome(conexao: sqlite3.Connection, nome: str) -> Tema | None:
     return _para_tema(linha) if linha is not None else None
 
 
+def obter_por_id(conexao: sqlite3.Connection, tema_id: int) -> Tema | None:
+    linha = conexao.execute(f"SELECT {_COLUNAS} FROM tema WHERE id = ?", (tema_id,)).fetchone()
+    return _para_tema(linha) if linha is not None else None
+
+
 def obter_ou_criar(
     conexao: sqlite3.Connection,
     nome: str,
