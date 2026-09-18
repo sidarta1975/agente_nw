@@ -1,0 +1,5 @@
+banco: dados/agente.db
+pasta_saida: saidas            # na Etapa 3 vira a pasta do Drive
+pasta_backups: dados/backups
+ollama_url: http://127.0.0.1:11434
+# URLs identificadoras da conta (alerts, iCal) entram só em config/local.yaml, fora do git

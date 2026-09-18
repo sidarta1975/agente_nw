@@ -1,0 +1,53 @@
+[project]
+name = "agente_nw"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "feedparser",
+    "trafilatura",
+    "httpx",
+    "pydantic>=2",
+    "pyyaml",
+    "numpy",
+    "sqlite-vec",
+    "flask",
+    "python-dateutil",
+    "phonenumbers",
+    "pyobjc-framework-Contacts",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "mypy",
+    "ruff",
+    "types-PyYAML",
+]
+
+[project.scripts]
+agente_nw = "agente_nw.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["agente_nw*", "config*"]
+
+[tool.ruff]
+line-length = 110
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+
+[[tool.mypy.overrides]]
+module = ["feedparser.*", "trafilatura.*", "sqlite_vec.*", "Contacts.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

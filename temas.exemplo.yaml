@@ -1,0 +1,19 @@
+# Copie para temas.yaml (fora do git) e escreva os SEUS temas.
+# descricao: frase corrida com as palavras que apareceriam numa notícia sobre o tema — é ela que vira embedding.
+# nivel: dominio (sei falar disso) | interesse (acompanho) | curiosidade (falaria com um resumo na mão)
+usuario:
+  nome: Nome do usuário
+  temas:
+    - nome: direito tributário
+      descricao: "reforma tributária, split payment, IVA dual, contencioso de ICMS e a transição até 2033"
+      sinonimos: [reforma tributária, IBS, CBS]
+      nivel: dominio
+      peso: 5
+    - nome: corrida de rua
+      descricao: "provas de rua, maratonas, treinos, tênis de corrida, lesões de corredor"
+      sinonimos: [maratona, meia maratona]
+      nivel: interesse
+      peso: 3
+ignorar:
+  - "horóscopo"
+  - "os 10 melhores"
