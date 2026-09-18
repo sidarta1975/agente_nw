@@ -6,10 +6,10 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 .DS_Store
-dados/
-saidas/
-capturas/
-logs/
+/dados/
+/saidas/
+/capturas/
+/logs/
 *.db
 *.db-wal
 *.db-shm
@@ -20,3 +20,5 @@ config/local.yaml
 *.csv
 docs/*
 !docs/.gitkeep
+/.claude/
+/Claude outputs/
