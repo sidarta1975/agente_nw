@@ -1,0 +1,71 @@
+saude:
+  - diabetes
+  - depressão
+  - depressao
+  - câncer
+  - cancer
+  - hipertensão
+  - hipertensao
+  - ansiedade
+  - transtorno bipolar
+  - cirurgia
+  - tratamento psiquiátrico
+  - tratamento psiquiatrico
+religiao:
+  - evangélico
+  - evangelico
+  - católico
+  - catolico
+  - espírita
+  - espirita
+  - umbanda
+  - candomblé
+  - candomble
+  - muçulmano
+  - muculmano
+  - judeu
+  - ateu
+  - igreja
+  - pastor
+  - padre
+politica:
+  - PT
+  - PL
+  - Bolsonaro
+  - Lula
+  - petista
+  - bolsonarista
+  - de esquerda
+  - de direita
+  - filiado ao partido
+  - votou em
+sindicato:
+  - sindicato
+  - sindicalizado
+  - sindical
+  - greve
+vida_sexual:
+  - orientação sexual
+  - orientacao sexual
+  - homossexual
+  - heterossexual
+  - bissexual
+  - gay
+  - lésbica
+  - lesbica
+  - vida sexual
+origem_racial:
+  - pessoa negra
+  - é negro
+  - é branco
+  - é pardo
+  - é indígena
+  - e indigena
+  - raça
+  - raca
+  - etnia
+menores:
+  - filha de
+  - filho de
+  - anos de idade
+  - menor de idade
