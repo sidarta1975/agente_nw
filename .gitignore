@@ -18,6 +18,7 @@ temas.local.yaml
 fontes.yaml
 config/local.yaml
 *.csv
+!tests/fixtures/*.csv
 docs/*
 !docs/.gitkeep
 /.claude/

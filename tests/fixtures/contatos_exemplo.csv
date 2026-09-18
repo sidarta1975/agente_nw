@@ -1,0 +1,6 @@
+Name,First Name,Last Name,E-mail 1 - Value,Phone 1 - Value,Organization Name,Organization Title,Notes,Group Membership
+João Silva,João,Silva,joao@example.com,+5511987654321,Empresa Um,Advogado,,* myContacts
+Maria Souza,Maria,Souza,maria@example.com,,Empresa Dois,Gerente,,* myContacts ::: Amigos
+Carlos Pereira,Carlos,Pereira,,+5511912345678,,,Gosta de futebol e viagens.,* myContacts
+Ana Costa,Ana,Costa,ana@example.com,+5511998765432,Empresa Três,Diretora,,* myContacts ::: Trabalho ::: Clientes
+Pedro Lima,Pedro,Lima,pedro@example.com,,,,,
