@@ -1,0 +1,66 @@
+from __future__ import annotations
+
+import sqlite3
+
+from agente_nw.nucleo.modelos.assunto_contato import AssuntoContato
+
+_COLUNAS = (
+    "id, assunto_id, perfil_id, gerado_em, tipo, aderencia_contato, aderencia_usuario, "
+    "conversavel, score, por_que, status, motivo"
+)
+
+
+def _para_assunto_contato(linha: sqlite3.Row) -> AssuntoContato:
+    return AssuntoContato(
+        id=linha["id"],
+        assunto_id=linha["assunto_id"],
+        perfil_id=linha["perfil_id"],
+        gerado_em=linha["gerado_em"],
+        tipo=linha["tipo"],
+        aderencia_contato=linha["aderencia_contato"],
+        aderencia_usuario=linha["aderencia_usuario"],
+        conversavel=linha["conversavel"],
+        score=linha["score"],
+        por_que=linha["por_que"],
+        status=linha["status"],
+        motivo=linha["motivo"],
+    )
+
+
+def inserir(conexao: sqlite3.Connection, assunto_contato: AssuntoContato) -> bool:
+    cursor = conexao.execute(
+        "INSERT INTO assunto_contato "
+        "(assunto_id, perfil_id, gerado_em, tipo, aderencia_contato, aderencia_usuario, "
+        "conversavel, score, por_que, status, motivo) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "ON CONFLICT (assunto_id, perfil_id, gerado_em) DO NOTHING",
+        (
+            assunto_contato.assunto_id,
+            assunto_contato.perfil_id,
+            assunto_contato.gerado_em,
+            assunto_contato.tipo,
+            assunto_contato.aderencia_contato,
+            assunto_contato.aderencia_usuario,
+            assunto_contato.conversavel,
+            assunto_contato.score,
+            assunto_contato.por_que,
+            assunto_contato.status,
+            assunto_contato.motivo,
+        ),
+    )
+    return cursor.rowcount > 0
+
+
+def listar_do_dia(conexao: sqlite3.Connection, perfil_id: int, data: str) -> list[AssuntoContato]:
+    linhas = conexao.execute(
+        f"SELECT {_COLUNAS} FROM assunto_contato WHERE perfil_id = ? AND gerado_em = ? ORDER BY score DESC",
+        (perfil_id, data),
+    ).fetchall()
+    return [_para_assunto_contato(linha) for linha in linhas]
+
+
+def listar_assunto_ids_ja_vistos(conexao: sqlite3.Connection, perfil_id: int) -> set[int]:
+    linhas = conexao.execute(
+        "SELECT DISTINCT assunto_id FROM assunto_contato WHERE perfil_id = ?", (perfil_id,)
+    ).fetchall()
+    return {linha["assunto_id"] for linha in linhas}

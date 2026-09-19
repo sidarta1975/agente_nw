@@ -17,10 +17,10 @@ from agente_nw.nucleo.agrupamento import agrupador
 from agente_nw.nucleo.agrupamento import calibracao as calibracao_agrupamento
 from agente_nw.nucleo.agrupamento.agrupador import ClienteEmbeddagem
 from agente_nw.nucleo.database import backup, conexao
-from agente_nw.nucleo.database.queries import perfil_tema, perfis, sistema
+from agente_nw.nucleo.database.queries import assunto_contato, assuntos, perfil_tema, perfis, sistema
 from agente_nw.nucleo.database.queries import temas as queries_temas
 from agente_nw.nucleo.modelos.configuracao import TemasArquivo
-from agente_nw.nucleo.relevancia import cartoes, qualificador
+from agente_nw.nucleo.relevancia import cartoes, cruzamento, qualificador
 from agente_nw.perfil import agenda_google_csv, agenda_macos, extrator
 from agente_nw.perfil.importador import importar as importar_contatos
 from agente_nw.perfil.lacunas import ORDEM_IMPACTO, campos_faltando
@@ -365,6 +365,54 @@ def cartao_cmd(assunto_id: int) -> int:
     return 0
 
 
+def cruzar_cmd() -> int:
+    cfg = configuracao()
+    conn = banco()
+    cliente = llm()
+    agora = datetime.now(UTC).isoformat()
+
+    contatos_ativos = perfis.listar_ativos(conn)
+    if not contatos_ativos:
+        print("Nenhum contato ativo.")
+        return 0
+
+    for contato in contatos_ativos:
+        assert contato.id is not None
+        resumo = cruzamento.cruzar_contato(cliente, conn, contato.id, cfg.limiares, agora)
+        if resumo.sem_assunto:
+            print(f"{contato.nome}: sem_assunto — {resumo.motivo}")
+        else:
+            print(
+                f"{contato.nome}: {resumo.conectores} conector(es), {resumo.viaveis} viável(is), "
+                f"{resumo.descartados} descartado(s), {resumo.erros} erro(s) de por_que"
+            )
+    return 0
+
+
+def menu_cmd(telefone: str) -> int:
+    telefone_normalizado = telefone_e164(telefone)
+    conn = banco()
+    perfil = perfis.obter_por_telefone_ou_email(conn, telefone_normalizado, None)
+    if perfil is None:
+        print(f"FALHA: nenhum contato encontrado com o telefone '{telefone}'")
+        return 1
+    assert perfil.id is not None
+
+    hoje = datetime.now(UTC).date().isoformat()
+    registros = [r for r in assunto_contato.listar_do_dia(conn, perfil.id, hoje) if r.status != "descartado"]
+    if not registros:
+        print(f"Nenhum assunto no menu de hoje ({hoje}) para {perfil.nome}.")
+        return 0
+
+    for registro in registros:
+        assunto = assuntos.obter_por_id(conn, registro.assunto_id)
+        titulo = assunto.titulo_gerado if assunto is not None else f"assunto #{registro.assunto_id}"
+        print(f"[{registro.tipo}] {titulo} (score={registro.score:.1f})")
+        if registro.por_que:
+            print(f"  por quê: {registro.por_que}")
+    return 0
+
+
 def importar_agenda_cmd(fonte: str, arquivo: str | None) -> int:
     if fonte == "macos":
         if not agenda_macos.solicitar_permissao():
@@ -521,6 +569,11 @@ def _montar_parser() -> argparse.ArgumentParser:
     cartao_parser = subparsers.add_parser("cartao")
     cartao_parser.add_argument("assunto_id", type=int)
 
+    subparsers.add_parser("cruzar")
+
+    menu_parser = subparsers.add_parser("menu")
+    menu_parser.add_argument("telefone")
+
     copiar_banco_parser = subparsers.add_parser("copiar-banco")
     copiar_banco_parser.add_argument("destino")
 
@@ -574,6 +627,10 @@ def main(argv: list[str] | None = None) -> int:
         return qualificar_cmd(args.limite)
     if args.comando == "cartao":
         return cartao_cmd(args.assunto_id)
+    if args.comando == "cruzar":
+        return cruzar_cmd()
+    if args.comando == "menu":
+        return menu_cmd(args.telefone)
     if args.comando == "copiar-banco":
         return copiar_banco(args.destino)
     if args.comando == "restaurar-backup":

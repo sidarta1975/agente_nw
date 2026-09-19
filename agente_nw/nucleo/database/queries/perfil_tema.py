@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import struct
 
 from agente_nw.nucleo.modelos.configuracao import NivelTema
 from agente_nw.nucleo.modelos.perfil_tema import OrigemTema, PerfilTema
@@ -59,3 +60,21 @@ def listar_por_perfil(conexao: sqlite3.Connection, perfil_id: int) -> list[Perfi
         (perfil_id,),
     ).fetchall()
     return [_para_perfil_tema(linha) for linha in linhas]
+
+
+def _desserializar(blob: bytes) -> list[float]:
+    quantidade = len(blob) // 4
+    return list(struct.unpack(f"<{quantidade}f", blob))
+
+
+def listar_confirmados_com_embedding(
+    conexao: sqlite3.Connection, perfil_id: int
+) -> list[tuple[str, str, list[float]]]:
+    linhas = conexao.execute(
+        "SELECT t.nome AS nome, pt.nivel AS nivel, vt.embedding AS embedding FROM perfil_tema pt "
+        "JOIN tema t ON t.id = pt.tema_id "
+        "JOIN vetor_tema vt ON vt.tema_id = pt.tema_id "
+        "WHERE pt.perfil_id = ? AND pt.confirmado = 1 AND pt.nivel IS NOT NULL",
+        (perfil_id,),
+    ).fetchall()
+    return [(linha["nome"], linha["nivel"], _desserializar(linha["embedding"])) for linha in linhas]

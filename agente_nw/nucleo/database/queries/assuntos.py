@@ -180,3 +180,26 @@ def gravar_qualificacao(
 
 def gravar_cartao(conexao: sqlite3.Connection, assunto_id: int, resumo_cartao: str) -> None:
     conexao.execute("UPDATE assunto SET resumo_cartao = ? WHERE id = ?", (resumo_cartao, assunto_id))
+
+
+def listar_qualificados_nao_vistos(
+    conexao: sqlite3.Connection,
+    substancial_minimo: float,
+    conversavel_minimo: float,
+    ids_vistos: set[int],
+) -> list[tuple[Assunto, list[float]]]:
+    colunas_assunto = ", ".join(f"a.{coluna}" for coluna in _COLUNAS.split(", "))
+    linhas = conexao.execute(
+        f"SELECT {colunas_assunto}, va.centroide AS centroide FROM assunto a "
+        "JOIN vetor_assunto va ON va.assunto_id = a.id "
+        "WHERE a.substancial >= ? AND a.conversavel >= ? ORDER BY a.id",
+        (substancial_minimo, conversavel_minimo),
+    ).fetchall()
+
+    resultado: list[tuple[Assunto, list[float]]] = []
+    for linha in linhas:
+        assunto = _para_assunto(linha)
+        if assunto.id in ids_vistos:
+            continue
+        resultado.append((assunto, _desserializar(linha["centroide"])))
+    return resultado

@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import struct
+
+import sqlite_vec
 
 from agente_nw.nucleo.modelos.perfil import Perfil
+from agente_nw.nucleo.vetores import centroide as calcular_media_ponderada
 
 _COLUNAS = (
     "id, tipo, nome, apelido, email, telefone, empresa, cargo, setor, cidade, naturalidade, "
@@ -40,6 +44,11 @@ def _para_perfil(linha: sqlite3.Row) -> Perfil:
 
 def obter_usuario(conexao: sqlite3.Connection) -> Perfil | None:
     linha = conexao.execute(f"SELECT {_COLUNAS} FROM perfil WHERE tipo = 'usuario'").fetchone()
+    return _para_perfil(linha) if linha is not None else None
+
+
+def obter_por_id(conexao: sqlite3.Connection, perfil_id: int) -> Perfil | None:
+    linha = conexao.execute(f"SELECT {_COLUNAS} FROM perfil WHERE id = ?", (perfil_id,)).fetchone()
     return _para_perfil(linha) if linha is not None else None
 
 
@@ -161,3 +170,41 @@ def atualizar_campos_guiados(
             "WHERE id = ?",
             (valor_coluna, agora, perfil_id),
         )
+
+
+def _desserializar(blob: bytes) -> list[float]:
+    quantidade = len(blob) // 4
+    return list(struct.unpack(f"<{quantidade}f", blob))
+
+
+def calcular_centroide(
+    conexao: sqlite3.Connection, perfil_id: int, peso_nivel: dict[str, float]
+) -> list[float] | None:
+    linhas = conexao.execute(
+        "SELECT pt.peso, pt.nivel, vt.embedding AS embedding FROM perfil_tema pt "
+        "JOIN vetor_tema vt ON vt.tema_id = pt.tema_id "
+        "WHERE pt.perfil_id = ? AND pt.confirmado = 1",
+        (perfil_id,),
+    ).fetchall()
+    if not linhas:
+        return None
+
+    vetores: list[list[float]] = []
+    pesos: list[float] = []
+    for linha in linhas:
+        peso_do_nivel = peso_nivel[linha["nivel"]] if linha["nivel"] is not None else 1.0
+        vetores.append(_desserializar(linha["embedding"]))
+        pesos.append(linha["peso"] * peso_do_nivel)
+
+    return calcular_media_ponderada(vetores, pesos)
+
+
+def gravar_centroide(conexao: sqlite3.Connection, perfil_id: int, centroide: list[float]) -> None:
+    vetor = sqlite_vec.serialize_float32(centroide)
+    conexao.execute("DELETE FROM vetor_perfil WHERE perfil_id = ?", (perfil_id,))
+    conexao.execute("INSERT INTO vetor_perfil (perfil_id, centroide) VALUES (?, ?)", (perfil_id, vetor))
+
+
+def obter_centroide(conexao: sqlite3.Connection, perfil_id: int) -> list[float] | None:
+    linha = conexao.execute("SELECT centroide FROM vetor_perfil WHERE perfil_id = ?", (perfil_id,)).fetchone()
+    return _desserializar(linha["centroide"]) if linha is not None else None
