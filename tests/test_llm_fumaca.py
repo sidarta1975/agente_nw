@@ -42,7 +42,9 @@ def preparo(tmp_path: Path) -> _Preparo:
     conexao_bd = conexao.abrir(tmp_path / "fumaca.db")
     migracoes.aplicar(conexao_bd)
     cliente_http = httpx.Client(timeout=60.0)
-    cliente = ClienteOllama(cliente_http, conexao_bd, cfg.roteamento, cfg.local.ollama_url)
+    cliente = ClienteOllama(
+        cliente_http, conexao_bd, cfg.roteamento, cfg.local.ollama_url, tmp_path / "chamadas_llm.jsonl"
+    )
     return _Preparo(cliente=cliente, conexao_bd=conexao_bd)
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import TypeVar
 
 import httpx
@@ -38,11 +39,30 @@ class ClienteOllama:
         conexao_bd: sqlite3.Connection,
         roteamento: Roteamento,
         ollama_url: str,
+        caminho_log: Path,
     ) -> None:
         self._http = http_client
         self._conexao = conexao_bd
         self._roteamento = roteamento
         self._ollama_url = ollama_url
+        self._caminho_log = caminho_log
+
+    def _registrar_log_chamada(self, tarefa_nome: str, tentativas_usadas: int, sucesso: bool) -> None:
+        try:
+            self._caminho_log.parent.mkdir(parents=True, exist_ok=True)
+            linha = json.dumps(
+                {
+                    "tarefa": tarefa_nome,
+                    "tentativas_usadas": tentativas_usadas,
+                    "sucesso": sucesso,
+                    "quando": datetime.now(UTC).isoformat(),
+                },
+                ensure_ascii=False,
+            )
+            with self._caminho_log.open("a", encoding="utf-8") as arquivo:
+                arquivo.write(linha + "\n")
+        except Exception:
+            pass
 
     def _tarefa(self, nome: str) -> TarefaRoteamento:
         perfil = self._roteamento.perfis[self._roteamento.perfil_ativo]
@@ -81,14 +101,18 @@ class ClienteOllama:
         nova_tentativa = self._roteamento.perfis[self._roteamento.perfil_ativo].nova_tentativa
 
         ultimo_erro = ""
-        for temperatura in (tarefa.temperature, nova_tentativa.temperature):
+        tentativas = (tarefa.temperature, nova_tentativa.temperature)
+        for indice, temperatura in enumerate(tentativas, start=1):
             try:
                 texto = self._chamar_generate(tarefa, prompt, temperatura)
                 bruto = json.loads(texto)
-                return esquema.model_validate(bruto)
+                resultado = esquema.model_validate(bruto)
+                self._registrar_log_chamada(tarefa_nome, indice, True)
+                return resultado
             except (json.JSONDecodeError, ValidationError, _GeracaoDegenerada) as erro:
                 ultimo_erro = str(erro)
 
+        self._registrar_log_chamada(tarefa_nome, len(tentativas), False)
         agora = datetime.now(UTC).isoformat()
         fila_id = fila_revisao.inserir(self._conexao, tarefa_nome, prompt, ultimo_erro, agora)
         self._conexao.commit()

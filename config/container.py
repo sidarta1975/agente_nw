@@ -46,7 +46,7 @@ def http() -> httpx.Client:
 @functools.lru_cache(maxsize=1)
 def llm() -> ClienteOllama:
     cfg = configuracao()
-    return ClienteOllama(http(), banco(), cfg.roteamento, cfg.local.ollama_url)
+    return ClienteOllama(http(), banco(), cfg.roteamento, cfg.local.ollama_url, caminho_log_chamadas_llm())
 
 
 def caminho_banco() -> Path:
@@ -74,6 +74,10 @@ def caminho_limiares_yaml() -> Path:
 
 def caminho_pasta_adr() -> Path:
     return RAIZ / "docs" / "adr"
+
+
+def caminho_log_chamadas_llm() -> Path:
+    return RAIZ / "dados" / "logs" / "chamadas_llm.jsonl"
 
 
 @functools.lru_cache(maxsize=1)

@@ -38,7 +38,7 @@ def conn(tmp_path: Path) -> sqlite3.Connection:
     return conexao_aberta
 
 
-def test_extracao_real_produz_tags_e_campos_esperados(conn: sqlite3.Connection) -> None:
+def test_extracao_real_produz_tags_e_campos_esperados(conn: sqlite3.Connection, tmp_path: Path) -> None:
     agora = "2026-01-01T00:00:00+00:00"
     conn.execute(
         "INSERT INTO perfil (tipo, nome, linguas, criado_em, atualizado_em) "
@@ -54,7 +54,10 @@ def test_extracao_real_produz_tags_e_campos_esperados(conn: sqlite3.Connection) 
     conn.commit()
 
     cfg = configuracao()
-    cliente = ClienteOllama(httpx.Client(timeout=60.0), conn, cfg.roteamento, cfg.local.ollama_url)
+    caminho_log = tmp_path / "chamadas_llm.jsonl"
+    cliente = ClienteOllama(
+        httpx.Client(timeout=60.0), conn, cfg.roteamento, cfg.local.ollama_url, caminho_log
+    )
 
     resumo = processar_fila(cliente, conn)
 

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
+import re
 import sqlite3
 import subprocess
 import sys
@@ -9,7 +11,7 @@ import time
 import traceback
 from collections.abc import Callable
 from contextlib import redirect_stdout
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import NamedTuple
 
@@ -36,6 +38,7 @@ from config.container import (
     banco,
     caminho_banco,
     caminho_limiares_yaml,
+    caminho_log_chamadas_llm,
     caminho_pasta_adr,
     caminho_pasta_backups,
     caminho_pasta_saida,
@@ -579,6 +582,112 @@ def ciclo_cmd() -> int:
     return 0
 
 
+def _dias_no_intervalo(desde: str, ate: str) -> list[str]:
+    inicio = date.fromisoformat(desde)
+    fim = date.fromisoformat(ate)
+    dias: list[str] = []
+    atual = inicio
+    while atual <= fim:
+        dias.append(atual.isoformat())
+        atual += timedelta(days=1)
+    return dias
+
+
+def _ler_log_ciclo(dia: str) -> tuple[float, list[tuple[str, float]]] | None:
+    pasta = RAIZ / "dados" / "logs"
+    arquivos = sorted(pasta.glob(f"ciclo_{dia}T*.log"))
+    if not arquivos:
+        return None
+
+    texto = arquivos[-1].read_text(encoding="utf-8")
+    duracoes: list[tuple[str, float]] = []
+    for linha in texto.splitlines():
+        correspondencia = re.search(r"\[conclu[ií]da em ([\d.]+)s\] (.+)", linha)
+        if correspondencia:
+            duracoes.append((correspondencia.group(2), float(correspondencia.group(1))))
+    total = sum(duracao for _nome, duracao in duracoes)
+    return total, duracoes
+
+
+def _ler_chamadas_llm(desde: str, ate: str) -> list[dict[str, object]]:
+    caminho = caminho_log_chamadas_llm()
+    if not caminho.exists():
+        return []
+
+    resultado: list[dict[str, object]] = []
+    for linha in caminho.read_text(encoding="utf-8").splitlines():
+        registro = json.loads(linha)
+        dia = str(registro.get("quando", ""))[:10]
+        if desde <= dia <= ate:
+            resultado.append(registro)
+    return resultado
+
+
+def certificar_cmd(desde: str, ate: str) -> int:
+    conn = banco()
+    dias = _dias_no_intervalo(desde, ate)
+
+    total_usado_geral = 0
+    total_entregue_geral = 0
+
+    for dia in dias:
+        print(f"=== {dia} ===")
+        resultado_log = _ler_log_ciclo(dia)
+        if resultado_log is None:
+            print("  Sem log de ciclo para este dia.")
+        else:
+            duracao_total, etapas = resultado_log
+            print(f"  Duração total do ciclo: {duracao_total:.1f}s")
+            for nome_etapa, duracao in etapas:
+                print(f"    {nome_etapa}: {duracao:.1f}s")
+
+        contagens_status = assunto_contato.contar_por_status(conn, dia)
+        contagens_tipo = assunto_contato.contar_por_perfil_e_tipo(conn, dia)
+        perfis_com_sugestao = {perfil_id for perfil_id, _tipo, _quantidade in contagens_tipo}
+        total_entregue = sum(
+            quantidade for status, quantidade in contagens_status.items() if status != "descartado"
+        )
+        usados = contagens_status.get("usado", 0)
+        total_usado_geral += usados
+        total_entregue_geral += total_entregue
+
+        print(f"  Contatos com sugestão: {len(perfis_com_sugestao)}")
+        print(
+            f"  Assuntos entregues: {total_entregue} (usado: {usados}, "
+            f"não serve: {contagens_status.get('nao_serve', 0)}, "
+            f"novo/pendente: {contagens_status.get('novo', 0)})"
+        )
+        for perfil_id, tipo, quantidade in sorted(contagens_tipo):
+            print(f"    perfil {perfil_id} [{tipo}]: {quantidade}")
+
+    print("=== Resumo agregado ===")
+    if total_entregue_geral:
+        print(
+            f"Aproveitamento geral: {total_usado_geral}/{total_entregue_geral} "
+            f"({total_usado_geral / total_entregue_geral:.1%})"
+        )
+    else:
+        print("Aproveitamento geral: sem assuntos entregues no período.")
+
+    chamadas = _ler_chamadas_llm(desde, ate)
+    if chamadas:
+        sucesso_primeira = sum(
+            1 for c in chamadas if c.get("tentativas_usadas") == 1 and c.get("sucesso") is True
+        )
+        print(f"Chamadas de LLM no período: {len(chamadas)}")
+        print(
+            f"Sucesso na primeira tentativa: {sucesso_primeira}/{len(chamadas)} "
+            f"({sucesso_primeira / len(chamadas):.1%})"
+        )
+    else:
+        print("Nenhuma chamada de LLM registrada no período.")
+
+    orfaos = assunto_contato.contar_orfaos(conn)
+    print(f"assunto_contato órfãos (deveria ser sempre 0): {orfaos}")
+
+    return 0
+
+
 def importar_agenda_cmd(fonte: str, arquivo: str | None) -> int:
     if fonte == "macos":
         if not agenda_macos.solicitar_permissao():
@@ -730,6 +839,10 @@ def _montar_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("calibrar-agrupamento")
     subparsers.add_parser("ciclo")
 
+    certificar_parser = subparsers.add_parser("certificar")
+    certificar_parser.add_argument("--desde", required=True)
+    certificar_parser.add_argument("--ate", required=True)
+
     qualificar_parser = subparsers.add_parser("qualificar")
     qualificar_parser.add_argument("--limite", type=int, default=None)
 
@@ -798,6 +911,8 @@ def main(argv: list[str] | None = None) -> int:
         return calibrar_agrupamento_cmd()
     if args.comando == "ciclo":
         return ciclo_cmd()
+    if args.comando == "certificar":
+        return certificar_cmd(args.desde, args.ate)
     if args.comando == "qualificar":
         return qualificar_cmd(args.limite)
     if args.comando == "cartao":

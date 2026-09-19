@@ -79,3 +79,28 @@ def marcar_nao_serve(conexao: sqlite3.Connection, ac_id: int, motivo: str) -> bo
         (motivo, ac_id),
     )
     return cursor.rowcount > 0
+
+
+def contar_por_status(conexao: sqlite3.Connection, data: str) -> dict[str, int]:
+    linhas = conexao.execute(
+        "SELECT status, COUNT(*) AS quantidade FROM assunto_contato WHERE gerado_em = ? GROUP BY status",
+        (data,),
+    ).fetchall()
+    return {linha["status"]: linha["quantidade"] for linha in linhas}
+
+
+def contar_por_perfil_e_tipo(conexao: sqlite3.Connection, data: str) -> list[tuple[int, str, int]]:
+    linhas = conexao.execute(
+        "SELECT perfil_id, tipo, COUNT(*) AS quantidade FROM assunto_contato "
+        "WHERE gerado_em = ? GROUP BY perfil_id, tipo",
+        (data,),
+    ).fetchall()
+    return [(linha["perfil_id"], linha["tipo"], linha["quantidade"]) for linha in linhas]
+
+
+def contar_orfaos(conexao: sqlite3.Connection) -> int:
+    (contagem,) = conexao.execute(
+        "SELECT COUNT(*) FROM assunto_contato ac LEFT JOIN assunto a ON a.id = ac.assunto_id "
+        "WHERE a.id IS NULL"
+    ).fetchone()
+    return int(contagem)

@@ -33,7 +33,9 @@ def test_corpo_da_chamada_tem_think_false_e_parametros_da_tarefa(tmp_path: Path)
     conexao_bd = conexao.abrir(tmp_path / "teste.db")
     migracoes.aplicar(conexao_bd)
 
-    cliente = ClienteOllama(cliente_http, conexao_bd, roteamento, "http://ollama.invalido")
+    cliente = ClienteOllama(
+        cliente_http, conexao_bd, roteamento, "http://ollama.invalido", tmp_path / "chamadas_llm.jsonl"
+    )
     resultado = cliente.gerar_json("qualificar", "prompt de teste", _EsquemaTeste)
 
     assert resultado.ok is True
