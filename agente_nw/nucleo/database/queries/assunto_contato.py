@@ -64,3 +64,18 @@ def listar_assunto_ids_ja_vistos(conexao: sqlite3.Connection, perfil_id: int) ->
         "SELECT DISTINCT assunto_id FROM assunto_contato WHERE perfil_id = ?", (perfil_id,)
     ).fetchall()
     return {linha["assunto_id"] for linha in linhas}
+
+
+def marcar_usado(conexao: sqlite3.Connection, ac_id: int) -> bool:
+    cursor = conexao.execute(
+        "UPDATE assunto_contato SET status = 'usado' WHERE id = ? AND status = 'novo'", (ac_id,)
+    )
+    return cursor.rowcount > 0
+
+
+def marcar_nao_serve(conexao: sqlite3.Connection, ac_id: int, motivo: str) -> bool:
+    cursor = conexao.execute(
+        "UPDATE assunto_contato SET status = 'nao_serve', motivo = ? WHERE id = ? AND status = 'novo'",
+        (motivo, ac_id),
+    )
+    return cursor.rowcount > 0

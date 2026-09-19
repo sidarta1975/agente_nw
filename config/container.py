@@ -59,6 +59,11 @@ def caminho_pasta_backups() -> Path:
     return caminho if caminho.is_absolute() else RAIZ / caminho
 
 
+def caminho_pasta_saida() -> Path:
+    caminho = Path(configuracao().local.pasta_saida)
+    return caminho if caminho.is_absolute() else RAIZ / caminho
+
+
 def caminho_sentinela() -> Path:
     return RAIZ / "dados" / "PARE"
 

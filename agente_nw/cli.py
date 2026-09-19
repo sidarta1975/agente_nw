@@ -21,6 +21,7 @@ from agente_nw.nucleo.database.queries import assunto_contato, assuntos, perfil_
 from agente_nw.nucleo.database.queries import temas as queries_temas
 from agente_nw.nucleo.modelos.configuracao import TemasArquivo
 from agente_nw.nucleo.relevancia import cartoes, cruzamento, qualificador
+from agente_nw.nucleo.saidas import markdown
 from agente_nw.perfil import agenda_google_csv, agenda_macos, extrator
 from agente_nw.perfil.importador import importar as importar_contatos
 from agente_nw.perfil.lacunas import ORDEM_IMPACTO, campos_faltando
@@ -32,6 +33,7 @@ from config.container import (
     caminho_limiares_yaml,
     caminho_pasta_adr,
     caminho_pasta_backups,
+    caminho_pasta_saida,
     caminho_sentinela,
     configuracao,
     http,
@@ -42,8 +44,6 @@ MODELOS_OBRIGATORIOS: list[str] = ["qwen3:4b", "bge-m3", "qwen3:8b"]
 
 COMANDOS_RESERVADOS: dict[str, int] = {
     "ciclo": 12,
-    "exportar-menu": 11,
-    "ler-marcacoes": 11,
     "calibrar-conector": 9,
 }
 
@@ -413,6 +413,55 @@ def menu_cmd(telefone: str) -> int:
     return 0
 
 
+def exportar_menu_cmd(data: str | None) -> int:
+    conn = banco()
+    data_efetiva = data if data is not None else datetime.now(UTC).date().isoformat()
+
+    perfis_ativos = perfis.listar_ativos(conn)
+    texto = markdown.gerar(conn, perfis_ativos, data_efetiva)
+
+    pasta = caminho_pasta_saida()
+    pasta.mkdir(parents=True, exist_ok=True)
+    caminho_arquivo = pasta / f"menu_{data_efetiva}.md"
+    caminho_arquivo.write_text(texto, encoding="utf-8")
+
+    print(f"Arquivo gerado em {caminho_arquivo}")
+    return 0
+
+
+def ler_marcacoes_cmd(data: str | None) -> int:
+    data_efetiva = data if data is not None else datetime.now(UTC).date().isoformat()
+    caminho_arquivo = caminho_pasta_saida() / f"menu_{data_efetiva}.md"
+    if not caminho_arquivo.exists():
+        print(f"FALHA: {caminho_arquivo} não existe")
+        return 1
+
+    conn = banco()
+    texto = caminho_arquivo.read_text(encoding="utf-8")
+    marcacoes, avisos = markdown.ler_marcacoes(texto)
+
+    aplicadas = 0
+    for marcacao_lida in marcacoes:
+        if marcacao_lida.resultado == "usado":
+            sucesso = assunto_contato.marcar_usado(conn, marcacao_lida.ac_id)
+        else:
+            assert marcacao_lida.motivo is not None
+            sucesso = assunto_contato.marcar_nao_serve(conn, marcacao_lida.ac_id, marcacao_lida.motivo)
+
+        if sucesso:
+            aplicadas += 1
+        else:
+            avisos.append(f"ac:{marcacao_lida.ac_id} não encontrado ou já resolvido")
+    conn.commit()
+
+    print(f"Marcações aplicadas: {aplicadas}")
+    if avisos:
+        print(f"Avisos ({len(avisos)}):")
+        for aviso in avisos:
+            print(f"  - {aviso}")
+    return 0
+
+
 def importar_agenda_cmd(fonte: str, arquivo: str | None) -> int:
     if fonte == "macos":
         if not agenda_macos.solicitar_permissao():
@@ -574,6 +623,12 @@ def _montar_parser() -> argparse.ArgumentParser:
     menu_parser = subparsers.add_parser("menu")
     menu_parser.add_argument("telefone")
 
+    exportar_menu_parser = subparsers.add_parser("exportar-menu")
+    exportar_menu_parser.add_argument("--data", default=None)
+
+    ler_marcacoes_parser = subparsers.add_parser("ler-marcacoes")
+    ler_marcacoes_parser.add_argument("--data", default=None)
+
     copiar_banco_parser = subparsers.add_parser("copiar-banco")
     copiar_banco_parser.add_argument("destino")
 
@@ -631,6 +686,10 @@ def main(argv: list[str] | None = None) -> int:
         return cruzar_cmd()
     if args.comando == "menu":
         return menu_cmd(args.telefone)
+    if args.comando == "exportar-menu":
+        return exportar_menu_cmd(args.data)
+    if args.comando == "ler-marcacoes":
+        return ler_marcacoes_cmd(args.data)
     if args.comando == "copiar-banco":
         return copiar_banco(args.destino)
     if args.comando == "restaurar-backup":
