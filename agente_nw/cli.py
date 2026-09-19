@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import io
 import sqlite3
 import subprocess
 import sys
-from datetime import UTC, datetime
+import time
+import traceback
+from collections.abc import Callable
+from contextlib import redirect_stdout
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import NamedTuple
 
@@ -43,7 +48,6 @@ from config.container import (
 MODELOS_OBRIGATORIOS: list[str] = ["qwen3:4b", "bge-m3", "qwen3:8b"]
 
 COMANDOS_RESERVADOS: dict[str, int] = {
-    "ciclo": 12,
     "calibrar-conector": 9,
 }
 
@@ -462,6 +466,119 @@ def ler_marcacoes_cmd(data: str | None) -> int:
     return 0
 
 
+class _LogCiclo:
+    def __init__(self, caminho: Path) -> None:
+        caminho.parent.mkdir(parents=True, exist_ok=True)
+        self._arquivo = caminho.open("a", encoding="utf-8")
+
+    def escrever(self, texto: str) -> None:
+        if not texto:
+            return
+        print(texto)
+        self._arquivo.write(texto + "\n")
+        self._arquivo.flush()
+
+    def fechar(self) -> None:
+        self._arquivo.close()
+
+
+def _gerar_cartoes_cmd() -> int:
+    cfg = configuracao()
+    resumo = cartoes.gerar_pendentes(llm(), banco(), cfg.limiares.cartao.teto_por_dia)
+    print(f"Candidatos: {resumo.candidatos}")
+    print(f"Cartões gerados: {resumo.gerados}")
+    print(f"Erros: {resumo.erros}")
+    return 0
+
+
+def _rodar_etapa(
+    log: _LogCiclo,
+    conn: sqlite3.Connection,
+    nome_etapa: str,
+    nome_exibicao: str,
+    hoje: str,
+    funcao_cmd: Callable[[], int],
+) -> bool:
+    if caminho_sentinela().exists():
+        log.escrever(f"Sentinela encontrada, parando antes de {nome_exibicao}.")
+        return False
+
+    progresso = sistema.progresso_obter(conn, nome_etapa)
+    if progresso is not None and progresso["data_ciclo"] == hoje:
+        log.escrever(f"{nome_exibicao}: já concluída hoje, pulando.")
+        return True
+
+    inicio = time.monotonic()
+    log.escrever(f"[{datetime.now(UTC).isoformat()}] Iniciando {nome_exibicao}")
+
+    buffer = io.StringIO()
+    try:
+        with redirect_stdout(buffer):
+            codigo = funcao_cmd()
+        if codigo != 0:
+            raise RuntimeError(f"{nome_exibicao} devolveu código {codigo}")
+    except Exception:
+        log.escrever(buffer.getvalue().rstrip("\n"))
+        duracao = time.monotonic() - inicio
+        log.escrever(f"[FALHA após {duracao:.1f}s] {nome_exibicao}")
+        log.escrever(traceback.format_exc())
+        raise
+
+    log.escrever(buffer.getvalue().rstrip("\n"))
+    duracao = time.monotonic() - inicio
+    log.escrever(f"[concluída em {duracao:.1f}s] {nome_exibicao}")
+    sistema.progresso_gravar(conn, nome_etapa, None, hoje, datetime.now(UTC).isoformat())
+    conn.commit()
+    return True
+
+
+def ciclo_cmd() -> int:
+    conn = banco()
+    hoje = datetime.now(UTC).date().isoformat()
+
+    progresso_backup = sistema.progresso_obter(conn, "ciclo:backup")
+    if progresso_backup is not None and progresso_backup["data_ciclo"] == hoje:
+        print(f"Ciclo já rodou hoje (concluído às {progresso_backup['atualizado_em']}).")
+        return 0
+
+    timestamp_log = datetime.now(UTC).isoformat().replace(":", "-")
+    caminho_log = RAIZ / "dados" / "logs" / f"ciclo_{timestamp_log}.log"
+    log = _LogCiclo(caminho_log)
+
+    try:
+        ontem = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
+        caminho_ontem = caminho_pasta_saida() / f"menu_{ontem}.md"
+        if caminho_ontem.exists():
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                ler_marcacoes_cmd(ontem)
+            log.escrever(buffer.getvalue().rstrip("\n"))
+        else:
+            log.escrever(f"Sem arquivo de ontem ({caminho_ontem}), pulando leitura de marcações.")
+
+        etapas: list[tuple[str, str, Callable[[], int]]] = [
+            ("ciclo:coleta", "coleta", coletar),
+            ("ciclo:extracao", "extração", processar_fila_cmd),
+            ("ciclo:agrupamento", "agrupamento", agrupar_cmd),
+            ("ciclo:qualificacao", "qualificação", lambda: qualificar_cmd(None)),
+            ("ciclo:cruzamento", "cruzamento", cruzar_cmd),
+            ("ciclo:cartoes", "geração de cartões", _gerar_cartoes_cmd),
+            ("ciclo:exportacao", "exportação do menu", lambda: exportar_menu_cmd(None)),
+            ("ciclo:backup", "backup", fazer_backup_cmd),
+        ]
+
+        for nome_etapa, nome_exibicao, funcao_cmd in etapas:
+            continuar = _rodar_etapa(log, conn, nome_etapa, nome_exibicao, hoje, funcao_cmd)
+            if not continuar:
+                return 0
+    except Exception:
+        return 1
+    finally:
+        log.fechar()
+
+    return 0
+
+
 def importar_agenda_cmd(fonte: str, arquivo: str | None) -> int:
     if fonte == "macos":
         if not agenda_macos.solicitar_permissao():
@@ -611,6 +728,7 @@ def _montar_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("processar-fila")
     subparsers.add_parser("agrupar")
     subparsers.add_parser("calibrar-agrupamento")
+    subparsers.add_parser("ciclo")
 
     qualificar_parser = subparsers.add_parser("qualificar")
     qualificar_parser.add_argument("--limite", type=int, default=None)
@@ -678,6 +796,8 @@ def main(argv: list[str] | None = None) -> int:
         return agrupar_cmd()
     if args.comando == "calibrar-agrupamento":
         return calibrar_agrupamento_cmd()
+    if args.comando == "ciclo":
+        return ciclo_cmd()
     if args.comando == "qualificar":
         return qualificar_cmd(args.limite)
     if args.comando == "cartao":

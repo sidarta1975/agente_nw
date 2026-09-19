@@ -203,3 +203,13 @@ def listar_qualificados_nao_vistos(
             continue
         resultado.append((assunto, _desserializar(linha["centroide"])))
     return resultado
+
+
+def listar_qualificados_sem_cartao(conexao: sqlite3.Connection, limite: int) -> list[Assunto]:
+    linhas = conexao.execute(
+        f"SELECT {_COLUNAS} FROM assunto "
+        "WHERE substancial IS NOT NULL AND conversavel IS NOT NULL AND resumo_cartao IS NULL "
+        "ORDER BY id LIMIT ?",
+        (limite,),
+    ).fetchall()
+    return [_para_assunto(linha) for linha in linhas]

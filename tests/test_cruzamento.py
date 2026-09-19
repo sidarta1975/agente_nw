@@ -12,6 +12,7 @@ from agente_nw.nucleo.llm import FalhaJsonInvalido
 from agente_nw.nucleo.modelos.assunto import Assunto
 from agente_nw.nucleo.modelos.configuracao import (
     AgrupamentoLimiares,
+    CartaoLimiares,
     ColetaLimiares,
     ConectorLimiares,
     Limiares,
@@ -58,6 +59,7 @@ def limiares() -> Limiares:
             intervalo_google_news_segundos=0,
             dias_alerta_feed_vazio=2,
         ),
+        cartao=CartaoLimiares(teto_por_dia=40),
     )
 
 

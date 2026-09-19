@@ -23,3 +23,5 @@ coleta:
   retencao_texto_dias: 90
   intervalo_google_news_segundos: 2
   dias_alerta_feed_vazio: 2
+cartao:
+  teto_por_dia: 40

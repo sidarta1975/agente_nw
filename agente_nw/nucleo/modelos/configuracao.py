@@ -108,6 +108,12 @@ class ColetaLimiares(BaseModel):
     dias_alerta_feed_vazio: int
 
 
+class CartaoLimiares(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    teto_por_dia: int
+
+
 class Limiares(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -115,6 +121,7 @@ class Limiares(BaseModel):
     qualificacao: QualificacaoLimiares
     conector: ConectorLimiares
     coleta: ColetaLimiares
+    cartao: CartaoLimiares
 
 
 class TemaUsuario(BaseModel):

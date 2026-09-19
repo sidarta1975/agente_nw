@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
@@ -62,3 +63,26 @@ def gerar_cartao(cliente_llm: ClienteCartao, conexao: sqlite3.Connection, assunt
     )
     conexao.commit()
     return None
+
+
+@dataclass
+class ResumoCartoes:
+    candidatos: int = 0
+    gerados: int = 0
+    erros: int = 0
+
+
+def gerar_pendentes(cliente_llm: ClienteCartao, conexao: sqlite3.Connection, limite: int) -> ResumoCartoes:
+    resumo = ResumoCartoes()
+    candidatos = assuntos.listar_qualificados_sem_cartao(conexao, limite)
+    resumo.candidatos = len(candidatos)
+
+    for assunto in candidatos:
+        assert assunto.id is not None
+        resultado = gerar_cartao(cliente_llm, conexao, assunto.id)
+        if resultado is None:
+            resumo.erros += 1
+        else:
+            resumo.gerados += 1
+
+    return resumo
