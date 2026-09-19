@@ -15,10 +15,12 @@ from pydantic import ValidationError
 from agente_nw.coleta.rss import leitor
 from agente_nw.nucleo.agrupamento import agrupador
 from agente_nw.nucleo.agrupamento import calibracao as calibracao_agrupamento
+from agente_nw.nucleo.agrupamento.agrupador import ClienteEmbeddagem
 from agente_nw.nucleo.database import backup, conexao
 from agente_nw.nucleo.database.queries import perfil_tema, perfis, sistema
 from agente_nw.nucleo.database.queries import temas as queries_temas
 from agente_nw.nucleo.modelos.configuracao import TemasArquivo
+from agente_nw.nucleo.relevancia import cartoes, qualificador
 from agente_nw.perfil import agenda_google_csv, agenda_macos, extrator
 from agente_nw.perfil.importador import importar as importar_contatos
 from agente_nw.perfil.lacunas import ORDEM_IMPACTO, campos_faltando
@@ -166,7 +168,12 @@ def verificar_ambiente() -> int:
     return 1 if houve_falha_obrigatoria else 0
 
 
-def importar_temas(arquivo: str, simular: bool, conexao_bd: sqlite3.Connection | None = None) -> int:
+def importar_temas(
+    arquivo: str,
+    simular: bool,
+    conexao_bd: sqlite3.Connection | None = None,
+    cliente_llm: ClienteEmbeddagem | None = None,
+) -> int:
     caminho = Path(arquivo)
     if not caminho.exists():
         print(f"FALHA: {caminho} não existe")
@@ -190,6 +197,7 @@ def importar_temas(arquivo: str, simular: bool, conexao_bd: sqlite3.Connection |
         return 0
 
     conn = conexao_bd if conexao_bd is not None else banco()
+    cliente = cliente_llm if cliente_llm is not None else llm()
     agora = datetime.now(UTC).isoformat()
 
     usuario = perfis.upsert_usuario(conn, temas_arquivo.usuario.nome, agora)
@@ -197,6 +205,8 @@ def importar_temas(arquivo: str, simular: bool, conexao_bd: sqlite3.Connection |
     for tema in temas_arquivo.usuario.temas:
         tema_gravado = queries_temas.obter_ou_criar(conn, tema.nome, tema.descricao, tema.sinonimos, agora)
         assert tema_gravado.id is not None
+        vetor = cliente.embeddar([f"{tema.nome}: {tema.descricao}"])[0]
+        queries_temas.gravar_embedding(conn, tema_gravado.id, vetor)
         perfil_tema.vincular(
             conn,
             usuario.id,
@@ -325,6 +335,33 @@ def calibrar_agrupamento_cmd() -> int:
     print(f"Limiar anterior: {resumo.limiar_anterior}")
     print(f"Limiar novo: {resumo.limiar_novo}")
     print(f"ADR escrito em: {resumo.caminho_adr}")
+    return 0
+
+
+def qualificar_cmd(limite: int | None) -> int:
+    cfg = configuracao()
+    limite_efetivo = limite if limite is not None else cfg.limiares.qualificacao.teto_por_dia
+    resumo = qualificador.qualificar_pendentes(llm(), banco(), limite_efetivo)
+
+    print(f"Candidatos: {resumo.candidatos}")
+    print(f"Títulos gerados: {resumo.titulos_gerados}")
+    print(f"Qualificados: {resumo.qualificados}")
+    print(f"Erros: {resumo.erros}")
+    return 0
+
+
+def cartao_cmd(assunto_id: int) -> int:
+    try:
+        resultado = cartoes.gerar_cartao(llm(), banco(), assunto_id)
+    except ValueError as erro:
+        print(f"FALHA: {erro}")
+        return 1
+
+    if resultado is None:
+        print("FALHA: não foi possível gerar um cartão válido (ver fila_revisao)")
+        return 1
+
+    print(resultado)
     return 0
 
 
@@ -478,6 +515,12 @@ def _montar_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("agrupar")
     subparsers.add_parser("calibrar-agrupamento")
 
+    qualificar_parser = subparsers.add_parser("qualificar")
+    qualificar_parser.add_argument("--limite", type=int, default=None)
+
+    cartao_parser = subparsers.add_parser("cartao")
+    cartao_parser.add_argument("assunto_id", type=int)
+
     copiar_banco_parser = subparsers.add_parser("copiar-banco")
     copiar_banco_parser.add_argument("destino")
 
@@ -527,6 +570,10 @@ def main(argv: list[str] | None = None) -> int:
         return agrupar_cmd()
     if args.comando == "calibrar-agrupamento":
         return calibrar_agrupamento_cmd()
+    if args.comando == "qualificar":
+        return qualificar_cmd(args.limite)
+    if args.comando == "cartao":
+        return cartao_cmd(args.assunto_id)
     if args.comando == "copiar-banco":
         return copiar_banco(args.destino)
     if args.comando == "restaurar-backup":

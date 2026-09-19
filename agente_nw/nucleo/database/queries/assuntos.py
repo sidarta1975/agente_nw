@@ -7,6 +7,7 @@ import struct
 import sqlite_vec
 
 from agente_nw.nucleo.modelos.assunto import Assunto, StatusAssunto
+from agente_nw.nucleo.vetores import cosseno
 
 _COLUNAS = (
     "id, titulo_gerado, primeiro_visto, ultimo_visto, n_itens, n_fontes_independentes, "
@@ -129,3 +130,53 @@ def obter_centroide(conexao: sqlite3.Connection, assunto_id: int) -> list[float]
         "SELECT centroide FROM vetor_assunto WHERE assunto_id = ?", (assunto_id,)
     ).fetchone()
     return _desserializar(linha["centroide"]) if linha is not None else None
+
+
+def listar_candidatos_qualificacao(conexao: sqlite3.Connection, limite: int) -> list[Assunto]:
+    linhas_temas = conexao.execute(
+        "SELECT DISTINCT vt.embedding FROM perfil_tema pt "
+        "JOIN perfil p ON p.id = pt.perfil_id "
+        "JOIN vetor_tema vt ON vt.tema_id = pt.tema_id "
+        "WHERE p.tipo = 'usuario' OR p.ativo = 1"
+    ).fetchall()
+    embeddings_temas = [_desserializar(linha["embedding"]) for linha in linhas_temas]
+    if not embeddings_temas:
+        return []
+
+    colunas_assunto = ", ".join(f"a.{coluna}" for coluna in _COLUNAS.split(", "))
+    linhas_assuntos = conexao.execute(
+        f"SELECT {colunas_assunto}, va.centroide AS centroide FROM assunto a "
+        "JOIN vetor_assunto va ON va.assunto_id = a.id "
+        "WHERE a.substancial IS NULL ORDER BY a.id"
+    ).fetchall()
+
+    candidatos: list[tuple[float, Assunto]] = []
+    for linha in linhas_assuntos:
+        centro = _desserializar(linha["centroide"])
+        melhor = max(cosseno(centro, embedding_tema) for embedding_tema in embeddings_temas)
+        candidatos.append((melhor, _para_assunto(linha)))
+
+    candidatos.sort(key=lambda par: par[0], reverse=True)
+    return [assunto for _, assunto in candidatos[:limite]]
+
+
+def gravar_titulo(conexao: sqlite3.Connection, assunto_id: int, titulo: str) -> None:
+    conexao.execute("UPDATE assunto SET titulo_gerado = ? WHERE id = ?", (titulo, assunto_id))
+
+
+def gravar_qualificacao(
+    conexao: sqlite3.Connection,
+    assunto_id: int,
+    substancial: float,
+    conversavel: float,
+    justificativa: str,
+    temas_ids: list[int],
+) -> None:
+    conexao.execute(
+        "UPDATE assunto SET substancial = ?, conversavel = ?, justificativa = ?, temas = ? WHERE id = ?",
+        (substancial, conversavel, justificativa, json.dumps(temas_ids), assunto_id),
+    )
+
+
+def gravar_cartao(conexao: sqlite3.Connection, assunto_id: int, resumo_cartao: str) -> None:
+    conexao.execute("UPDATE assunto SET resumo_cartao = ? WHERE id = ?", (resumo_cartao, assunto_id))
