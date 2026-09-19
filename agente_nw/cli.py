@@ -13,6 +13,8 @@ import yaml
 from pydantic import ValidationError
 
 from agente_nw.coleta.rss import leitor
+from agente_nw.nucleo.agrupamento import agrupador
+from agente_nw.nucleo.agrupamento import calibracao as calibracao_agrupamento
 from agente_nw.nucleo.database import backup, conexao
 from agente_nw.nucleo.database.queries import perfil_tema, perfis, sistema
 from agente_nw.nucleo.database.queries import temas as queries_temas
@@ -25,6 +27,8 @@ from config.container import (
     RAIZ,
     banco,
     caminho_banco,
+    caminho_limiares_yaml,
+    caminho_pasta_adr,
     caminho_pasta_backups,
     caminho_sentinela,
     configuracao,
@@ -38,7 +42,6 @@ COMANDOS_RESERVADOS: dict[str, int] = {
     "ciclo": 12,
     "exportar-menu": 11,
     "ler-marcacoes": 11,
-    "calibrar-agrupamento": 7,
     "calibrar-conector": 9,
 }
 
@@ -297,6 +300,34 @@ def processar_fila_cmd() -> int:
     return 0
 
 
+def agrupar_cmd() -> int:
+    cfg = configuracao()
+    data_referencia = datetime.now(UTC).isoformat()
+    resumo = agrupador.agrupar(llm(), banco(), cfg.limiares, caminho_sentinela(), data_referencia)
+
+    print(f"Itens embeddados: {resumo.itens_embeddados}")
+    print(f"Assuntos criados: {resumo.assuntos_criados}")
+    print(f"Itens vinculados: {resumo.itens_vinculados}")
+    print(f"Republicações: {resumo.republicacoes}")
+    print(f"Assuntos reabertos: {resumo.assuntos_reabertos}")
+    print(f"Assuntos encerrados: {resumo.assuntos_encerrados}")
+    print(f"Assuntos divididos: {resumo.assuntos_divididos}")
+    return 0
+
+
+def calibrar_agrupamento_cmd() -> int:
+    caminho_adr = caminho_pasta_adr() / "adr-0001-limiar-agrupamento.md"
+    resumo = calibracao_agrupamento.calibrar(llm(), banco(), caminho_limiares_yaml(), caminho_adr)
+
+    print(f"Pares na banda de dúvida amostrados: {resumo.pares_na_banda}")
+    print(f"Pares de controle amostrados: {resumo.pares_controle}")
+    print(f"Pares avaliados pelo qwen3:8b: {resumo.pares_avaliados}")
+    print(f"Limiar anterior: {resumo.limiar_anterior}")
+    print(f"Limiar novo: {resumo.limiar_novo}")
+    print(f"ADR escrito em: {resumo.caminho_adr}")
+    return 0
+
+
 def importar_agenda_cmd(fonte: str, arquivo: str | None) -> int:
     if fonte == "macos":
         if not agenda_macos.solicitar_permissao():
@@ -444,6 +475,8 @@ def _montar_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("backup")
     subparsers.add_parser("coletar")
     subparsers.add_parser("processar-fila")
+    subparsers.add_parser("agrupar")
+    subparsers.add_parser("calibrar-agrupamento")
 
     copiar_banco_parser = subparsers.add_parser("copiar-banco")
     copiar_banco_parser.add_argument("destino")
@@ -490,6 +523,10 @@ def main(argv: list[str] | None = None) -> int:
         return coletar()
     if args.comando == "processar-fila":
         return processar_fila_cmd()
+    if args.comando == "agrupar":
+        return agrupar_cmd()
+    if args.comando == "calibrar-agrupamento":
+        return calibrar_agrupamento_cmd()
     if args.comando == "copiar-banco":
         return copiar_banco(args.destino)
     if args.comando == "restaurar-backup":

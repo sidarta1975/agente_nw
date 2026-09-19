@@ -40,7 +40,7 @@ def configuracao() -> ConfiguracaoCarregada:
 
 @functools.lru_cache(maxsize=1)
 def http() -> httpx.Client:
-    return httpx.Client(timeout=30.0)
+    return httpx.Client(timeout=120.0)
 
 
 @functools.lru_cache(maxsize=1)
@@ -61,6 +61,14 @@ def caminho_pasta_backups() -> Path:
 
 def caminho_sentinela() -> Path:
     return RAIZ / "dados" / "PARE"
+
+
+def caminho_limiares_yaml() -> Path:
+    return RAIZ / "config" / "limiares.yaml"
+
+
+def caminho_pasta_adr() -> Path:
+    return RAIZ / "docs" / "adr"
 
 
 @functools.lru_cache(maxsize=1)

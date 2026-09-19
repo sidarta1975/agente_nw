@@ -1,7 +1,7 @@
 agrupamento:
-  cosseno_mesmo_assunto: 0.82     # calibrar no brief 007
+  cosseno_mesmo_assunto: 0.77     # calibrar no brief 007
   cosseno_republicacao: 0.94
-  divergencia_minima_fonte_independente: 0.30
+  divergencia_minima_fonte_independente: 0.08
   janela_dias: 7
   itens_para_dividir: 12
 qualificacao:

@@ -57,9 +57,9 @@ def test_perfil_sem_campo_think_e_recusado() -> None:
 
 def test_limiares_carrega_e_tem_todas_as_chaves() -> None:
     limiares = Limiares.model_validate(_carregar(RAIZ / "config" / "limiares.yaml"))
-    assert limiares.agrupamento.cosseno_mesmo_assunto == 0.82
+    assert limiares.agrupamento.cosseno_mesmo_assunto == 0.77
     assert limiares.agrupamento.cosseno_republicacao == 0.94
-    assert limiares.agrupamento.divergencia_minima_fonte_independente == 0.30
+    assert limiares.agrupamento.divergencia_minima_fonte_independente == 0.08
     assert limiares.agrupamento.janela_dias == 7
     assert limiares.agrupamento.itens_para_dividir == 12
     assert limiares.qualificacao.substancial_minimo == 0.6
