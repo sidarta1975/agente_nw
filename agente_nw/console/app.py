@@ -10,7 +10,14 @@ from flask import Flask, abort, g, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
 
 from agente_nw.nucleo.database import conexao, migracoes
-from agente_nw.nucleo.database.queries import assunto_contato, assuntos, fila_extracao, perfil_tema, perfis
+from agente_nw.nucleo.database.queries import (
+    assunto_contato,
+    assuntos,
+    fila_extracao,
+    perfil_tema,
+    perfis,
+    redes_sociais,
+)
 from agente_nw.nucleo.database.queries import temas as queries_temas
 from agente_nw.nucleo.llm import ClienteOllama
 from agente_nw.nucleo.modelos.assunto import Assunto
@@ -97,12 +104,14 @@ def criar_app(
         tags_com_tema = [(tag, queries_temas.obter_por_id(conn, tag.tema_id)) for tag in tags]
         confirmadas = [(tag, tema) for tag, tema in tags_com_tema if tag.confirmado]
         nao_confirmadas = [(tag, tema) for tag, tema in tags_com_tema if not tag.confirmado]
+        redes = redes_sociais.listar_por_perfil(conn, perfil_id)
         return render_template(
             "ficha.html",
             perfil=perfil,
             campos=campos,
             confirmadas=confirmadas,
             nao_confirmadas=nao_confirmadas,
+            redes=redes,
         )
 
     @app.route("/contatos/<int:perfil_id>/confirmar-tags", methods=["POST"])
@@ -190,6 +199,55 @@ def criar_app(
         assunto_contato.marcar_nao_serve(conn, ac_id, motivo)
         conn.commit()
         return redirect(url_for("menu_contato", perfil_id=perfil_id))
+
+    def _validar_link(link: str) -> bool:
+        return link.startswith("http://") or link.startswith("https://")
+
+    @app.route("/contatos/<int:perfil_id>/redes-sociais/adicionar", methods=["POST"])
+    def adicionar_rede_social_contato(perfil_id: int) -> Response:
+        conn = _conn()
+        _perfil_ou_404(perfil_id)
+        rede = request.form.get("rede", "").strip()
+        link = request.form.get("link", "").strip()
+        if rede and link and _validar_link(link):
+            redes_sociais.inserir(conn, perfil_id, rede, link, datetime.now(UTC).isoformat())
+            conn.commit()
+        return redirect(url_for("ficha", perfil_id=perfil_id))
+
+    @app.route("/contatos/<int:perfil_id>/redes-sociais/<int:rede_social_id>/remover", methods=["POST"])
+    def remover_rede_social_contato(perfil_id: int, rede_social_id: int) -> Response:
+        conn = _conn()
+        _perfil_ou_404(perfil_id)
+        redes_sociais.remover(conn, rede_social_id)
+        conn.commit()
+        return redirect(url_for("ficha", perfil_id=perfil_id))
+
+    @app.route("/eu")
+    def eu() -> str:
+        conn = _conn()
+        usuario = _usuario()
+        assert usuario.id is not None
+        redes = redes_sociais.listar_por_perfil(conn, usuario.id)
+        return render_template("eu.html", usuario=usuario, redes=redes)
+
+    @app.route("/eu/redes-sociais/adicionar", methods=["POST"])
+    def adicionar_rede_social_usuario() -> Response:
+        conn = _conn()
+        usuario = _usuario()
+        assert usuario.id is not None
+        rede = request.form.get("rede", "").strip()
+        link = request.form.get("link", "").strip()
+        if rede and link and _validar_link(link):
+            redes_sociais.inserir(conn, usuario.id, rede, link, datetime.now(UTC).isoformat())
+            conn.commit()
+        return redirect(url_for("eu"))
+
+    @app.route("/eu/redes-sociais/<int:rede_social_id>/remover", methods=["POST"])
+    def remover_rede_social_usuario(rede_social_id: int) -> Response:
+        conn = _conn()
+        redes_sociais.remover(conn, rede_social_id)
+        conn.commit()
+        return redirect(url_for("eu"))
 
     @app.route("/temas")
     def temas_lista() -> str:

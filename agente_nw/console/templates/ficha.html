@@ -60,6 +60,29 @@
     <p class="vazio">Nenhuma pendente.</p>
   {% endif %}
 
+  <h2>Redes sociais</h2>
+  {% if redes %}
+    <ul class="simples" style="list-style: none; padding-left: 0;">
+      {% for rs in redes %}
+        <li>
+          <strong>{{ rs.rede }}</strong> — <a class="item-link" href="{{ rs.link }}" target="_blank" rel="noopener noreferrer">{{ rs.link }}</a>
+          <form class="acao" method="post" action="{{ url_for('remover_rede_social_contato', perfil_id=perfil.id, rede_social_id=rs.id) }}">
+            <button type="submit" class="perigo">Remover</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="vazio">Nenhuma cadastrada.</p>
+  {% endif %}
+  <form class="bloco" method="post" action="{{ url_for('adicionar_rede_social_contato', perfil_id=perfil.id) }}">
+    <label for="rede-{{ perfil.id }}">Rede</label>
+    <input id="rede-{{ perfil.id }}" type="text" name="rede" placeholder="instagram, linkedin, facebook, x, outro">
+    <label for="link-{{ perfil.id }}">Link (https://…)</label>
+    <input id="link-{{ perfil.id }}" type="text" name="link" placeholder="https://…">
+    <p><button type="submit">Adicionar rede social</button></p>
+  </form>
+
   <h2>Adicionar texto</h2>
   <form class="bloco" method="post" action="{{ url_for('adicionar_texto', perfil_id=perfil.id) }}">
     <textarea name="texto" placeholder="Cole ou digite um texto sobre este contato…"></textarea>
