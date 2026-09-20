@@ -43,16 +43,14 @@ agente_nw/
 │   │   └── saidas/           # cartão, menu, exportação Markdown
 │   ├── coleta/
 │   │   ├── rss/              # feedparser, trafilatura, canonicalização, google news
-│   │   └── capturas/         # (Etapa 2) recepção do que vem da extensão
+│   │   └── capturas/         # recepção do que vem da leitura de rede social sob demanda
 │   ├── perfil/                # importação da agenda, extração de texto, lacunas, centróide de perfil
 │   ├── console/                # Flask + templates + estáticos
 │   └── integracoes/          # (Etapa 3)
-├── extensao/                 # (Etapa 2) extensão do Chrome
 ├── scripts/
 │   ├── migracoes/             # 001_inicial.sql, 002_..., aplicados em ordem
 │   ├── instalar_macos.sh
-│   ├── verificar.sh          # ruff + mypy --strict + pytest
-│   └── launchd/               # plists: ollama e ciclo
+│   └── verificar.sh          # ruff + mypy --strict + pytest
 ├── docs/                      # fora do git, exceto o que a governança listar
 ├── dados/                     # agente.db, backups/ — fora do git
 ├── saidas/                    # menu_AAAA-MM-DD.md — fora do git
@@ -60,21 +58,21 @@ agente_nw/
 └── tests/
 ```
 
-Nome do pacote e da pasta é sempre `agente_nw` — nunca `agente_relacionamento`. Desvio de nomenclatura é corrigido imediatamente.
+Nome do pacote e da pasta é sempre `agente_nw`. Desvio de nomenclatura é corrigido imediatamente.
 
 ## 3. Stack
 
 - Python 3.12 do Homebrew; Bash para utilitários.
 - SQLite em modo WAL, `busy_timeout` e `foreign_keys` ligados, arquivo único em `dados/agente.db`. Nunca compartilhado entre processos. `sqlite-vec` carregado na abertura da conexão.
-- Ollama para inferência local, `http://localhost:11434`, subido pelo LaunchAgent do projeto (`scripts/launchd/br.agente_nw.ollama.plist`) — nunca pelo aplicativo do Ollama. Modelo por tarefa definido em `config/llm_routing.yaml` — verificar com `ollama list` antes de sugerir download. `qwen3:4b` com modo de raciocínio desligado (`think: false`) obrigatório em toda chamada, e `bge-m3` para embeddings. Dois modelos carregados ao mesmo tempo (`OLLAMA_MAX_LOADED_MODELS=2`, `OLLAMA_KEEP_ALIVE=30m`).
+- Ollama para inferência local, `http://localhost:11434`, subido pelo próprio usuário fora do aplicativo do Ollama. Modelo por tarefa definido em `config/llm_routing.yaml` — verificar com `ollama list` antes de sugerir download. `qwen3:4b` com modo de raciocínio desligado (`think: false`) é o único modelo de geração e julgamento; `bge-m3` para embeddings. `qwen3:8b` só é carregado por `agente_nw calibrar-agrupamento`, procedimento manual e esporádico. Dois modelos carregados ao mesmo tempo (`OLLAMA_MAX_LOADED_MODELS=2`, `OLLAMA_KEEP_ALIVE=30m`).
 - Embeddings: `bge-m3` (1024 dimensões, multilíngue).
 - Índice vetorial: `sqlite-vec`, no mesmo arquivo do banco.
 - Contratos: Pydantic v2 com `frozen=True`.
 - Arquitetura hexagonal; dependências via `config/container.py`.
 - Saída estruturada do LLM sempre em modo JSON com esquema (`format: json`); `num_ctx` explícito em toda chamada.
 - Interface: console web local em `console/`, Flask, `http://localhost:8765`, só em `127.0.0.1`.
-- Coleta em rede social: extensão própria do Chrome (`extensao/`, manifest v3), sempre sob demanda (Etapa 2).
-- Agendamento: `launchd` (macOS), com recuperação de execução perdida. Nunca laço infinito em processo.
+- Coleta em rede social: automação de navegador (Playwright), aberta na hora da consulta, com a sessão do próprio usuário, um contato por chamada.
+- Agendamento: não existe. Nenhuma tarefa periódica. Toda execução é disparada explicitamente por Sidarta pelo console ou pela CLI.
 - Testes: pytest. Tipagem: mypy strict. Lint: ruff. Suíte roda via `scripts/verificar.sh`, sempre por Sidarta no terminal — nunca pelo executor.
 
 ## 4. Regras de alteração
@@ -99,17 +97,15 @@ Nome do pacote e da pasta é sempre `agente_nw` — nunca `agente_relacionamento
 
 ## 6. Tarefas não assistidas
 
-Podem rodar sem supervisão: coleta RSS, extração, geração de embeddings, agrupamento, qualificação, cruzamento, cartão do assunto.
+Não existem. Nenhuma etapa do sistema — coleta RSS, extração, agrupamento, qualificação, cruzamento, cartão, leitura de rede social, geração do menu — roda sem que Sidarta a dispare explicitamente pelo console ou pela CLI. Cada disparo é isolado, corresponde a uma consulta com contexto e escreve no banco quando termina.
 
-Requisitos: idempotência e retomada, log em arquivo, kill switch por arquivo sentinela, shards disjuntos se houver mais de um processo, SQLite nunca compartilhado.
+Requisitos que continuam valendo em toda execução, mesmo sob demanda: idempotência e retomada, log em arquivo, SQLite nunca compartilhado entre processos, desenvolvimento sempre em cópia (`agente_nw copiar-banco`) — o banco real só é tocado por operação autorizada por Sidarta.
 
-Durante uma medição de aceite, o único processo que escreve em `dados/agente.db` é o ciclo. Desenvolvimento usa cópia (`agente_nw copiar-banco`).
-
-**Nunca rodam sozinhos:** git, coleta em rede social (sempre disparada pelo usuário, um contato por vez), alteração de ficha de contato, a suíte de testes padrão (`scripts/verificar.sh`, pytest, ruff, mypy) — o executor escreve e mantém o script; quem roda é Sidarta, no terminal dele.
+**Nunca rodam sozinhos:** git, leitura de rede social, alteração de ficha de contato, a suíte de testes padrão (`scripts/verificar.sh`, pytest, ruff, mypy) — o executor escreve e mantém o script; quem roda é Sidarta, no terminal dele.
 
 ## 7. Comportamento do software
 
-O sistema classifica e cruza; o usuário confirma tags e marca o menu. Não existe geração nem envio de mensagem. Nunca rodam sozinhos: git, coleta em rede social, alteração de ficha de contato.
+O usuário aciona uma consulta para um contato específico com um contexto (motivo, ocasião, o que quer descobrir). O sistema busca em paralelo notícia filtrada pelos temas do contato, faz uma leitura de rede social por automação de navegador com a sessão do próprio usuário e usa o que já está registrado sobre o contato; o motor de cruzamento avalia os candidatos, monta um menu de assuntos com o "por quê" de cada um, e grava a resposta no histórico permanente daquele contato. Não existe geração nem envio de mensagem: o usuário decide o que fazer com o menu. Nunca rodam sozinhos: git, leitura de rede social, alteração de ficha de contato.
 
 ## 8. Relatório final obrigatório
 
