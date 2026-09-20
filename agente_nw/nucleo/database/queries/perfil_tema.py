@@ -54,6 +54,13 @@ def confirmar(conexao: sqlite3.Connection, perfil_id: int, tema_id: int) -> None
     )
 
 
+def atualizar_nivel(conexao: sqlite3.Connection, perfil_id: int, tema_id: int, nivel: NivelTema) -> None:
+    conexao.execute(
+        "UPDATE perfil_tema SET nivel = ? WHERE perfil_id = ? AND tema_id = ?",
+        (nivel, perfil_id, tema_id),
+    )
+
+
 def listar_por_perfil(conexao: sqlite3.Connection, perfil_id: int) -> list[PerfilTema]:
     linhas = conexao.execute(
         f"SELECT {_COLUNAS} FROM perfil_tema WHERE perfil_id = ? ORDER BY tema_id",

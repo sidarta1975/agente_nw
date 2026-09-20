@@ -65,6 +65,13 @@ def listar(conexao: sqlite3.Connection) -> list[Tema]:
     return [_para_tema(linha) for linha in linhas]
 
 
+def atualizar(conexao: sqlite3.Connection, tema_id: int, descricao: str, sinonimos: list[str]) -> None:
+    conexao.execute(
+        "UPDATE tema SET descricao = ?, sinonimos = ? WHERE id = ?",
+        (descricao, json.dumps(sinonimos, ensure_ascii=False), tema_id),
+    )
+
+
 def gravar_embedding(conexao: sqlite3.Connection, tema_id: int, embedding: list[float]) -> None:
     vetor = sqlite_vec.serialize_float32(embedding)
     conexao.execute("DELETE FROM vetor_tema WHERE tema_id = ?", (tema_id,))

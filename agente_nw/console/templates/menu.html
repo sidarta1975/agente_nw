@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block titulo %}menu{% endblock %}
+
+{% macro acoes_item(perfil, registro, motivos) %}
+  <form class="acao" method="post" action="{{ url_for('marcar_usado_rota', perfil_id=perfil.id, ac_id=registro.id) }}">
+    <button type="submit">usei</button>
+  </form>
+  {% for texto, codigo in motivos %}
+    <form class="acao" method="post" action="{{ url_for('marcar_nao_serve_rota', perfil_id=perfil.id, ac_id=registro.id) }}">
+      <input type="hidden" name="motivo" value="{{ codigo }}">
+      <button type="submit" class="perigo">não serve: {{ texto }}</button>
+    </form>
+  {% endfor %}
+{% endmacro %}
+
+{% block conteudo %}
+{% if modo == "lista" %}
+  <h1>Menu do dia</h1>
+  {% if perfis %}
+    <ul class="simples">
+      {% for perfil in perfis %}
+        <li><a class="item-link" href="{{ url_for('menu_contato', perfil_id=perfil.id) }}">{{ perfil.apelido or perfil.nome }}</a></li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="vazio">Nenhum contato com menu gerado hoje.</p>
+  {% endif %}
+
+{% else %}
+  <h1>Menu — {{ perfil.apelido or perfil.nome }}</h1>
+
+  <h2>Conectores</h2>
+  {% if conectores %}
+    {% for registro, assunto in conectores %}
+      <div class="cartao">
+        <strong>{{ assunto.titulo_gerado if assunto else "(sem título)" }}</strong>
+        <p class="por-que">{{ registro.por_que or "(não gerado)" }}</p>
+        {{ acoes_item(perfil, registro, motivos) }}
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="vazio">Nenhum conector hoje.</p>
+  {% endif %}
+
+  <h2>Viáveis com esforço</h2>
+  {% if viaveis %}
+    {% for registro, assunto in viaveis %}
+      <div class="cartao">
+        <strong>{{ assunto.titulo_gerado if assunto else "(sem título)" }}</strong>
+        <p class="por-que">{{ registro.por_que or "(não gerado)" }}</p>
+        <details open>
+          <summary>Cartão</summary>
+          <p>{{ (assunto.resumo_cartao if assunto else None) or "(não gerado)" }}</p>
+        </details>
+        {{ acoes_item(perfil, registro, motivos) }}
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="vazio">Nenhum viável com esforço hoje.</p>
+  {% endif %}
+
+  <details>
+    <summary>Fora do domínio ({{ descartados|length }})</summary>
+    {% if descartados %}
+      <ul class="simples">
+        {% for registro, assunto in descartados %}
+          <li>{{ assunto.titulo_gerado if assunto else "(sem título)" }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="vazio">Nenhum.</p>
+    {% endif %}
+  </details>
+{% endif %}
+{% endblock %}

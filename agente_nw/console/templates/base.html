@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <title>agente_nw — {% block titulo %}console{% endblock %}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 4rem;
+      color: #1a1a1a;
+      background: #fafafa;
+      line-height: 1.45;
+    }
+    nav {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 2px solid #222;
+    }
+    nav a {
+      font-weight: 600;
+      text-decoration: none;
+      color: #222;
+    }
+    nav a:hover { text-decoration: underline; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1.1rem; margin-top: 2rem; border-top: 1px solid #ddd; padding-top: 1rem; }
+    h3 { font-size: 1rem; color: #444; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+    th, td { text-align: left; padding: 0.4rem 0.5rem; border-bottom: 1px solid #e0e0e0; }
+    th { color: #666; font-weight: 600; font-size: 0.85rem; }
+    a.item-link { color: #0645ad; text-decoration: none; }
+    a.item-link:hover { text-decoration: underline; }
+    .selo { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 1rem; font-size: 0.75rem; }
+    .selo-ativo { background: #d7f0d7; color: #1a5c1a; }
+    .selo-inativo { background: #eee; color: #777; }
+    .lacunas { color: #a05a00; font-size: 0.85rem; }
+    .cartao {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 0.4rem;
+      padding: 0.75rem 1rem;
+      margin: 0.5rem 0 1rem;
+    }
+    .por-que { color: #444; font-style: italic; margin: 0.25rem 0 0.5rem; }
+    form.acao { display: inline; margin-right: 0.4rem; }
+    form.bloco { margin: 0.75rem 0; }
+    button {
+      font: inherit;
+      padding: 0.3rem 0.7rem;
+      border-radius: 0.3rem;
+      border: 1px solid #999;
+      background: #f0f0f0;
+      cursor: pointer;
+    }
+    button:hover { background: #e4e4e4; }
+    button.primario { background: #222; color: #fff; border-color: #222; }
+    button.primario:hover { background: #444; }
+    button.perigo { color: #8a1f1f; }
+    input[type="text"], textarea, select {
+      font: inherit;
+      padding: 0.35rem 0.5rem;
+      border: 1px solid #bbb;
+      border-radius: 0.3rem;
+      width: 100%;
+      max-width: 32rem;
+    }
+    textarea { min-height: 3.5rem; }
+    label { display: block; margin: 0.6rem 0 0.2rem; font-size: 0.85rem; color: #444; }
+    details { margin: 0.4rem 0; }
+    summary { cursor: pointer; font-weight: 600; }
+    .vazio { color: #888; font-style: italic; }
+    ul.simples { padding-left: 1.2rem; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="{{ url_for('contatos') }}">Contatos</a>
+    <a href="{{ url_for('menu_lista') }}">Menu</a>
+    <a href="{{ url_for('temas_lista') }}">Temas</a>
+  </nav>
+  {% block conteudo %}{% endblock %}
+</body>
+</html>

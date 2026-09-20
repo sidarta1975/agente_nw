@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block titulo %}{{ perfil.apelido or perfil.nome }}{% endblock %}
+{% block conteudo %}
+  <h1>{{ perfil.apelido or perfil.nome }}</h1>
+  <p>
+    {% if perfil.ativo %}<span class="selo selo-ativo">ativo</span>{% else %}<span class="selo selo-inativo">inativo</span>{% endif %}
+    {% if perfil.telefone %} · {{ perfil.telefone }}{% endif %}
+    {% if perfil.email %} · {{ perfil.email }}{% endif %}
+  </p>
+
+  {% if not perfil.ativo %}
+    <form class="bloco" method="post" action="{{ url_for('ativar', perfil_id=perfil.id) }}">
+      <button type="submit" class="primario">Ativar contato</button>
+    </form>
+  {% endif %}
+
+  <h2>Campos</h2>
+  <table>
+    <tbody>
+      {% for campo, valor, vazio in campos %}
+        <tr>
+          <th>{{ campo }}</th>
+          {% if vazio %}
+            <td class="lacunas">(vazio)</td>
+          {% else %}
+            <td>{{ valor }}</td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Tags confirmadas</h2>
+  {% if confirmadas %}
+    <ul class="simples">
+      {% for tag, tema in confirmadas %}
+        <li>{{ tema.nome if tema else "tema #" ~ tag.tema_id }} — peso {{ tag.peso }}, origem {{ tag.origem }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="vazio">Nenhuma ainda.</p>
+  {% endif %}
+
+  <h2>Tags não confirmadas</h2>
+  {% if nao_confirmadas %}
+    <form method="post" action="{{ url_for('confirmar_tags', perfil_id=perfil.id) }}">
+      <ul class="simples" style="list-style: none; padding-left: 0;">
+        {% for tag, tema in nao_confirmadas %}
+          <li>
+            <label style="display: inline; margin: 0;">
+              <input type="checkbox" name="tema_id" value="{{ tag.tema_id }}">
+              {{ tema.nome if tema else "tema #" ~ tag.tema_id }} — peso {{ tag.peso }}, origem {{ tag.origem }}
+            </label>
+          </li>
+        {% endfor %}
+      </ul>
+      <button type="submit" class="primario">Confirmar marcadas</button>
+    </form>
+  {% else %}
+    <p class="vazio">Nenhuma pendente.</p>
+  {% endif %}
+
+  <h2>Adicionar texto</h2>
+  <form class="bloco" method="post" action="{{ url_for('adicionar_texto', perfil_id=perfil.id) }}">
+    <textarea name="texto" placeholder="Cole ou digite um texto sobre este contato…"></textarea>
+    <p><button type="submit">Adicionar</button></p>
+  </form>
+
+  <h2>Menu</h2>
+  <form class="bloco" method="post" action="{{ url_for('gerar_menu', perfil_id=perfil.id) }}">
+    <button type="submit" class="primario">Gerar menu agora</button>
+  </form>
+{% endblock %}

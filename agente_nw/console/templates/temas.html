@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block titulo %}temas{% endblock %}
+{% block conteudo %}
+  <h1>Temas</h1>
+
+  {% if confirmados %}
+    {% for tema, vinculo in confirmados %}
+      <div class="cartao">
+        <h3>{{ tema.nome }}</h3>
+
+        <form method="post" action="{{ url_for('atualizar_tema', tema_id=tema.id) }}">
+          <label for="descricao-{{ tema.id }}">Descrição</label>
+          <textarea id="descricao-{{ tema.id }}" name="descricao">{{ tema.descricao }}</textarea>
+          <label for="sinonimos-{{ tema.id }}">Sinônimos (separados por vírgula)</label>
+          <input id="sinonimos-{{ tema.id }}" type="text" name="sinonimos" value="{{ tema.sinonimos|join(', ') }}">
+          <p><button type="submit">Salvar</button></p>
+        </form>
+
+        <form method="post" action="{{ url_for('atualizar_nivel_tema', tema_id=tema.id) }}">
+          <label for="nivel-{{ tema.id }}">Nível</label>
+          <select id="nivel-{{ tema.id }}" name="nivel">
+            {% for nivel in niveis %}
+              <option value="{{ nivel }}" {% if nivel == vinculo.nivel %}selected{% endif %}>{{ nivel }}</option>
+            {% endfor %}
+          </select>
+          <p><button type="submit">Salvar nível</button></p>
+        </form>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="vazio">Nenhum tema confirmado ainda.</p>
+  {% endif %}
+
+  <h2>Sugestões pendentes</h2>
+  {% if pendentes %}
+    <ul class="simples" style="list-style: none; padding-left: 0;">
+      {% for tema, vinculo in pendentes %}
+        <li class="bloco">
+          {{ tema.nome }}
+          <form class="acao" method="post" action="{{ url_for('confirmar_tema_pendente', tema_id=tema.id) }}">
+            <button type="submit">Confirmar</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="vazio">Nenhuma pendente.</p>
+  {% endif %}
+{% endblock %}

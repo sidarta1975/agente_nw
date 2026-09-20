@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block titulo %}contatos{% endblock %}
+{% block conteudo %}
+  <h1>Contatos</h1>
+  {% if linhas %}
+    <table>
+      <thead>
+        <tr><th>Nome</th><th>Lacunas</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for perfil, n_lacunas in linhas %}
+          <tr>
+            <td><a class="item-link" href="{{ url_for('ficha', perfil_id=perfil.id) }}">{{ perfil.apelido or perfil.nome }}</a></td>
+            <td>{% if n_lacunas %}<span class="lacunas">{{ n_lacunas }} campo(s) faltando</span>{% else %}—{% endif %}</td>
+            <td>
+              {% if perfil.ativo %}
+                <span class="selo selo-ativo">ativo</span>
+              {% else %}
+                <span class="selo selo-inativo">inativo</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="vazio">Nenhum contato importado ainda.</p>
+  {% endif %}
+{% endblock %}

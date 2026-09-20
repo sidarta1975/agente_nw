@@ -20,6 +20,7 @@ import yaml
 from pydantic import ValidationError
 
 from agente_nw.coleta.rss import leitor
+from agente_nw.console.app import criar_app
 from agente_nw.nucleo.agrupamento import agrupador
 from agente_nw.nucleo.agrupamento import calibracao as calibracao_agrupamento
 from agente_nw.nucleo.agrupamento.agrupador import ClienteEmbeddagem
@@ -816,6 +817,21 @@ def confirmar_tags_cmd(telefone: str, todas: bool, ids: str | None) -> int:
     return 0
 
 
+def console_cmd(caminho_banco_str: str, porta: int) -> int:
+    caminho_banco_console = Path(caminho_banco_str)
+    if not caminho_banco_console.exists():
+        print(f"FALHA: {caminho_banco_console} não existe")
+        return 1
+
+    cfg = configuracao()
+    caminho_log_llm = RAIZ / "dados" / "logs" / "console_chamadas_llm.jsonl"
+    app = criar_app(
+        caminho_banco_console, caminho_log_llm, cfg.roteamento, cfg.limiares, cfg.local.ollama_url
+    )
+    app.run(host="127.0.0.1", port=porta)
+    return 0
+
+
 def _comando_reservado(nome: str, brief: int) -> int:
     print(f"'{nome}' disponível a partir do brief {brief:03d}")
     return 0
@@ -883,6 +899,10 @@ def _montar_parser() -> argparse.ArgumentParser:
     grupo_confirmar.add_argument("--todas", action="store_true")
     grupo_confirmar.add_argument("--ids")
 
+    console_parser = subparsers.add_parser("console")
+    console_parser.add_argument("--banco", required=True)
+    console_parser.add_argument("--porta", type=int, default=8765)
+
     for nome in COMANDOS_RESERVADOS:
         subparsers.add_parser(nome)
 
@@ -937,6 +957,8 @@ def main(argv: list[str] | None = None) -> int:
         return ativar_cmd(args.telefone)
     if args.comando == "confirmar-tags":
         return confirmar_tags_cmd(args.telefone, args.todas, args.ids)
+    if args.comando == "console":
+        return console_cmd(args.banco, args.porta)
     if args.comando in COMANDOS_RESERVADOS:
         return _comando_reservado(args.comando, COMANDOS_RESERVADOS[args.comando])
 

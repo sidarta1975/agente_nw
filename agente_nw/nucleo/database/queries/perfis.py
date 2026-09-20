@@ -125,6 +125,11 @@ def listar_ativos(conexao: sqlite3.Connection) -> list[Perfil]:
     return [_para_perfil(linha) for linha in linhas]
 
 
+def listar_todos(conexao: sqlite3.Connection) -> list[Perfil]:
+    linhas = conexao.execute(f"SELECT {_COLUNAS} FROM perfil WHERE tipo = 'contato' ORDER BY nome").fetchall()
+    return [_para_perfil(linha) for linha in linhas]
+
+
 _CAMPOS_GUIADOS = (
     "cidade",
     "naturalidade",
