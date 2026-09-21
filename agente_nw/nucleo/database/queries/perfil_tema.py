@@ -61,6 +61,13 @@ def atualizar_nivel(conexao: sqlite3.Connection, perfil_id: int, tema_id: int, n
     )
 
 
+def desvincular(conexao: sqlite3.Connection, perfil_id: int, tema_id: int) -> bool:
+    cursor = conexao.execute(
+        "DELETE FROM perfil_tema WHERE perfil_id = ? AND tema_id = ?", (perfil_id, tema_id)
+    )
+    return cursor.rowcount > 0
+
+
 def listar_por_perfil(conexao: sqlite3.Connection, perfil_id: int) -> list[PerfilTema]:
     linhas = conexao.execute(
         f"SELECT {_COLUNAS} FROM perfil_tema WHERE perfil_id = ? ORDER BY tema_id",

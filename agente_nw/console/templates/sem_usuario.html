@@ -1,17 +1,40 @@
 {% extends "base.html" %}
-{% block titulo %}usuário não configurado{% endblock %}
+{% block titulo %}configurar perfil{% endblock %}
 {% block conteudo %}
-  <h1>Perfil do usuário ainda não configurado</h1>
+  <h1>Configurar perfil do usuário</h1>
   <p>
-    Esta tela precisa do perfil de <strong>usuário</strong> (você) já cadastrado no banco.
-    Ele ainda não existe.
+    Preencha seu nome e ao menos um tema (recomendado: três, em níveis diferentes).
+    Cada tema precisa de nome, uma descrição de pelo menos 8 palavras (usada para embedding), nível e peso.
+    Você pode adicionar, remover e mudar o nível de temas depois em <a class="item-link" href="{{ url_for('temas_lista') }}">/temas</a>.
   </p>
   <p>
-    Para configurar, preencha o arquivo <code>temas.yaml</code> na raiz do projeto
-    (use <code>temas.exemplo.yaml</code> como modelo) e rode no terminal:
+    Alternativa: editar <code>temas.yaml</code> na raiz e rodar <code>agente_nw importar-temas</code> — os dois caminhos gravam pelo mesmo lugar.
   </p>
-  <pre><code>agente_nw importar-temas</code></pre>
-  <p>
-    Isso cria o perfil de usuário com o nome e os temas declarados. Depois recarregue esta página.
-  </p>
+
+  {% if erro %}<p class="lacunas">{{ erro }}</p>{% endif %}
+
+  <form class="bloco" method="post" action="{{ url_for('configurar_perfil_usuario') }}">
+    <label for="nome">Nome do usuário</label>
+    <input id="nome" type="text" name="nome" required>
+
+    <h2>Temas</h2>
+    {% for i in range(quantidade_slots) %}
+      <div class="cartao">
+        <label for="tema_{{ i }}_nome">Tema #{{ i + 1 }} — nome</label>
+        <input id="tema_{{ i }}_nome" type="text" name="tema_{{ i }}_nome">
+        <label for="tema_{{ i }}_descricao">Descrição (≥ 8 palavras)</label>
+        <textarea id="tema_{{ i }}_descricao" name="tema_{{ i }}_descricao"></textarea>
+        <label for="tema_{{ i }}_nivel">Nível</label>
+        <select id="tema_{{ i }}_nivel" name="tema_{{ i }}_nivel">
+          <option value="dominio">domínio</option>
+          <option value="interesse" selected>interesse</option>
+          <option value="curiosidade">curiosidade</option>
+        </select>
+        <label for="tema_{{ i }}_peso">Peso (1 a 5)</label>
+        <input id="tema_{{ i }}_peso" type="number" name="tema_{{ i }}_peso" min="1" max="5" value="3">
+      </div>
+    {% endfor %}
+
+    <p><button type="submit" class="primario">Criar perfil</button></p>
+  </form>
 {% endblock %}

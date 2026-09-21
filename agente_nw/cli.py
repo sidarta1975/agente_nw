@@ -229,28 +229,15 @@ def importar_temas(
             print(f"Termos a ignorar: {', '.join(temas_arquivo.ignorar)}")
         return 0
 
+    from agente_nw.perfil.configurador import salvar_perfil_usuario
+
     conn = conexao_bd if conexao_bd is not None else banco()
     cliente = cliente_llm if cliente_llm is not None else llm()
     agora = datetime.now(UTC).isoformat()
 
-    usuario = perfis.upsert_usuario(conn, temas_arquivo.usuario.nome, agora)
-    assert usuario.id is not None
-    for tema in temas_arquivo.usuario.temas:
-        tema_gravado = queries_temas.obter_ou_criar(conn, tema.nome, tema.descricao, tema.sinonimos, agora)
-        assert tema_gravado.id is not None
-        vetor = cliente.embeddar([f"{tema.nome}: {tema.descricao}"])[0]
-        queries_temas.gravar_embedding(conn, tema_gravado.id, vetor)
-        perfil_tema.vincular(
-            conn,
-            usuario.id,
-            tema_gravado.id,
-            tema.peso,
-            "declarada",
-            tema.nivel,
-            True,
-            agora,
-        )
-    conn.commit()
+    usuario = salvar_perfil_usuario(
+        conn, cliente, temas_arquivo.usuario.nome, temas_arquivo.usuario.temas, agora
+    )
 
     print(f"Usuário: {usuario.nome}")
     print(f"{len(temas_arquivo.usuario.temas)} tema(s) gravados no banco.")

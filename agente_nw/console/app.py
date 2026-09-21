@@ -7,6 +7,7 @@ from typing import cast
 
 import httpx
 from flask import Flask, abort, g, redirect, render_template, request, url_for
+from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
 from agente_nw.coleta.capturas import busca
@@ -23,14 +24,14 @@ from agente_nw.nucleo.database.queries import temas as queries_temas
 from agente_nw.nucleo.llm import ClienteOllama
 from agente_nw.nucleo.modelos.assunto import Assunto
 from agente_nw.nucleo.modelos.assunto_contato import AssuntoContato
-from agente_nw.nucleo.modelos.configuracao import Limiares, NivelTema, Roteamento
+from agente_nw.nucleo.modelos.configuracao import Limiares, NivelTema, Roteamento, TemaUsuario
 from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
 from agente_nw.nucleo.modelos.perfil import Perfil
 from agente_nw.nucleo.modelos.perfil_tema import PerfilTema
 from agente_nw.nucleo.modelos.tema import Tema
 from agente_nw.nucleo.relevancia import cruzamento
 from agente_nw.nucleo.saidas.markdown import _MOTIVOS
-from agente_nw.perfil import extrator
+from agente_nw.perfil import configurador, extrator
 from agente_nw.perfil.lacunas import campos_faltando
 from agente_nw.perfil.normalizacao import telefone_e164
 
@@ -87,8 +88,8 @@ def criar_app(
     def _usuario_ou_none() -> Perfil | None:
         return perfis.obter_usuario(_conn())
 
-    def _sem_usuario() -> str:
-        return render_template("sem_usuario.html")
+    def _sem_usuario(erro: str | None = None) -> str:
+        return render_template("sem_usuario.html", quantidade_slots=5, erro=erro)
 
     def _com_assunto(itens: list[AssuntoContato]) -> list[tuple[AssuntoContato, Assunto | None]]:
         conn = _conn()
@@ -450,6 +451,72 @@ def criar_app(
         assert usuario.id is not None
         perfil_tema.confirmar(conn, usuario.id, tema_id)
         conn.commit()
+        return redirect(url_for("temas_lista"))
+
+    def _monta_tema_usuario_do_form(prefixo: str) -> TemaUsuario | None:
+        nome = request.form.get(f"{prefixo}nome", "").strip()
+        if not nome:
+            return None
+        descricao = request.form.get(f"{prefixo}descricao", "").strip()
+        nivel_bruto = request.form.get(f"{prefixo}nivel", "").strip()
+        if nivel_bruto not in _NIVEIS:
+            raise ValueError(f"nível inválido: '{nivel_bruto}'")
+        peso_bruto = request.form.get(f"{prefixo}peso", "3").strip() or "3"
+        try:
+            peso = int(peso_bruto)
+        except ValueError as erro:
+            raise ValueError(f"peso inválido: '{peso_bruto}'") from erro
+        return TemaUsuario(
+            nome=nome,
+            descricao=descricao,
+            nivel=nivel_bruto,
+            peso=peso,
+            sinonimos=[],
+        )
+
+    @app.route("/eu/configurar", methods=["POST"])
+    def configurar_perfil_usuario() -> Response | str:
+        nome = request.form.get("nome", "").strip()
+        if not nome:
+            return _sem_usuario(erro="Nome é obrigatório.")
+        temas: list[TemaUsuario] = []
+        try:
+            for i in range(20):
+                tema = _monta_tema_usuario_do_form(f"tema_{i}_")
+                if tema is not None:
+                    temas.append(tema)
+        except (ValueError, ValidationError) as erro:
+            return _sem_usuario(erro=str(erro))
+        if not temas:
+            return _sem_usuario(erro="Cadastre ao menos um tema.")
+
+        agora = datetime.now(UTC).isoformat()
+        configurador.salvar_perfil_usuario(_conn(), _cliente_llm(), nome, temas, agora)
+        return redirect(url_for("eu"))
+
+    @app.route("/temas/novo", methods=["POST"])
+    def adicionar_tema_usuario() -> Response:
+        usuario = _usuario_ou_none()
+        if usuario is None:
+            abort(400)
+        assert usuario.id is not None
+        try:
+            tema = _monta_tema_usuario_do_form("tema_")
+        except (ValueError, ValidationError):
+            abort(400)
+        if tema is None:
+            abort(400)
+        agora = datetime.now(UTC).isoformat()
+        configurador.adicionar_tema_do_usuario(_conn(), _cliente_llm(), usuario.id, tema, agora)
+        return redirect(url_for("temas_lista"))
+
+    @app.route("/temas/<int:tema_id>/remover-do-usuario", methods=["POST"])
+    def remover_tema_do_usuario(tema_id: int) -> Response:
+        usuario = _usuario_ou_none()
+        if usuario is None:
+            abort(400)
+        assert usuario.id is not None
+        configurador.remover_tema_do_usuario(_conn(), usuario.id, tema_id)
         return redirect(url_for("temas_lista"))
 
     return app

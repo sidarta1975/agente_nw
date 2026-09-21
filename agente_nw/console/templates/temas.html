@@ -25,11 +25,32 @@
           </select>
           <p><button type="submit">Salvar nível</button></p>
         </form>
+
+        <form method="post" action="{{ url_for('remover_tema_do_usuario', tema_id=tema.id) }}">
+          <p><button type="submit" class="perigo">Remover tema do usuário</button></p>
+        </form>
       </div>
     {% endfor %}
   {% else %}
     <p class="vazio">Nenhum tema confirmado ainda.</p>
   {% endif %}
+
+  <h2>Adicionar novo tema</h2>
+  <form class="bloco" method="post" action="{{ url_for('adicionar_tema_usuario') }}">
+    <label for="tema_novo_nome">Nome do tema</label>
+    <input id="tema_novo_nome" type="text" name="tema_nome" required>
+    <label for="tema_novo_descricao">Descrição (≥ 8 palavras)</label>
+    <textarea id="tema_novo_descricao" name="tema_descricao" required></textarea>
+    <label for="tema_novo_nivel">Nível</label>
+    <select id="tema_novo_nivel" name="tema_nivel">
+      {% for nivel in niveis %}
+        <option value="{{ nivel }}" {% if nivel == 'interesse' %}selected{% endif %}>{{ nivel }}</option>
+      {% endfor %}
+    </select>
+    <label for="tema_novo_peso">Peso (1 a 5)</label>
+    <input id="tema_novo_peso" type="number" name="tema_peso" min="1" max="5" value="3">
+    <p><button type="submit" class="primario">Adicionar tema</button></p>
+  </form>
 
   <h2>Sugestões pendentes</h2>
   {% if pendentes %}
