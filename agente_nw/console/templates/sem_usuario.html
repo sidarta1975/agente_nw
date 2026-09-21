@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block titulo %}usuário não configurado{% endblock %}
+{% block conteudo %}
+  <h1>Perfil do usuário ainda não configurado</h1>
+  <p>
+    Esta tela precisa do perfil de <strong>usuário</strong> (você) já cadastrado no banco.
+    Ele ainda não existe.
+  </p>
+  <p>
+    Para configurar, preencha o arquivo <code>temas.yaml</code> na raiz do projeto
+    (use <code>temas.exemplo.yaml</code> como modelo) e rode no terminal:
+  </p>
+  <pre><code>agente_nw importar-temas</code></pre>
+  <p>
+    Isso cria o perfil de usuário com o nome e os temas declarados. Depois recarregue esta página.
+  </p>
+{% endblock %}

@@ -114,6 +114,27 @@ def inserir_ou_atualizar_contato(
     return atualizado
 
 
+def inserir_novo_contato(
+    conexao: sqlite3.Connection,
+    nome: str,
+    telefone: str | None,
+    email: str | None,
+    agora: str,
+) -> Perfil:
+    """INSERT direto de um novo contato, sem lookup por telefone/email. Usado
+    quando o chamador já sabe que é um contato novo (formulário do console),
+    inclusive quando não há telefone nem email."""
+    cursor = conexao.execute(
+        "INSERT INTO perfil (tipo, nome, telefone, email, linguas, ativo, gerar_agora, "
+        "criado_em, atualizado_em) VALUES ('contato', ?, ?, ?, '[]', 0, 0, ?, ?)",
+        (nome, telefone, email, agora, agora),
+    )
+    assert cursor.lastrowid is not None
+    novo = obter_por_id(conexao, cursor.lastrowid)
+    assert novo is not None
+    return novo
+
+
 def ativar(conexao: sqlite3.Connection, perfil_id: int) -> None:
     conexao.execute("UPDATE perfil SET ativo = 1 WHERE id = ?", (perfil_id,))
 

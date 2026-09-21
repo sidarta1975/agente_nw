@@ -31,6 +31,7 @@ from agente_nw.nucleo.relevancia import cruzamento
 from agente_nw.nucleo.saidas.markdown import _MOTIVOS
 from agente_nw.perfil import extrator
 from agente_nw.perfil.lacunas import ORDEM_IMPACTO, campos_faltando
+from agente_nw.perfil.normalizacao import telefone_e164
 
 _NIVEIS: tuple[NivelTema, ...] = ("dominio", "interesse", "curiosidade")
 _MEIOS: tuple[str, ...] = ("pessoalmente", "telefone", "whatsapp", "carta", "outro")
@@ -82,10 +83,11 @@ def criar_app(
             abort(404)
         return perfil
 
-    def _usuario() -> Perfil:
-        usuario = perfis.obter_usuario(_conn())
-        assert usuario is not None
-        return usuario
+    def _usuario_ou_none() -> Perfil | None:
+        return perfis.obter_usuario(_conn())
+
+    def _sem_usuario() -> str:
+        return render_template("sem_usuario.html")
 
     def _com_assunto(itens: list[AssuntoContato]) -> list[tuple[AssuntoContato, Assunto | None]]:
         conn = _conn()
@@ -99,6 +101,21 @@ def criar_app(
     def contatos() -> str:
         linhas = [(perfil, len(campos_faltando(perfil))) for perfil in perfis.listar_todos(_conn())]
         return render_template("contatos.html", linhas=linhas)
+
+    @app.route("/contatos/novo", methods=["POST"])
+    def novo_contato() -> Response:
+        conn = _conn()
+        nome = request.form.get("nome", "").strip()
+        if not nome:
+            abort(400)
+        telefone = telefone_e164(request.form.get("telefone", ""))
+        email_bruto = request.form.get("email", "").strip()
+        email = email_bruto or None
+        agora = datetime.now(UTC).isoformat()
+        perfil = perfis.inserir_novo_contato(conn, nome, telefone, email, agora)
+        conn.commit()
+        assert perfil.id is not None
+        return redirect(url_for("ficha", perfil_id=perfil.id))
 
     @app.route("/contatos/<int:perfil_id>")
     def ficha(perfil_id: int) -> str:
@@ -277,7 +294,9 @@ def criar_app(
     @app.route("/eu")
     def eu() -> str:
         conn = _conn()
-        usuario = _usuario()
+        usuario = _usuario_ou_none()
+        if usuario is None:
+            return _sem_usuario()
         assert usuario.id is not None
         redes = redes_sociais.listar_por_perfil(conn, usuario.id)
         return render_template("eu.html", usuario=usuario, redes=redes)
@@ -285,7 +304,9 @@ def criar_app(
     @app.route("/eu/redes-sociais/adicionar", methods=["POST"])
     def adicionar_rede_social_usuario() -> Response:
         conn = _conn()
-        usuario = _usuario()
+        usuario = _usuario_ou_none()
+        if usuario is None:
+            abort(400)
         assert usuario.id is not None
         rede = request.form.get("rede", "").strip()
         link = request.form.get("link", "").strip()
@@ -304,7 +325,9 @@ def criar_app(
     @app.route("/temas")
     def temas_lista() -> str:
         conn = _conn()
-        usuario = _usuario()
+        usuario = _usuario_ou_none()
+        if usuario is None:
+            return _sem_usuario()
         assert usuario.id is not None
         vinculos = {vinculo.tema_id: vinculo for vinculo in perfil_tema.listar_por_perfil(conn, usuario.id)}
 
@@ -339,7 +362,9 @@ def criar_app(
     @app.route("/temas/<int:tema_id>/nivel", methods=["POST"])
     def atualizar_nivel_tema(tema_id: int) -> Response:
         conn = _conn()
-        usuario = _usuario()
+        usuario = _usuario_ou_none()
+        if usuario is None:
+            abort(400)
         assert usuario.id is not None
         nivel_bruto = request.form.get("nivel", "")
         if nivel_bruto not in _NIVEIS:
@@ -351,7 +376,9 @@ def criar_app(
     @app.route("/temas/<int:tema_id>/confirmar", methods=["POST"])
     def confirmar_tema_pendente(tema_id: int) -> Response:
         conn = _conn()
-        usuario = _usuario()
+        usuario = _usuario_ou_none()
+        if usuario is None:
+            abort(400)
         assert usuario.id is not None
         perfil_tema.confirmar(conn, usuario.id, tema_id)
         conn.commit()
