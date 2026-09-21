@@ -131,6 +131,7 @@ def criar_app(
         confirmadas = [(tag, tema) for tag, tema in tags_com_tema if tag.confirmado]
         nao_confirmadas = [(tag, tema) for tag, tema in tags_com_tema if not tag.confirmado]
         redes = redes_sociais.listar_por_perfil(conn, perfil_id)
+        outros_contatos = [p for p in perfis.listar_todos(conn) if p.id != perfil_id]
         return render_template(
             "ficha.html",
             perfil=perfil,
@@ -140,6 +141,7 @@ def criar_app(
             redes_buscaveis=busca.REDES_SUPORTADAS,
             rede_busca=rede_busca,
             resultado_busca=resultado_busca,
+            outros_contatos=outros_contatos,
         )
 
     @app.route("/contatos/<int:perfil_id>")
@@ -202,6 +204,55 @@ def criar_app(
 
         agora = datetime.now(UTC).isoformat()
         perfis.atualizar_ficha_manual(conn, perfil_id, campos, agora)
+        conn.commit()
+        return redirect(url_for("ficha", perfil_id=perfil_id))
+
+    @app.route("/contatos/<int:perfil_id>/apagar", methods=["POST"])
+    def apagar_contato(perfil_id: int) -> Response | str:
+        conn = _conn()
+        perfil = _perfil_ou_404(perfil_id)
+        n_fatos, n_consultas = perfis.contagem_historico_protegido(conn, perfil_id)
+        bloqueado = n_fatos > 0 or n_consultas > 0
+        confirmado = request.form.get("confirmar") == "sim"
+        if bloqueado or not confirmado:
+            return render_template(
+                "confirmar_apagar.html",
+                perfil=perfil,
+                n_fatos=n_fatos,
+                n_consultas=n_consultas,
+                bloqueado=bloqueado,
+            )
+        perfis.apagar_contato_completo(conn, perfil_id)
+        conn.commit()
+        return redirect(url_for("contatos"))
+
+    @app.route("/contatos/<int:perfil_id>/unir", methods=["POST"])
+    def unir_contato(perfil_id: int) -> Response | str:
+        conn = _conn()
+        canonico = _perfil_ou_404(perfil_id)
+        outro_id_bruto = request.form.get("outro_id", "").strip()
+        if not outro_id_bruto.isdigit():
+            abort(400)
+        outro_id = int(outro_id_bruto)
+        if outro_id == perfil_id:
+            abort(400)
+        duplicado = perfis.obter_por_id(conn, outro_id)
+        if duplicado is None or duplicado.tipo != "contato":
+            abort(400)
+        confirmado = request.form.get("confirmar") == "sim"
+        if not confirmado:
+            n_fatos_dup, n_consultas_dup = perfis.contagem_historico_protegido(conn, outro_id)
+            return render_template(
+                "confirmar_unir.html",
+                canonico=canonico,
+                duplicado=duplicado,
+                n_fatos_dup=n_fatos_dup,
+                n_consultas_dup=n_consultas_dup,
+            )
+        try:
+            perfis.unir_contatos(conn, perfil_id, outro_id)
+        except ValueError:
+            abort(400)
         conn.commit()
         return redirect(url_for("ficha", perfil_id=perfil_id))
 

@@ -139,6 +139,137 @@ def ativar(conexao: sqlite3.Connection, perfil_id: int) -> None:
     conexao.execute("UPDATE perfil SET ativo = 1 WHERE id = ?", (perfil_id,))
 
 
+def contagem_historico_protegido(conexao: sqlite3.Connection, perfil_id: int) -> tuple[int, int]:
+    """Devolve (n_fatos, n_consultas) — as duas tabelas cuja imutabilidade
+    impede apagar o perfil por caminho direto."""
+    (n_fatos,) = conexao.execute("SELECT COUNT(*) FROM fato WHERE perfil_id = ?", (perfil_id,)).fetchone()
+    (n_consultas,) = conexao.execute(
+        "SELECT COUNT(*) FROM consulta_contato WHERE perfil_id = ?", (perfil_id,)
+    ).fetchone()
+    return int(n_fatos), int(n_consultas)
+
+
+def apagar_contato_completo(conexao: sqlite3.Connection, perfil_id: int) -> None:
+    """Apaga o perfil e todas as tabelas dependentes sem imutabilidade.
+    Chamador é responsável por checar antes que `contagem_historico_protegido`
+    devolveu (0, 0). Falha por FK se houver linha remanescente em fato ou
+    consulta_contato — o gatilho continua bloqueando DELETE em ambas."""
+    conexao.execute("DELETE FROM assunto_contato WHERE perfil_id = ?", (perfil_id,))
+    conexao.execute("DELETE FROM rede_social WHERE perfil_id = ?", (perfil_id,))
+    conexao.execute("DELETE FROM perfil_tema WHERE perfil_id = ?", (perfil_id,))
+    conexao.execute("DELETE FROM fila_extracao WHERE perfil_id = ?", (perfil_id,))
+    conexao.execute("DELETE FROM descarte_sensivel WHERE perfil_id = ?", (perfil_id,))
+    conexao.execute("DELETE FROM vetor_perfil WHERE perfil_id = ?", (perfil_id,))
+    conexao.execute("DELETE FROM perfil WHERE id = ?", (perfil_id,))
+
+
+_CAMPOS_MERGE_UNIAO: tuple[str, ...] = (
+    "apelido",
+    "email",
+    "telefone",
+    "empresa",
+    "cargo",
+    "setor",
+    "cidade",
+    "naturalidade",
+    "formacao",
+    "tem_filhos",
+    "faixa_etaria",
+    "notas",
+)
+
+
+def _campos_para_preencher_do_outro(canonico: Perfil, duplicado: Perfil) -> dict[str, object]:
+    campos: dict[str, object] = {}
+    for campo in _CAMPOS_MERGE_UNIAO:
+        valor_canonico = getattr(canonico, campo)
+        valor_duplicado = getattr(duplicado, campo)
+        if valor_canonico is None and valor_duplicado is not None:
+            campos[campo] = valor_duplicado
+    if not canonico.linguas and duplicado.linguas:
+        campos["linguas"] = list(duplicado.linguas)
+    return campos
+
+
+def unir_contatos(conexao: sqlite3.Connection, canonico_id: int, duplicado_id: int) -> None:
+    """Reatribui ao canônico tudo que estava no duplicado e apaga o duplicado.
+    Preenche campos vazios do canônico com valores do duplicado, sem sobrescrever.
+    Assume que a migração 005 já ajustou os gatilhos de fato e consulta_contato
+    para permitir UPDATE de `perfil_id`.
+
+    Não permite unir o perfil de usuário nem unir consigo mesmo."""
+    if canonico_id == duplicado_id:
+        raise ValueError("canônico e duplicado precisam ser contatos diferentes")
+
+    canonico = obter_por_id(conexao, canonico_id)
+    duplicado = obter_por_id(conexao, duplicado_id)
+    if canonico is None or duplicado is None:
+        raise ValueError("canônico ou duplicado não encontrado")
+    if canonico.tipo != "contato" or duplicado.tipo != "contato":
+        raise ValueError("unir só se aplica a perfis de contato")
+
+    agora = duplicado.atualizado_em
+    campos_para_completar = _campos_para_preencher_do_outro(canonico, duplicado)
+    if campos_para_completar:
+        atualizar_ficha_manual(conexao, canonico_id, campos_para_completar, agora)
+
+    # perfil_tema: DELETE do duplicado quando canonico já tem o mesmo tema;
+    # UPDATE do restante.
+    temas_do_canonico = {
+        linha["tema_id"]
+        for linha in conexao.execute(
+            "SELECT tema_id FROM perfil_tema WHERE perfil_id = ?", (canonico_id,)
+        ).fetchall()
+    }
+    for linha in conexao.execute(
+        "SELECT tema_id FROM perfil_tema WHERE perfil_id = ?", (duplicado_id,)
+    ).fetchall():
+        if linha["tema_id"] in temas_do_canonico:
+            conexao.execute(
+                "DELETE FROM perfil_tema WHERE perfil_id = ? AND tema_id = ?",
+                (duplicado_id, linha["tema_id"]),
+            )
+        else:
+            conexao.execute(
+                "UPDATE perfil_tema SET perfil_id = ? WHERE perfil_id = ? AND tema_id = ?",
+                (canonico_id, duplicado_id, linha["tema_id"]),
+            )
+
+    # assunto_contato: UNIQUE (assunto_id, perfil_id, gerado_em). Mesma estratégia.
+    ja_no_canonico = {
+        (linha["assunto_id"], linha["gerado_em"])
+        for linha in conexao.execute(
+            "SELECT assunto_id, gerado_em FROM assunto_contato WHERE perfil_id = ?", (canonico_id,)
+        ).fetchall()
+    }
+    for linha in conexao.execute(
+        "SELECT id, assunto_id, gerado_em FROM assunto_contato WHERE perfil_id = ?", (duplicado_id,)
+    ).fetchall():
+        chave = (linha["assunto_id"], linha["gerado_em"])
+        if chave in ja_no_canonico:
+            conexao.execute("DELETE FROM assunto_contato WHERE id = ?", (linha["id"],))
+        else:
+            conexao.execute(
+                "UPDATE assunto_contato SET perfil_id = ? WHERE id = ?", (canonico_id, linha["id"])
+            )
+
+    # Reatribuições simples nas demais tabelas.
+    conexao.execute("UPDATE rede_social SET perfil_id = ? WHERE perfil_id = ?", (canonico_id, duplicado_id))
+    conexao.execute("UPDATE fila_extracao SET perfil_id = ? WHERE perfil_id = ?", (canonico_id, duplicado_id))
+    conexao.execute(
+        "UPDATE descarte_sensivel SET perfil_id = ? WHERE perfil_id = ?", (canonico_id, duplicado_id)
+    )
+    conexao.execute("UPDATE fato SET perfil_id = ? WHERE perfil_id = ?", (canonico_id, duplicado_id))
+    conexao.execute(
+        "UPDATE consulta_contato SET perfil_id = ? WHERE perfil_id = ?", (canonico_id, duplicado_id)
+    )
+
+    # Centróide do canônico pode ficar defasado; deixamos para o próximo cruzar_contato
+    # recalcular. Apagamos o do duplicado explicitamente antes do DELETE do perfil.
+    conexao.execute("DELETE FROM vetor_perfil WHERE perfil_id = ?", (duplicado_id,))
+    conexao.execute("DELETE FROM perfil WHERE id = ?", (duplicado_id,))
+
+
 def listar_ativos(conexao: sqlite3.Connection) -> list[Perfil]:
     linhas = conexao.execute(
         f"SELECT {_COLUNAS} FROM perfil WHERE ativo = 1 AND tipo = 'contato' ORDER BY nome"

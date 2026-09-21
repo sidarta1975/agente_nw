@@ -156,4 +156,24 @@
   <form class="bloco" method="post" action="{{ url_for('gerar_menu', perfil_id=perfil.id) }}">
     <button type="submit" class="primario">Gerar menu agora</button>
   </form>
+
+  <h2>Ações administrativas</h2>
+  <form class="bloco" method="post" action="{{ url_for('apagar_contato', perfil_id=perfil.id) }}">
+    <p>Apagar este contato (só possível se não tiver histórico permanente).</p>
+    <p><button type="submit" class="perigo">Apagar contato…</button></p>
+  </form>
+
+  {% if outros_contatos %}
+    <form class="bloco" method="post" action="{{ url_for('unir_contato', perfil_id=perfil.id) }}">
+      <p>Unir outro contato neste — este perfil vira canônico, o escolhido é absorvido e apagado.</p>
+      <label for="outro_id">Contato duplicado a absorver</label>
+      <select id="outro_id" name="outro_id" required>
+        <option value="">— escolha —</option>
+        {% for outro in outros_contatos %}
+          <option value="{{ outro.id }}">{{ outro.apelido or outro.nome }} (id {{ outro.id }})</option>
+        {% endfor %}
+      </select>
+      <p><button type="submit" class="perigo">Unir…</button></p>
+    </form>
+  {% endif %}
 {% endblock %}
