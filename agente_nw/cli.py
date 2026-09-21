@@ -1,16 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import io
 import json
-import re
 import sqlite3
 import subprocess
 import sys
-import time
-import traceback
-from collections.abc import Callable
-from contextlib import redirect_stdout
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import NamedTuple
@@ -133,7 +127,7 @@ def _verificar_ollama_app_na_porta() -> ItemVerificacao:
 
     app_rodando = "Ollama.app" in saida
     detalhe = (
-        "Ollama.app está rodando — feche o aplicativo e suba 'ollama serve' pelo LaunchAgent do projeto"
+        "Ollama.app está rodando — feche o aplicativo e suba 'ollama serve' manualmente num terminal"
         if app_rodando
         else "ok"
     )
@@ -470,119 +464,6 @@ def ler_marcacoes_cmd(data: str | None) -> int:
     return 0
 
 
-class _LogCiclo:
-    def __init__(self, caminho: Path) -> None:
-        caminho.parent.mkdir(parents=True, exist_ok=True)
-        self._arquivo = caminho.open("a", encoding="utf-8")
-
-    def escrever(self, texto: str) -> None:
-        if not texto:
-            return
-        print(texto)
-        self._arquivo.write(texto + "\n")
-        self._arquivo.flush()
-
-    def fechar(self) -> None:
-        self._arquivo.close()
-
-
-def _gerar_cartoes_cmd() -> int:
-    cfg = configuracao()
-    resumo = cartoes.gerar_pendentes(llm(), banco(), cfg.limiares.cartao.teto_por_dia)
-    print(f"Candidatos: {resumo.candidatos}")
-    print(f"Cartões gerados: {resumo.gerados}")
-    print(f"Erros: {resumo.erros}")
-    return 0
-
-
-def _rodar_etapa(
-    log: _LogCiclo,
-    conn: sqlite3.Connection,
-    nome_etapa: str,
-    nome_exibicao: str,
-    hoje: str,
-    funcao_cmd: Callable[[], int],
-) -> bool:
-    if caminho_sentinela().exists():
-        log.escrever(f"Sentinela encontrada, parando antes de {nome_exibicao}.")
-        return False
-
-    progresso = sistema.progresso_obter(conn, nome_etapa)
-    if progresso is not None and progresso["data_ciclo"] == hoje:
-        log.escrever(f"{nome_exibicao}: já concluída hoje, pulando.")
-        return True
-
-    inicio = time.monotonic()
-    log.escrever(f"[{datetime.now(UTC).isoformat()}] Iniciando {nome_exibicao}")
-
-    buffer = io.StringIO()
-    try:
-        with redirect_stdout(buffer):
-            codigo = funcao_cmd()
-        if codigo != 0:
-            raise RuntimeError(f"{nome_exibicao} devolveu código {codigo}")
-    except Exception:
-        log.escrever(buffer.getvalue().rstrip("\n"))
-        duracao = time.monotonic() - inicio
-        log.escrever(f"[FALHA após {duracao:.1f}s] {nome_exibicao}")
-        log.escrever(traceback.format_exc())
-        raise
-
-    log.escrever(buffer.getvalue().rstrip("\n"))
-    duracao = time.monotonic() - inicio
-    log.escrever(f"[concluída em {duracao:.1f}s] {nome_exibicao}")
-    sistema.progresso_gravar(conn, nome_etapa, None, hoje, datetime.now(UTC).isoformat())
-    conn.commit()
-    return True
-
-
-def ciclo_cmd() -> int:
-    conn = banco()
-    hoje = datetime.now(UTC).date().isoformat()
-
-    progresso_backup = sistema.progresso_obter(conn, "ciclo:backup")
-    if progresso_backup is not None and progresso_backup["data_ciclo"] == hoje:
-        print(f"Ciclo já rodou hoje (concluído às {progresso_backup['atualizado_em']}).")
-        return 0
-
-    timestamp_log = datetime.now(UTC).isoformat().replace(":", "-")
-    caminho_log = RAIZ / "dados" / "logs" / f"ciclo_{timestamp_log}.log"
-    log = _LogCiclo(caminho_log)
-
-    try:
-        ontem = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
-        caminho_ontem = caminho_pasta_saida() / f"menu_{ontem}.md"
-        if caminho_ontem.exists():
-            buffer = io.StringIO()
-            with redirect_stdout(buffer):
-                ler_marcacoes_cmd(ontem)
-            log.escrever(buffer.getvalue().rstrip("\n"))
-        else:
-            log.escrever(f"Sem arquivo de ontem ({caminho_ontem}), pulando leitura de marcações.")
-
-        etapas: list[tuple[str, str, Callable[[], int]]] = [
-            ("ciclo:coleta", "coleta", coletar),
-            ("ciclo:extracao", "extração", processar_fila_cmd),
-            ("ciclo:agrupamento", "agrupamento", agrupar_cmd),
-            ("ciclo:qualificacao", "qualificação", lambda: qualificar_cmd(None)),
-            ("ciclo:cruzamento", "cruzamento", cruzar_cmd),
-            ("ciclo:cartoes", "geração de cartões", _gerar_cartoes_cmd),
-            ("ciclo:exportacao", "exportação do menu", lambda: exportar_menu_cmd(None)),
-            ("ciclo:backup", "backup", fazer_backup_cmd),
-        ]
-
-        for nome_etapa, nome_exibicao, funcao_cmd in etapas:
-            continuar = _rodar_etapa(log, conn, nome_etapa, nome_exibicao, hoje, funcao_cmd)
-            if not continuar:
-                return 0
-    except Exception:
-        return 1
-    finally:
-        log.fechar()
-
-    return 0
-
-
 def _dias_no_intervalo(desde: str, ate: str) -> list[str]:
     inicio = date.fromisoformat(desde)
     fim = date.fromisoformat(ate)
@@ -592,22 +473,6 @@ def _dias_no_intervalo(desde: str, ate: str) -> list[str]:
         dias.append(atual.isoformat())
         atual += timedelta(days=1)
     return dias
-
-
-def _ler_log_ciclo(dia: str) -> tuple[float, list[tuple[str, float]]] | None:
-    pasta = RAIZ / "dados" / "logs"
-    arquivos = sorted(pasta.glob(f"ciclo_{dia}T*.log"))
-    if not arquivos:
-        return None
-
-    texto = arquivos[-1].read_text(encoding="utf-8")
-    duracoes: list[tuple[str, float]] = []
-    for linha in texto.splitlines():
-        correspondencia = re.search(r"\[conclu[ií]da em ([\d.]+)s\] (.+)", linha)
-        if correspondencia:
-            duracoes.append((correspondencia.group(2), float(correspondencia.group(1))))
-    total = sum(duracao for _nome, duracao in duracoes)
-    return total, duracoes
 
 
 def _ler_chamadas_llm(desde: str, ate: str) -> list[dict[str, object]]:
@@ -633,15 +498,6 @@ def certificar_cmd(desde: str, ate: str) -> int:
 
     for dia in dias:
         print(f"=== {dia} ===")
-        resultado_log = _ler_log_ciclo(dia)
-        if resultado_log is None:
-            print("  Sem log de ciclo para este dia.")
-        else:
-            duracao_total, etapas = resultado_log
-            print(f"  Duração total do ciclo: {duracao_total:.1f}s")
-            for nome_etapa, duracao in etapas:
-                print(f"    {nome_etapa}: {duracao:.1f}s")
-
         contagens_status = assunto_contato.contar_por_status(conn, dia)
         contagens_tipo = assunto_contato.contar_por_perfil_e_tipo(conn, dia)
         perfis_com_sugestao = {perfil_id for perfil_id, _tipo, _quantidade in contagens_tipo}
@@ -853,7 +709,6 @@ def _montar_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("processar-fila")
     subparsers.add_parser("agrupar")
     subparsers.add_parser("calibrar-agrupamento")
-    subparsers.add_parser("ciclo")
 
     certificar_parser = subparsers.add_parser("certificar")
     certificar_parser.add_argument("--desde", required=True)
@@ -929,8 +784,6 @@ def main(argv: list[str] | None = None) -> int:
         return agrupar_cmd()
     if args.comando == "calibrar-agrupamento":
         return calibrar_agrupamento_cmd()
-    if args.comando == "ciclo":
-        return ciclo_cmd()
     if args.comando == "certificar":
         return certificar_cmd(args.desde, args.ate)
     if args.comando == "qualificar":

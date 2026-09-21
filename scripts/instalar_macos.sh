@@ -9,17 +9,18 @@ cd "$(dirname "$0")/.."
 brew install python@3.12
 
 # Ollama: a FÓRMULA do Homebrew instala só o binário. O instalador oficial (e o cask) instala o
-# aplicativo, que se registra no login e ocupa a porta 11434 — o conflito que o LaunchAgent do
-# brief 012 quer evitar. NÃO iniciar por `brew services start ollama`: isso cria um segundo
-# LaunchAgent sem as variáveis OLLAMA_MAX_LOADED_MODELS / OLLAMA_KEEP_ALIVE.
+# aplicativo, que se registra no login e ocupa a porta 11434 — o que queremos evitar. NÃO iniciar
+# por `brew services start ollama`: isso registra um serviço sem as variáveis
+# OLLAMA_MAX_LOADED_MODELS / OLLAMA_KEEP_ALIVE, e além disso a arquitetura sob demanda
+# (decisão de 2026-09-20) dispensa qualquer agendador ou serviço do projeto.
 brew install ollama
 
 ollama pull qwen3:4b
 ollama pull bge-m3
-ollama pull qwen3:8b   # só para a calibração do brief 007
+ollama pull qwen3:8b   # só para a calibração de agrupamento (comando manual)
 
 echo
-echo "Até o brief 012 existir, suba o servidor manualmente, num terminal à parte:"
+echo "Suba o servidor manualmente, num terminal à parte, quando for usar o agente:"
 echo "  OLLAMA_MAX_LOADED_MODELS=2 OLLAMA_KEEP_ALIVE=30m ollama serve"
 echo "Nunca use 'brew services start ollama' nem o aplicativo Ollama.app."
 echo
