@@ -140,6 +140,36 @@ def _verificar_arquivo_existe(nome: str, caminho: Path) -> ItemVerificacao:
     return ItemVerificacao(nome, existe, detalhe, obrigatorio=False)
 
 
+def _verificar_playwright_chromium() -> ItemVerificacao:
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as erro:
+        return ItemVerificacao(
+            "Playwright + Chromium instalados",
+            False,
+            f"lib Playwright ausente: {erro} — rode 'pip install -e .[dev]'",
+            obrigatorio=True,
+        )
+    try:
+        with sync_playwright() as p:
+            caminho = Path(p.chromium.executable_path)
+    except Exception as erro:
+        return ItemVerificacao(
+            "Playwright + Chromium instalados",
+            False,
+            f"erro ao consultar Chromium: {erro} — rode 'playwright install chromium'",
+            obrigatorio=True,
+        )
+    if not caminho.exists():
+        return ItemVerificacao(
+            "Playwright + Chromium instalados",
+            False,
+            f"{caminho} não existe — rode 'playwright install chromium'",
+            obrigatorio=True,
+        )
+    return ItemVerificacao("Playwright + Chromium instalados", True, str(caminho), obrigatorio=True)
+
+
 def verificar_ambiente() -> int:
     try:
         config = configuracao()
@@ -155,6 +185,7 @@ def verificar_ambiente() -> int:
         _verificar_ollama(cliente, ollama_url),
         *_verificar_modelos(cliente, ollama_url),
         _verificar_ollama_app_na_porta(),
+        _verificar_playwright_chromium(),
         _verificar_arquivo_existe("temas.yaml existe", RAIZ / "temas.yaml"),
         _verificar_arquivo_existe("fontes.yaml existe", RAIZ / "fontes.yaml"),
     ]
@@ -464,6 +495,33 @@ def ler_marcacoes_cmd(data: str | None) -> int:
     return 0
 
 
+def ler_rede_social_cmd(telefone: str) -> int:
+    telefone_normalizado = telefone_e164(telefone)
+    conn = banco()
+    perfil = perfis.obter_por_telefone_ou_email(conn, telefone_normalizado, None)
+    if perfil is None:
+        print(f"FALHA: nenhum contato encontrado com o telefone '{telefone}'")
+        return 1
+    assert perfil.id is not None
+
+    from agente_nw.coleta.capturas.leitor import ler_redes_sociais_do_contato
+    from agente_nw.coleta.capturas.playwright_backend import abrir_pagina_playwright
+
+    agora = datetime.now(UTC).isoformat()
+    pasta_navegador = RAIZ / "dados" / "navegador"
+    resumo = ler_redes_sociais_do_contato(
+        llm(), conn, perfil.id, abrir_pagina_playwright, pasta_navegador, agora
+    )
+
+    print(f"Redes lidas: {resumo.redes_lidas}")
+    print(f"Redes sem sessão: {resumo.redes_sem_sessao}")
+    print(f"Blocos capturados: {resumo.blocos_capturados}")
+    print(f"Fatos gravados: {resumo.fatos_gravados}")
+    for motivo in resumo.motivos_sem_sessao:
+        print(f"  - {motivo}")
+    return 0
+
+
 def _dias_no_intervalo(desde: str, ate: str) -> list[str]:
     inicio = date.fromisoformat(desde)
     fim = date.fromisoformat(ate)
@@ -758,6 +816,9 @@ def _montar_parser() -> argparse.ArgumentParser:
     console_parser.add_argument("--banco", required=True)
     console_parser.add_argument("--porta", type=int, default=8765)
 
+    ler_rede_social_parser = subparsers.add_parser("ler-rede-social")
+    ler_rede_social_parser.add_argument("telefone")
+
     for nome in COMANDOS_RESERVADOS:
         subparsers.add_parser(nome)
 
@@ -812,6 +873,8 @@ def main(argv: list[str] | None = None) -> int:
         return confirmar_tags_cmd(args.telefone, args.todas, args.ids)
     if args.comando == "console":
         return console_cmd(args.banco, args.porta)
+    if args.comando == "ler-rede-social":
+        return ler_rede_social_cmd(args.telefone)
     if args.comando in COMANDOS_RESERVADOS:
         return _comando_reservado(args.comando, COMANDOS_RESERVADOS[args.comando])
 

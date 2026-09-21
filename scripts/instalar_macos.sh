@@ -29,4 +29,10 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 
+# Playwright: a lib Python é instalada pelo pip acima, mas o binário do Chromium
+# precisa ser baixado à parte. É usado pela leitura de rede social sob demanda
+# (brief 017) — sem ele o comando `agente_nw ler-rede-social` falha na verificação
+# de ambiente.
+playwright install chromium
+
 mkdir -p dados/backups saidas logs
