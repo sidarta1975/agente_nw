@@ -23,6 +23,7 @@ from agente_nw.nucleo.llm import ClienteOllama
 from agente_nw.nucleo.modelos.assunto import Assunto
 from agente_nw.nucleo.modelos.assunto_contato import AssuntoContato
 from agente_nw.nucleo.modelos.configuracao import Limiares, NivelTema, Roteamento
+from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
 from agente_nw.nucleo.modelos.perfil import Perfil
 from agente_nw.nucleo.modelos.perfil_tema import PerfilTema
 from agente_nw.nucleo.modelos.tema import Tema
@@ -32,6 +33,11 @@ from agente_nw.perfil import extrator
 from agente_nw.perfil.lacunas import ORDEM_IMPACTO, campos_faltando
 
 _NIVEIS: tuple[NivelTema, ...] = ("dominio", "interesse", "curiosidade")
+_MEIOS: tuple[str, ...] = ("pessoalmente", "telefone", "whatsapp", "carta", "outro")
+
+
+def _lista_de_csv(bruto: str) -> list[str]:
+    return [pedaco.strip() for pedaco in bruto.split(",") if pedaco.strip()]
 
 
 def criar_app(
@@ -149,6 +155,52 @@ def criar_app(
         _perfil_ou_404(perfil_id)
         agora = datetime.now(UTC).isoformat()
         cruzamento.cruzar_contato(_cliente_llm(), conn, perfil_id, limiares, agora)
+        return redirect(url_for("menu_contato", perfil_id=perfil_id))
+
+    @app.route("/contatos/<int:perfil_id>/preparar", methods=["GET"])
+    def preparar_form(perfil_id: int) -> str:
+        perfil = _perfil_ou_404(perfil_id)
+        return render_template("preparar.html", perfil=perfil, meios=_MEIOS)
+
+    @app.route("/contatos/<int:perfil_id>/preparar", methods=["POST"])
+    def preparar_acao(perfil_id: int) -> Response:
+        import httpx
+
+        from agente_nw.coleta.capturas.playwright_backend import abrir_pagina_playwright
+        from agente_nw.nucleo import consulta as consulta_mod
+
+        perfil = _perfil_ou_404(perfil_id)
+        assert perfil.id is not None
+        meio = request.form.get("meio", "")
+        if meio not in _MEIOS:
+            abort(400)
+
+        contexto = ContextoConsulta(
+            assunto=request.form.get("assunto", "").strip(),
+            meio=meio,  # type: ignore[arg-type]
+            objetivo=request.form.get("objetivo", "").strip(),
+            interessa=_lista_de_csv(request.form.get("interessa", "")),
+            evitar=_lista_de_csv(request.form.get("evitar", "")),
+            livre=request.form.get("livre", "").strip(),
+        )
+
+        pasta_navegador = caminho_banco.parent / "navegador"
+        caminho_fontes = caminho_banco.parent.parent / "fontes.yaml"
+        agora = datetime.now(UTC).isoformat()
+        with httpx.Client(timeout=120.0) as cliente_http:
+            consulta_mod.preparar(
+                conexao=_conn(),
+                cliente_llm=_cliente_llm(),
+                cliente_http=cliente_http,
+                perfil_id=perfil.id,
+                contexto=contexto,
+                limiares=limiares,
+                caminho_fontes=caminho_fontes,
+                caminho_sentinela=caminho_banco.parent / "PARE",
+                abrir_pagina=abrir_pagina_playwright,
+                pasta_navegador=pasta_navegador,
+                agora=agora,
+            )
         return redirect(url_for("menu_contato", perfil_id=perfil_id))
 
     @app.route("/menu")

@@ -495,6 +495,80 @@ def ler_marcacoes_cmd(data: str | None) -> int:
     return 0
 
 
+def _lista_de_csv(bruto: str) -> list[str]:
+    return [pedaco.strip() for pedaco in bruto.split(",") if pedaco.strip()]
+
+
+def preparar_cmd(
+    telefone: str, assunto: str, meio: str, objetivo: str, interessa: str, evitar: str, livre: str
+) -> int:
+    telefone_normalizado = telefone_e164(telefone)
+    conn = banco()
+    perfil = perfis.obter_por_telefone_ou_email(conn, telefone_normalizado, None)
+    if perfil is None:
+        print(f"FALHA: nenhum contato encontrado com o telefone '{telefone}'")
+        return 1
+    assert perfil.id is not None
+
+    from agente_nw.coleta.capturas.playwright_backend import abrir_pagina_playwright
+    from agente_nw.nucleo.consulta import preparar
+    from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta, MeioContato
+
+    if meio not in ("pessoalmente", "telefone", "whatsapp", "carta", "outro"):
+        print(f"FALHA: meio inválido '{meio}'")
+        return 1
+
+    contexto = ContextoConsulta(
+        assunto=assunto,
+        meio=meio,  # type: ignore[arg-type]
+        objetivo=objetivo,
+        interessa=_lista_de_csv(interessa),
+        evitar=_lista_de_csv(evitar),
+        livre=livre,
+    )
+    _ = MeioContato  # mantém o import usado pelo type: ignore acima
+
+    cfg = configuracao()
+    agora = datetime.now(UTC).isoformat()
+    resultado = preparar(
+        conexao=conn,
+        cliente_llm=llm(),
+        cliente_http=http(),
+        perfil_id=perfil.id,
+        contexto=contexto,
+        limiares=cfg.limiares,
+        caminho_fontes=RAIZ / "fontes.yaml",
+        caminho_sentinela=caminho_sentinela(),
+        abrir_pagina=abrir_pagina_playwright,
+        pasta_navegador=RAIZ / "dados" / "navegador",
+        agora=agora,
+    )
+
+    print(f"Consulta #{resultado.consulta_id} gravada para {perfil.nome}.")
+    resumo_rede = resultado.resumo_rede_social
+    print(
+        f"Rede social — redes lidas: {resumo_rede.redes_lidas}, "
+        f"blocos: {resumo_rede.blocos_capturados}, fatos: {resumo_rede.fatos_gravados}, "
+        f"sem sessão: {resumo_rede.redes_sem_sessao}"
+    )
+    for motivo in resumo_rede.motivos_sem_sessao:
+        print(f"  - {motivo}")
+
+    if resultado.aviso:
+        print(f"AVISO: {resultado.aviso}")
+
+    for item in resultado.itens_menu:
+        print(f"[{item.tipo}] {item.titulo} (score={item.score:.1f})")
+        if item.por_que:
+            print(f"  por quê: {item.por_que}")
+
+    if resultado.historico_texto:
+        print("--- Histórico recente ---")
+        print(resultado.historico_texto)
+
+    return 0
+
+
 def ler_rede_social_cmd(telefone: str) -> int:
     telefone_normalizado = telefone_e164(telefone)
     conn = banco()
@@ -819,6 +893,17 @@ def _montar_parser() -> argparse.ArgumentParser:
     ler_rede_social_parser = subparsers.add_parser("ler-rede-social")
     ler_rede_social_parser.add_argument("telefone")
 
+    preparar_parser = subparsers.add_parser("preparar")
+    preparar_parser.add_argument("--telefone", required=True)
+    preparar_parser.add_argument("--assunto", required=True)
+    preparar_parser.add_argument(
+        "--meio", required=True, choices=["pessoalmente", "telefone", "whatsapp", "carta", "outro"]
+    )
+    preparar_parser.add_argument("--objetivo", required=True)
+    preparar_parser.add_argument("--interessa", default="")
+    preparar_parser.add_argument("--evitar", default="")
+    preparar_parser.add_argument("--livre", default="")
+
     for nome in COMANDOS_RESERVADOS:
         subparsers.add_parser(nome)
 
@@ -875,6 +960,16 @@ def main(argv: list[str] | None = None) -> int:
         return console_cmd(args.banco, args.porta)
     if args.comando == "ler-rede-social":
         return ler_rede_social_cmd(args.telefone)
+    if args.comando == "preparar":
+        return preparar_cmd(
+            args.telefone,
+            args.assunto,
+            args.meio,
+            args.objetivo,
+            args.interessa,
+            args.evitar,
+            args.livre,
+        )
     if args.comando in COMANDOS_RESERVADOS:
         return _comando_reservado(args.comando, COMANDOS_RESERVADOS[args.comando])
 

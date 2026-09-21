@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block titulo %}Preparar consulta — {{ perfil.apelido or perfil.nome }}{% endblock %}
+{% block conteudo %}
+  <h1>Preparar consulta com {{ perfil.apelido or perfil.nome }}</h1>
+  <p>
+    Descreva o contexto da conversa que você quer preparar. O sistema faz coleta,
+    lê rede social (se cadastrada), cruza com o já registrado e devolve um menu
+    de assuntos. A leitura de rede social pode pedir login e esperar até 3 min.
+  </p>
+
+  <form class="bloco" method="post" action="{{ url_for('preparar_acao', perfil_id=perfil.id) }}">
+    <label for="assunto">Assunto</label>
+    <input id="assunto" type="text" name="assunto" required placeholder="Ex.: proposta comercial, retomada de conversa, aniversário">
+
+    <label for="meio">Meio</label>
+    <select id="meio" name="meio" required>
+      {% for m in meios %}
+        <option value="{{ m }}">{{ m }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="objetivo">Objetivo</label>
+    <textarea id="objetivo" name="objetivo" required placeholder="O que você quer que aconteça nessa conversa?"></textarea>
+
+    <label for="interessa">Interessa (separado por vírgula, opcional)</label>
+    <input id="interessa" type="text" name="interessa" placeholder="Ex.: notícia recente sobre esporte, projeto novo">
+
+    <label for="evitar">Evitar (separado por vírgula, opcional)</label>
+    <input id="evitar" type="text" name="evitar" placeholder="Ex.: política, temas sensíveis do momento">
+
+    <label for="livre">Anotações livres (opcional)</label>
+    <textarea id="livre" name="livre" placeholder="Qualquer nota extra que ajude a preparar a conversa"></textarea>
+
+    <p><button type="submit" class="primario">Preparar</button></p>
+  </form>
+{% endblock %}

@@ -89,6 +89,12 @@
     <p><button type="submit">Adicionar</button></p>
   </form>
 
+  <h2>Preparar consulta</h2>
+  <p>
+    <a class="item-link" href="{{ url_for('preparar_form', perfil_id=perfil.id) }}">Preparar consulta com este contato</a>
+    — informa contexto (assunto, meio, objetivo) e o sistema faz coleta, rede social, cruzamento e menu de uma vez.
+  </p>
+
   <h2>Menu</h2>
   <form class="bloco" method="post" action="{{ url_for('gerar_menu', perfil_id=perfil.id) }}">
     <button type="submit" class="primario">Gerar menu agora</button>
