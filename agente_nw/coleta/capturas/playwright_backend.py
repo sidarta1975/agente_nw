@@ -40,6 +40,23 @@ class PaginaPlaywright:
         self._pagina.evaluate("window.scrollTo(0, document.body.scrollHeight)")
         self._pagina.wait_for_timeout(1000)
 
+    def coletar_links(self) -> list[tuple[str, str]]:
+        """Devolve `[(href_absoluto, texto_visível_do_container)]` para cada
+        `<a href>` na página. O texto do container é o `innerText` do ancestral
+        mais próximo entre `li`, `article` ou `div` — o suficiente pra pegar
+        nome do candidato + descrição adjacente em resultados de busca."""
+        script = (
+            "Array.from(document.querySelectorAll('a[href]')).map(a => { "
+            "  const c = a.closest('li, article, div'); "
+            "  return [a.href, c ? c.innerText.trim() : (a.innerText || '')]; "
+            "})"
+        )
+        try:
+            resultado = self._pagina.evaluate(script)
+        except Exception:
+            return []
+        return [(str(item[0]), str(item[1])) for item in resultado]
+
     def fechar(self) -> None:
         try:
             self._contexto.close()

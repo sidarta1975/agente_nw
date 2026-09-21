@@ -9,6 +9,7 @@ import httpx
 from flask import Flask, abort, g, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
 
+from agente_nw.coleta.capturas import busca
 from agente_nw.nucleo.database import conexao, migracoes
 from agente_nw.nucleo.database.queries import (
     assunto_contato,
@@ -117,8 +118,11 @@ def criar_app(
         assert perfil.id is not None
         return redirect(url_for("ficha", perfil_id=perfil.id))
 
-    @app.route("/contatos/<int:perfil_id>")
-    def ficha(perfil_id: int) -> str:
+    def _renderizar_ficha(
+        perfil_id: int,
+        rede_busca: str | None = None,
+        resultado_busca: object | None = None,
+    ) -> str:
         conn = _conn()
         perfil = _perfil_ou_404(perfil_id)
         tags = perfil_tema.listar_por_perfil(conn, perfil_id)
@@ -132,7 +136,14 @@ def criar_app(
             confirmadas=confirmadas,
             nao_confirmadas=nao_confirmadas,
             redes=redes,
+            redes_buscaveis=busca.REDES_SUPORTADAS,
+            rede_busca=rede_busca,
+            resultado_busca=resultado_busca,
         )
+
+    @app.route("/contatos/<int:perfil_id>")
+    def ficha(perfil_id: int) -> str:
+        return _renderizar_ficha(perfil_id)
 
     @app.route("/contatos/<int:perfil_id>/confirmar-tags", methods=["POST"])
     def confirmar_tags(perfil_id: int) -> Response:
@@ -329,6 +340,24 @@ def criar_app(
         redes_sociais.remover(conn, rede_social_id)
         conn.commit()
         return redirect(url_for("ficha", perfil_id=perfil_id))
+
+    @app.route("/contatos/<int:perfil_id>/redes-sociais/buscar", methods=["POST"])
+    def buscar_rede_social_contato(perfil_id: int) -> str:
+        from agente_nw.coleta.capturas.playwright_backend import PaginaPlaywright
+
+        perfil = _perfil_ou_404(perfil_id)
+        rede = request.form.get("rede", "").strip().lower()
+        if rede not in busca.REDES_SUPORTADAS:
+            abort(400)
+
+        pasta_rede = caminho_banco.parent / "navegador" / rede
+        pagina = PaginaPlaywright(pasta_rede, headless=False)
+        try:
+            resultado = busca.buscar(pagina, rede, perfil.nome, perfil.empresa)
+        finally:
+            pagina.fechar()
+
+        return _renderizar_ficha(perfil_id, rede_busca=rede, resultado_busca=resultado)
 
     @app.route("/eu")
     def eu() -> str:

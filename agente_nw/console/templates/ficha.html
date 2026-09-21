@@ -104,6 +104,42 @@
     <p><button type="submit">Adicionar rede social</button></p>
   </form>
 
+  <h3>Buscar candidatos na rede</h3>
+  <p>Abre a busca nativa da rede social com a sua sessão de login já ativa. Cada resultado precisa ser confirmado por você antes de virar link cadastrado.</p>
+  {% for r in redes_buscaveis %}
+    <form class="acao" method="post" action="{{ url_for('buscar_rede_social_contato', perfil_id=perfil.id) }}">
+      <input type="hidden" name="rede" value="{{ r }}">
+      <button type="submit">Buscar em {{ r }}</button>
+    </form>
+  {% endfor %}
+
+  {% if resultado_busca is not none %}
+    <h3>Candidatos em {{ rede_busca }}</h3>
+    {% if not resultado_busca.autenticado %}
+      <p class="vazio">{{ resultado_busca.motivo }}</p>
+    {% elif not resultado_busca.candidatos %}
+      <p class="vazio">Nenhum candidato encontrado. Tente ajustar o nome ou a empresa do contato antes de buscar de novo.</p>
+    {% else %}
+      <ul class="simples" style="list-style: none; padding-left: 0;">
+        {% for candidato in resultado_busca.candidatos %}
+          <li class="cartao">
+            <strong>{{ candidato.nome_exibido or "(sem nome)" }}</strong>
+            {% if candidato.descricao %}<br><span class="por-que">{{ candidato.descricao }}</span>{% endif %}
+            <br><a class="item-link" href="{{ candidato.link }}" target="_blank" rel="noopener noreferrer">{{ candidato.link }}</a>
+            <p>
+              <form class="acao" method="post" action="{{ url_for('adicionar_rede_social_contato', perfil_id=perfil.id) }}">
+                <input type="hidden" name="rede" value="{{ rede_busca }}">
+                <input type="hidden" name="link" value="{{ candidato.link }}">
+                <button type="submit" class="primario">Confirmar</button>
+              </form>
+              <button type="button" class="perigo" onclick="this.closest('li').remove()">Descartar</button>
+            </p>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endif %}
+
   <h2>Adicionar texto</h2>
   <form class="bloco" method="post" action="{{ url_for('adicionar_texto', perfil_id=perfil.id) }}">
     <textarea name="texto" placeholder="Cole ou digite um texto sobre este contato…"></textarea>
