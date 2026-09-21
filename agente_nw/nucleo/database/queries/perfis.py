@@ -198,6 +198,55 @@ def atualizar_campos_guiados(
         )
 
 
+_CAMPOS_EDITAVEIS_MANUAL = (
+    "nome",
+    "apelido",
+    "email",
+    "telefone",
+    "empresa",
+    "cargo",
+    "setor",
+    "cidade",
+    "naturalidade",
+    "linguas",
+    "formacao",
+    "tem_filhos",
+    "faixa_etaria",
+    "notas",
+)
+
+
+def atualizar_ficha_manual(
+    conexao: sqlite3.Connection, perfil_id: int, campos: dict[str, object], agora: str
+) -> None:
+    """Edição manual de campos da ficha do contato pelo usuário no console.
+
+    Sobrescreve o valor atual, mesmo se já preenchido — o oposto de
+    ``atualizar_campos_guiados`` (LLM-assistida), que só completa lacunas.
+    Chave `linguas` deve vir como lista; `tem_filhos` como bool ou None; os
+    demais como str ou None. Chaves fora de ``_CAMPOS_EDITAVEIS_MANUAL`` são
+    silenciosamente ignoradas.
+    """
+    for campo, valor in campos.items():
+        if campo not in _CAMPOS_EDITAVEIS_MANUAL:
+            continue
+
+        if campo == "linguas":
+            assert valor is None or isinstance(valor, list)
+            serializado = json.dumps(valor or [], ensure_ascii=False)
+            conexao.execute(
+                "UPDATE perfil SET linguas = ?, atualizado_em = ? WHERE id = ?",
+                (serializado, agora, perfil_id),
+            )
+            continue
+
+        valor_coluna = int(valor) if campo == "tem_filhos" and isinstance(valor, bool) else valor
+        conexao.execute(
+            f"UPDATE perfil SET {campo} = ?, atualizado_em = ? WHERE id = ?",  # noqa: S608 — allowlist acima
+            (valor_coluna, agora, perfil_id),
+        )
+
+
 def _desserializar(blob: bytes) -> list[float]:
     quantidade = len(blob) // 4
     return list(struct.unpack(f"<{quantidade}f", blob))

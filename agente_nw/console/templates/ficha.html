@@ -14,21 +14,42 @@
     </form>
   {% endif %}
 
-  <h2>Campos</h2>
-  <table>
-    <tbody>
-      {% for campo, valor, vazio in campos %}
-        <tr>
-          <th>{{ campo }}</th>
-          {% if vazio %}
-            <td class="lacunas">(vazio)</td>
-          {% else %}
-            <td>{{ valor }}</td>
-          {% endif %}
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <h2>Editar ficha</h2>
+  <form class="bloco" method="post" action="{{ url_for('editar_ficha', perfil_id=perfil.id) }}">
+    <label for="nome">Nome (obrigatório)</label>
+    <input id="nome" type="text" name="nome" required value="{{ perfil.nome }}">
+    <label for="apelido">Apelido</label>
+    <input id="apelido" type="text" name="apelido" value="{{ perfil.apelido or '' }}">
+    <label for="telefone">Telefone (formato internacional)</label>
+    <input id="telefone" type="text" name="telefone" value="{{ perfil.telefone or '' }}" placeholder="+5511900000000">
+    <label for="email">E-mail</label>
+    <input id="email" type="text" name="email" value="{{ perfil.email or '' }}">
+    <label for="empresa">Empresa</label>
+    <input id="empresa" type="text" name="empresa" value="{{ perfil.empresa or '' }}">
+    <label for="cargo">Cargo</label>
+    <input id="cargo" type="text" name="cargo" value="{{ perfil.cargo or '' }}">
+    <label for="setor">Setor</label>
+    <input id="setor" type="text" name="setor" value="{{ perfil.setor or '' }}">
+    <label for="cidade">Cidade</label>
+    <input id="cidade" type="text" name="cidade" value="{{ perfil.cidade or '' }}">
+    <label for="naturalidade">Naturalidade</label>
+    <input id="naturalidade" type="text" name="naturalidade" value="{{ perfil.naturalidade or '' }}">
+    <label for="linguas">Línguas (separadas por vírgula)</label>
+    <input id="linguas" type="text" name="linguas" value="{{ perfil.linguas|join(', ') }}">
+    <label for="formacao">Formação</label>
+    <input id="formacao" type="text" name="formacao" value="{{ perfil.formacao or '' }}">
+    <label for="tem_filhos">Tem filhos</label>
+    <select id="tem_filhos" name="tem_filhos">
+      <option value="" {% if perfil.tem_filhos is none %}selected{% endif %}>não sei</option>
+      <option value="sim" {% if perfil.tem_filhos is sameas true %}selected{% endif %}>sim</option>
+      <option value="nao" {% if perfil.tem_filhos is sameas false %}selected{% endif %}>não</option>
+    </select>
+    <label for="faixa_etaria">Faixa etária</label>
+    <input id="faixa_etaria" type="text" name="faixa_etaria" value="{{ perfil.faixa_etaria or '' }}" placeholder="Ex.: 30-40">
+    <label for="notas">Notas</label>
+    <textarea id="notas" name="notas" placeholder="Anotações livres sobre este contato">{{ perfil.notas or '' }}</textarea>
+    <p><button type="submit" class="primario">Salvar</button></p>
+  </form>
 
   <h2>Tags confirmadas</h2>
   {% if confirmadas %}

@@ -30,7 +30,7 @@ from agente_nw.nucleo.modelos.tema import Tema
 from agente_nw.nucleo.relevancia import cruzamento
 from agente_nw.nucleo.saidas.markdown import _MOTIVOS
 from agente_nw.perfil import extrator
-from agente_nw.perfil.lacunas import ORDEM_IMPACTO, campos_faltando
+from agente_nw.perfil.lacunas import campos_faltando
 from agente_nw.perfil.normalizacao import telefone_e164
 
 _NIVEIS: tuple[NivelTema, ...] = ("dominio", "interesse", "curiosidade")
@@ -121,8 +121,6 @@ def criar_app(
     def ficha(perfil_id: int) -> str:
         conn = _conn()
         perfil = _perfil_ou_404(perfil_id)
-        lacunas = set(campos_faltando(perfil))
-        campos = [(campo, getattr(perfil, campo), campo in lacunas) for campo in ORDEM_IMPACTO]
         tags = perfil_tema.listar_por_perfil(conn, perfil_id)
         tags_com_tema = [(tag, queries_temas.obter_por_id(conn, tag.tema_id)) for tag in tags]
         confirmadas = [(tag, tema) for tag, tema in tags_com_tema if tag.confirmado]
@@ -131,7 +129,6 @@ def criar_app(
         return render_template(
             "ficha.html",
             perfil=perfil,
-            campos=campos,
             confirmadas=confirmadas,
             nao_confirmadas=nao_confirmadas,
             redes=redes,
@@ -151,6 +148,48 @@ def criar_app(
         conn = _conn()
         _perfil_ou_404(perfil_id)
         perfis.ativar(conn, perfil_id)
+        conn.commit()
+        return redirect(url_for("ficha", perfil_id=perfil_id))
+
+    @app.route("/contatos/<int:perfil_id>/editar", methods=["POST"])
+    def editar_ficha(perfil_id: int) -> Response:
+        conn = _conn()
+        _perfil_ou_404(perfil_id)
+        nome = request.form.get("nome", "").strip()
+        if not nome:
+            abort(400)
+
+        def _texto_ou_none(chave: str) -> str | None:
+            bruto = request.form.get(chave, "").strip()
+            return bruto or None
+
+        tem_filhos_bruto = request.form.get("tem_filhos", "").strip()
+        if tem_filhos_bruto == "sim":
+            tem_filhos: bool | None = True
+        elif tem_filhos_bruto == "nao":
+            tem_filhos = False
+        else:
+            tem_filhos = None
+
+        campos: dict[str, object] = {
+            "nome": nome,
+            "apelido": _texto_ou_none("apelido"),
+            "email": _texto_ou_none("email"),
+            "telefone": telefone_e164(request.form.get("telefone", "")),
+            "empresa": _texto_ou_none("empresa"),
+            "cargo": _texto_ou_none("cargo"),
+            "setor": _texto_ou_none("setor"),
+            "cidade": _texto_ou_none("cidade"),
+            "naturalidade": _texto_ou_none("naturalidade"),
+            "linguas": _lista_de_csv(request.form.get("linguas", "")),
+            "formacao": _texto_ou_none("formacao"),
+            "tem_filhos": tem_filhos,
+            "faixa_etaria": _texto_ou_none("faixa_etaria"),
+            "notas": _texto_ou_none("notas"),
+        }
+
+        agora = datetime.now(UTC).isoformat()
+        perfis.atualizar_ficha_manual(conn, perfil_id, campos, agora)
         conn.commit()
         return redirect(url_for("ficha", perfil_id=perfil_id))
 

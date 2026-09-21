@@ -105,9 +105,7 @@ def test_contatos_lista_todos_com_lacunas_e_status(conn: sqlite3.Connection, cli
     assert "campo(s) faltando" in texto
 
 
-def test_ficha_mostra_lacunas_e_tags_confirmadas_e_pendentes(
-    conn: sqlite3.Connection, client: FlaskClient
-) -> None:
+def test_ficha_mostra_formulario_de_edicao_e_tags(conn: sqlite3.Connection, client: FlaskClient) -> None:
     contato = perfis.inserir_ou_atualizar_contato(conn, "Carla", None, "carla@x.com", None, None, None, AGORA)
     assert contato.id is not None
     tema = temas.obter_ou_criar(conn, "vela", "descrição do tema de vela para embedding", [], AGORA)
@@ -119,7 +117,9 @@ def test_ficha_mostra_lacunas_e_tags_confirmadas_e_pendentes(
 
     assert resposta.status_code == 200
     texto = resposta.get_data(as_text=True)
-    assert "(vazio)" in texto
+    assert "Editar ficha" in texto
+    assert 'name="empresa"' in texto
+    assert 'name="cidade"' in texto
     assert "vela" in texto
 
 
