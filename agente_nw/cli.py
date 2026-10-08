@@ -14,6 +14,7 @@ from contextlib import redirect_stdout
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import NamedTuple
+from urllib.parse import urlparse
 
 import httpx
 import yaml
@@ -99,9 +100,15 @@ def _buscar_tags_ollama(cliente: httpx.Client, ollama_url: str) -> list[str] | N
         return None
 
 
-def _verificar_ollama(cliente: httpx.Client, ollama_url: str) -> ItemVerificacao:
+def _verificar_ollama(
+    cliente: httpx.Client, ollama_url: str, servidor: ServidorNaPorta | None
+) -> ItemVerificacao:
     nomes = _buscar_tags_ollama(cliente, ollama_url)
-    return ItemVerificacao("Ollama responde", nomes is not None, ollama_url, obrigatorio=True)
+    detalhe = ollama_url
+    if servidor is not None:
+        compartilhada = ", compartilhada" if servidor.tipo == "outra instância" else ""
+        detalhe = f"{ollama_url} — {servidor.tipo} (PID {servidor.pid}){compartilhada}"
+    return ItemVerificacao("Ollama responde", nomes is not None, detalhe, obrigatorio=True)
 
 
 def modelos_obrigatorios(perfil: PerfilRoteamento) -> list[str]:
@@ -150,20 +157,78 @@ def _verificar_memoria(perfil: PerfilRoteamento) -> ItemVerificacao:
     return ItemVerificacao(nome, fisica_gb >= perfil.memoria_minima_gb, detalhe, obrigatorio=True)
 
 
-def _verificar_ollama_app_na_porta() -> ItemVerificacao:
-    nome = "Servidor não é o Ollama.app"
-    try:
-        saida = subprocess.run(["ps", "aux"], capture_output=True, text=True, timeout=5).stdout
-    except Exception as erro:
-        return ItemVerificacao(nome, True, f"não verificado: {erro}", obrigatorio=False)
+ROTULO_LAUNCHAGENT_PROJETO = "br.agente_nw.ollama"
 
-    app_rodando = "Ollama.app" in saida
-    detalhe = (
-        "Ollama.app está rodando — feche o aplicativo e suba 'ollama serve' pelo LaunchAgent do projeto"
-        if app_rodando
-        else "ok"
-    )
-    return ItemVerificacao(nome, not app_rodando, detalhe, obrigatorio=False)
+
+def _porta_de(ollama_url: str) -> int:
+    porta = urlparse(ollama_url).port
+    return porta if porta is not None else 11434
+
+
+def _classificar_processo(comando: str, pid: int, rotulos_launchctl: dict[str, int]) -> str:
+    if "Ollama.app" in comando:
+        return "Ollama.app"
+    if rotulos_launchctl.get(ROTULO_LAUNCHAGENT_PROJETO) == pid:
+        return "LaunchAgent do projeto"
+    if "ollama" in comando:
+        return "outra instância"
+    return "desconhecido"
+
+
+def _rotulos_launchctl() -> dict[str, int]:
+    saida = subprocess.run(
+        ["launchctl", "list"], capture_output=True, text=True, timeout=5, check=True
+    ).stdout
+    rotulos: dict[str, int] = {}
+    for linha in saida.splitlines()[1:]:
+        colunas = linha.split("\t")
+        if len(colunas) == 3 and colunas[0].isdigit():
+            rotulos[colunas[2]] = int(colunas[0])
+    return rotulos
+
+
+class ServidorNaPorta(NamedTuple):
+    tipo: str
+    pid: int
+    comando: str
+
+
+def _inspecionar_porta(porta: int) -> ServidorNaPorta | None:
+    """None quando nada escuta na porta ou quando lsof/ps não puderam ser lidos."""
+    try:
+        saida = subprocess.run(
+            ["lsof", "-nP", f"-iTCP:{porta}", "-sTCP:LISTEN", "-Fp"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        ).stdout
+        pids = [int(linha[1:]) for linha in saida.splitlines() if linha.startswith("p")]
+        if not pids:
+            return None
+        pid = pids[0]
+        comando = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True, timeout=5
+        ).stdout.strip()
+        try:
+            rotulos = _rotulos_launchctl()
+        except Exception:
+            rotulos = {}
+        return ServidorNaPorta(_classificar_processo(comando, pid, rotulos), pid, comando)
+    except Exception:
+        return None
+
+
+def _verificar_servidor_na_porta(ollama_url: str, servidor: ServidorNaPorta | None) -> ItemVerificacao:
+    nome = "Servidor não é o Ollama.app"
+    if servidor is None:
+        return ItemVerificacao(nome, True, "não verificado", obrigatorio=False)
+    if servidor.tipo == "Ollama.app":
+        detalhe = (
+            f"Ollama.app (PID {servidor.pid}) escuta em {ollama_url} — aponte ollama_url para outra "
+            "instância ou suba 'ollama serve' pelo LaunchAgent do projeto"
+        )
+        return ItemVerificacao(nome, False, detalhe, obrigatorio=False)
+    return ItemVerificacao(nome, True, f"{servidor.tipo} (PID {servidor.pid})", obrigatorio=False)
 
 
 def _verificar_arquivo_existe(nome: str, caminho: Path) -> ItemVerificacao:
@@ -182,14 +247,15 @@ def verificar_ambiente() -> int:
 
     cliente = http()
     perfil = config.roteamento.perfis[config.roteamento.perfil_ativo]
+    servidor = _inspecionar_porta(_porta_de(ollama_url))
     itens = [
         _verificar_perfil_llm(config.roteamento, origem_perfil_llm()),
         _verificar_python(),
         _verificar_sqlite_vec(),
-        _verificar_ollama(cliente, ollama_url),
+        _verificar_ollama(cliente, ollama_url, servidor),
         _verificar_memoria(perfil),
         *_verificar_modelos(cliente, ollama_url, perfil),
-        _verificar_ollama_app_na_porta(),
+        _verificar_servidor_na_porta(ollama_url, servidor),
         _verificar_arquivo_existe("temas.yaml existe", RAIZ / "temas.yaml"),
         _verificar_arquivo_existe("fontes.yaml existe", RAIZ / "fontes.yaml"),
     ]

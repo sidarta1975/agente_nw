@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
+<!-- Uso previsto: máquina dedicada (MacBook Air, perfil air16). Em máquina compartilhada com outros projetos, não instalar — ver AGENTS.md, seção Ollama. -->
 <dict>
 	<key>Label</key>
 	<string>br.agente_nw.ollama</string>

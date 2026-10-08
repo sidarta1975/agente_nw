@@ -1,7 +1,7 @@
 # AGENTS.md — agente_nw
 
 > Coloque este arquivo na raiz do repositório. Claude Code lê antes de qualquer tarefa.
-> Padrão herdado dos repositórios lex_hub, pandora_96 e claw.
+> Padrão herdado dos repositórios lex_hub, pandora_96 e claw_planalto (ferramenta externa, não clonada nesta máquina).
 
 ---
 
@@ -66,7 +66,10 @@ Nome do pacote e da pasta é sempre `agente_nw` — nunca `agente_relacionamento
 
 - Python 3.12 do Homebrew; Bash para utilitários.
 - SQLite em modo WAL, `busy_timeout` e `foreign_keys` ligados, arquivo único em `dados/agente.db`. Nunca compartilhado entre processos. `sqlite-vec` carregado na abertura da conexão.
-- Ollama para inferência local, `http://localhost:11434`, subido pelo LaunchAgent do projeto (`scripts/launchd/br.agente_nw.ollama.plist`) — nunca pelo aplicativo do Ollama. Modelo por tarefa vem do **perfil ativo** de `config/llm_routing.yaml`, escolhido por `perfil_llm` em `config/local.yaml` (ausente = `air16`): `air16` no Air (produção), `pro48` no Pro (desenvolvimento) — verificar com `ollama list` antes de sugerir download. `think: false` obrigatório em toda tarefa (o perfil pode omitir a chave do payload com `enviar_think: false`, para modelos sem modo de raciocínio); `bge-m3` para embeddings nos dois perfis. Dois modelos carregados ao mesmo tempo (`OLLAMA_MAX_LOADED_MODELS=2`, `OLLAMA_KEEP_ALIVE=30m`).
+- Ollama para inferência local, acessado pela `ollama_url` de `config/local.yaml`, por máquina. Modelo por tarefa vem do **perfil ativo** de `config/llm_routing.yaml`, escolhido por `perfil_llm` em `config/local.yaml` (ausente = `air16`) — verificar com `ollama list` antes de sugerir download. `think: false` obrigatório em toda tarefa (o perfil pode omitir a chave do payload com `enviar_think: false`, para modelos sem modo de raciocínio); `bge-m3` para embeddings nos dois perfis.
+  - **Máquina dedicada (Air, `air16`):** LaunchAgent próprio `br.agente_nw.ollama` em `http://localhost:11434`, com `OLLAMA_MAX_LOADED_MODELS=2` e `OLLAMA_KEEP_ALIVE=30m`, instalado por `scripts/instalar_macos.sh` — nunca pelo aplicativo Ollama.app.
+  - **Máquina compartilhada (Pro, `pro48`):** não instalar o LaunchAgent do projeto; `ollama_url` aponta para a instância já existente (hoje `http://127.0.0.1:11435`, mantida pelo `cervello`, modelo `qwen2.5:14b`). Nunca reiniciar essa instância a partir deste projeto.
+  - **Automação futura deste projeto:** garantir disponibilidade com `launchctl kickstart` **sem** `-k` e só do rótulo `br.agente_nw.ollama`; nunca `ollama serve` incondicional; nunca tocar em rótulos de outros projetos.
 - Embeddings: `bge-m3` (1024 dimensões, multilíngue).
 - Índice vetorial: `sqlite-vec`, no mesmo arquivo do banco.
 - Contratos: Pydantic v2 com `frozen=True`.

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 from pathlib import Path
 
 import httpx
@@ -14,11 +16,12 @@ PAGINA_HTML = f"<html><body><article>{_PARAGRAFO}</article></body></html>"
 
 
 def _feed_xml(nome: str, link: str) -> bytes:
+    publicado = format_datetime(datetime.now(UTC) - timedelta(days=1))
     return f"""<?xml version="1.0"?>
 <rss version="2.0"><channel><title>{nome}</title>
 <item><title>Notícia da fonte {nome} sobre um assunto qualquer</title>
 <link>{link}</link>
-<pubDate>Fri, 18 Sep 2026 10:00:00 GMT</pubDate></item>
+<pubDate>{publicado}</pubDate></item>
 </channel></rss>""".encode()
 
 

@@ -8,6 +8,17 @@ cd "$(dirname "$0")/.."
 # Python 3.12 do Homebrew (traz o próprio SQLite e aceita carregar extensões, que o sqlite-vec exige)
 brew install python@3.12
 
+# Máquina compartilhada: se já há um servidor Ollama na porta de destino, não instalar o LaunchAgent
+# do projeto — apontar ollama_url (config/local.yaml) para a instância existente.
+PORTA_OLLAMA=11434
+PID_EXISTENTE=$(lsof -nP -iTCP:"$PORTA_OLLAMA" -sTCP:LISTEN -t 2>/dev/null | head -n1 || true)
+if [ -n "$PID_EXISTENTE" ]; then
+    COMANDO_EXISTENTE=$(ps -p "$PID_EXISTENTE" -o command= || true)
+    echo "já existe um servidor Ollama em $PORTA_OLLAMA (PID $PID_EXISTENTE, comando $COMANDO_EXISTENTE)." >&2
+    echo "Em máquina compartilhada, aponte ollama_url em config/local.yaml para a instância existente em vez de instalar o LaunchAgent do projeto." >&2
+    exit 1
+fi
+
 # Ollama: a FÓRMULA do Homebrew instala só o binário. O instalador oficial (e o cask) instala o
 # aplicativo, que se registra no login e ocupa a porta 11434 — o conflito que o LaunchAgent do
 # brief 012 quer evitar. NÃO iniciar por `brew services start ollama`: isso cria um segundo
