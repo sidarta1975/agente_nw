@@ -74,13 +74,17 @@ def test_centroide_do_contato_entra_com_peso_03(conn: sqlite3.Connection) -> Non
     b = _assunto(conn, "B", _vetor(0.8, 0.6))  # 0,7 × 0,8 + 0,3 × 0,6 = 0,74
     conn.commit()
 
-    ordem, _ = selecionar_por_consulta(conn, contato.id, _vetor(1.0, 0.0), _vetor(0.0, 1.0), 0.6, 0.6, 10, [], _LIMIARES)
+    ordem, _ = selecionar_por_consulta(
+        conn, contato.id, _vetor(1.0, 0.0), _vetor(0.0, 1.0), 0.6, 0.6, 10, [], _LIMIARES
+    )
 
     assert [x.id for x in ordem] == [b, a]
 
 
 def test_evitados_saem_antes_do_corte_e_nao_ocupam_vaga(conn: sqlite3.Connection) -> None:
-    contato = perfis.inserir_ou_atualizar_contato(conn, "Ana", "+5511900001111", None, None, None, None, AGORA)
+    contato = perfis.inserir_ou_atualizar_contato(
+        conn, "Ana", "+5511900001111", None, None, None, None, AGORA
+    )
     assert contato.id is not None
     evitados = [_assunto(conn, f"Política tema {n}", _vetor(1.0, 0.0)) for n in range(3)]
     mantidos = [_assunto(conn, f"Vela tema {n}", _vetor(0.9, 0.1)) for n in range(12)]

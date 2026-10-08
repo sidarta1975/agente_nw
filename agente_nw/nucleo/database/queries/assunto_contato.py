@@ -62,7 +62,10 @@ def listar_do_dia(conexao: sqlite3.Connection, perfil_id: int, data: str) -> lis
 
 
 def listar_assunto_ids_ja_vistos(conexao: sqlite3.Connection, perfil_id: int) -> set[int]:
-    """Assuntos sobre os quais o usuário já decidiu (usado ou não serve) — só esses deixam de ser candidatos."""
+    """Assuntos sobre os quais o usuário já decidiu (usado ou não serve).
+
+    Só esses deixam de ser candidatos.
+    """
     linhas = conexao.execute(
         "SELECT DISTINCT assunto_id FROM assunto_contato "
         "WHERE perfil_id = ? AND status IN ('usado', 'nao_serve')",

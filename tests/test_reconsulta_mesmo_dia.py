@@ -93,7 +93,9 @@ def conn(tmp_path: Path) -> sqlite3.Connection:
 
 
 def _contato(conn: sqlite3.Connection) -> int:
-    contato = perfis.inserir_ou_atualizar_contato(conn, "Ana", "+5511900001111", None, None, None, None, AGORA)
+    contato = perfis.inserir_ou_atualizar_contato(
+        conn, "Ana", "+5511900001111", None, None, None, None, AGORA
+    )
     assert contato.id is not None
     conn.commit()
     return contato.id
@@ -121,8 +123,12 @@ def _contexto(assunto: str = "mercado de vela", evitar: list[str] | None = None)
     return ContextoConsulta(assunto=assunto, meio="pessoalmente", objetivo="retomar", evitar=evitar or [])
 
 
-def _consultar(conn: sqlite3.Connection, perfil_id: int, limiares: Limiares, contexto: ContextoConsulta) -> None:
-    cruzar_contato_por_consulta(_ClienteFalso(), conn, perfil_id, contexto, CENTROIDE_CONSULTA, limiares, AGORA)
+def _consultar(
+    conn: sqlite3.Connection, perfil_id: int, limiares: Limiares, contexto: ContextoConsulta
+) -> None:
+    cruzar_contato_por_consulta(
+        _ClienteFalso(), conn, perfil_id, contexto, CENTROIDE_CONSULTA, limiares, AGORA
+    )
 
 
 def _por_assunto(conn: sqlite3.Connection, perfil_id: int) -> dict[int, AssuntoContato]:

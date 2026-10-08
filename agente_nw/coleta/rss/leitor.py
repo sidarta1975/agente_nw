@@ -66,9 +66,7 @@ def coletar(
     hoje = datetime.now(UTC).date().isoformat()
 
     feeds_arquivo = (
-        _carregar_fontes_arquivo(caminho_fontes_yaml).feeds
-        if caminho_fontes_yaml is not None
-        else []
+        _carregar_fontes_arquivo(caminho_fontes_yaml).feeds if caminho_fontes_yaml is not None else []
     )
     temas_usuario = queries_temas.listar(conexao_bd)
     feeds_google_news = gerar_consultas(temas_usuario)
