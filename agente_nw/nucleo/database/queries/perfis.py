@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 import sqlite3
 import struct
+from typing import Protocol
 
 import sqlite_vec
 
+from agente_nw.nucleo.database.queries import fatos
 from agente_nw.nucleo.modelos.perfil import Perfil
 from agente_nw.nucleo.vetores import centroide as calcular_media_ponderada
 
@@ -403,6 +405,49 @@ def calcular_centroide(
         pesos.append(linha["peso"] * peso_do_nivel)
 
     return calcular_media_ponderada(vetores, pesos)
+
+
+_PESO_TAG_NAO_CONFIRMADA = 0.5
+_MAXIMO_FATOS_NO_CENTROIDE = 20
+
+
+class _ClienteEmbeddagem(Protocol):
+    def embeddar(self, textos: list[str]) -> list[list[float]]: ...
+
+
+def calcular_centroide_flexivel(
+    conexao: sqlite3.Connection,
+    perfil_id: int,
+    peso_nivel: dict[str, float],
+    cliente_llm: _ClienteEmbeddagem,
+) -> list[float] | None:
+    """Centroide do contato sem exigir tag confirmada (brief 034).
+
+    Fontes em ordem de preferência: (a) tags confirmadas; (b) tags sugeridas, com peso 0,5;
+    (c) embedding do texto dos fatos mais recentes. Sem nenhuma, devolve None."""
+    confirmado = calcular_centroide(conexao, perfil_id, peso_nivel)
+    if confirmado is not None:
+        return confirmado
+
+    linhas = conexao.execute(
+        "SELECT pt.peso, pt.nivel, vt.embedding AS embedding FROM perfil_tema pt "
+        "JOIN vetor_tema vt ON vt.tema_id = pt.tema_id "
+        "WHERE pt.perfil_id = ? AND pt.confirmado = 0",
+        (perfil_id,),
+    ).fetchall()
+    if linhas:
+        vetores = [_desserializar(linha["embedding"]) for linha in linhas]
+        pesos = [
+            linha["peso"] * (peso_nivel[linha["nivel"]] if linha["nivel"] is not None else 1.0)
+            for linha in linhas
+        ]
+        return calcular_media_ponderada(vetores, [peso * _PESO_TAG_NAO_CONFIRMADA for peso in pesos])
+
+    fatos_recentes = fatos.listar_recentes(conexao, perfil_id, _MAXIMO_FATOS_NO_CENTROIDE)
+    if not fatos_recentes:
+        return None
+    texto = "\n".join(fato.conteudo for fato in fatos_recentes)
+    return cliente_llm.embeddar([texto])[0]
 
 
 def gravar_centroide(conexao: sqlite3.Connection, perfil_id: int, centroide: list[float]) -> None:

@@ -19,7 +19,7 @@ from agente_nw.nucleo.database.queries import fontes as queries_fontes
 from agente_nw.nucleo.database.queries import itens as queries_itens
 from agente_nw.nucleo.database.queries import sistema
 from agente_nw.nucleo.database.queries import temas as queries_temas
-from agente_nw.nucleo.modelos.configuracao import ColetaLimiares, FontesArquivo
+from agente_nw.nucleo.modelos.configuracao import ColetaLimiares, FeedFonte, FontesArquivo
 from agente_nw.nucleo.modelos.fonte import Fonte
 from agente_nw.nucleo.modelos.item import Item
 
@@ -56,20 +56,25 @@ def _data_feedparser_para_iso(entrada: feedparser.FeedParserDict) -> str | None:
 def coletar(
     conexao_bd: sqlite3.Connection,
     cliente_http: httpx.Client,
-    caminho_fontes_yaml: Path,
+    caminho_fontes_yaml: Path | None,
     limiares: ColetaLimiares,
     caminho_sentinela: Path,
+    feeds_extras: list[FeedFonte] | None = None,
 ) -> ResumoColeta:
     inicio = time.monotonic()
     resumo = ResumoColeta()
     hoje = datetime.now(UTC).date().isoformat()
 
-    feeds_arquivo = _carregar_fontes_arquivo(caminho_fontes_yaml).feeds
+    feeds_arquivo = (
+        _carregar_fontes_arquivo(caminho_fontes_yaml).feeds
+        if caminho_fontes_yaml is not None
+        else []
+    )
     temas_usuario = queries_temas.listar(conexao_bd)
     feeds_google_news = gerar_consultas(temas_usuario)
 
     fontes_no_banco: list[Fonte] = []
-    for feed in [*feeds_arquivo, *feeds_google_news]:
+    for feed in [*feeds_arquivo, *feeds_google_news, *(feeds_extras or [])]:
         fonte = queries_fontes.obter_ou_criar(
             conexao_bd, feed.nome, feed.url, _dominio(feed.url), feed.tipo, feed.confiabilidade
         )

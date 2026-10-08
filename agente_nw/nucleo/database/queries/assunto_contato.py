@@ -6,7 +6,7 @@ from agente_nw.nucleo.modelos.assunto_contato import AssuntoContato
 
 _COLUNAS = (
     "id, assunto_id, perfil_id, gerado_em, tipo, aderencia_contato, aderencia_usuario, "
-    "conversavel, score, por_que, status, motivo"
+    "conversavel, score, por_que, status, motivo, aderencia_consulta"
 )
 
 
@@ -24,6 +24,7 @@ def _para_assunto_contato(linha: sqlite3.Row) -> AssuntoContato:
         por_que=linha["por_que"],
         status=linha["status"],
         motivo=linha["motivo"],
+        aderencia_consulta=linha["aderencia_consulta"],
     )
 
 
@@ -31,8 +32,8 @@ def inserir(conexao: sqlite3.Connection, assunto_contato: AssuntoContato) -> boo
     cursor = conexao.execute(
         "INSERT INTO assunto_contato "
         "(assunto_id, perfil_id, gerado_em, tipo, aderencia_contato, aderencia_usuario, "
-        "conversavel, score, por_que, status, motivo) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "conversavel, score, por_que, status, motivo, aderencia_consulta) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT (assunto_id, perfil_id, gerado_em) DO NOTHING",
         (
             assunto_contato.assunto_id,
@@ -46,6 +47,7 @@ def inserir(conexao: sqlite3.Connection, assunto_contato: AssuntoContato) -> boo
             assunto_contato.por_que,
             assunto_contato.status,
             assunto_contato.motivo,
+            assunto_contato.aderencia_consulta,
         ),
     )
     return cursor.rowcount > 0
@@ -60,10 +62,23 @@ def listar_do_dia(conexao: sqlite3.Connection, perfil_id: int, data: str) -> lis
 
 
 def listar_assunto_ids_ja_vistos(conexao: sqlite3.Connection, perfil_id: int) -> set[int]:
+    """Assuntos sobre os quais o usuário já decidiu (usado ou não serve) — só esses deixam de ser candidatos."""
     linhas = conexao.execute(
-        "SELECT DISTINCT assunto_id FROM assunto_contato WHERE perfil_id = ?", (perfil_id,)
+        "SELECT DISTINCT assunto_id FROM assunto_contato "
+        "WHERE perfil_id = ? AND status IN ('usado', 'nao_serve')",
+        (perfil_id,),
     ).fetchall()
     return {linha["assunto_id"] for linha in linhas}
+
+
+def apagar_nao_decididos_do_dia(conexao: sqlite3.Connection, perfil_id: int, data: str) -> int:
+    """Apaga as linhas do dia ainda não decididas pelo usuário (novo ou descartado)."""
+    cursor = conexao.execute(
+        "DELETE FROM assunto_contato "
+        "WHERE perfil_id = ? AND gerado_em = ? AND status IN ('novo', 'descartado')",
+        (perfil_id, data),
+    )
+    return cursor.rowcount
 
 
 def marcar_usado(conexao: sqlite3.Connection, ac_id: int) -> bool:

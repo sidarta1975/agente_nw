@@ -4,7 +4,7 @@ import math
 
 import pytest
 
-from agente_nw.nucleo.modelos.configuracao import ConectorLimiares
+from agente_nw.nucleo.modelos.configuracao import ConectorLimiares, ConsultaLimiares
 from agente_nw.nucleo.relevancia.pontuacao import avaliar
 
 _CENTROIDE_ASSUNTO = [1.0, 0.0]
@@ -22,6 +22,15 @@ def limiares() -> ConectorLimiares:
         peso_nivel=_PESO_NIVEL,
         candidatos_por_contato=10,
         itens_no_menu=5,
+        consulta=ConsultaLimiares(
+            minima=0.45,
+            peso_consulta=50,
+            peso_contato=25,
+            peso_usuario=10,
+            peso_conversavel=15,
+            selecao_peso_consulta=0.7,
+            selecao_peso_contato=0.3,
+        ),
     )
 
 

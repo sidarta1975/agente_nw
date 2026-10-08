@@ -23,3 +23,4 @@ class AssuntoContato(BaseModel):
     por_que: str | None = None
     status: StatusAssuntoContato
     motivo: str | None = None
+    aderencia_consulta: float | None = None

@@ -15,6 +15,7 @@ class Avaliacao:
     score: float
     tipo: TipoConector
     ponto_de_apoio: str | None
+    aderencia_consulta: float | None = None
 
 
 def avaliar(
@@ -77,4 +78,77 @@ def avaliar(
         score=score,
         tipo=tipo,
         ponto_de_apoio=ponto_de_apoio,
+    )
+
+
+def avaliar_por_consulta(
+    centroide_assunto: list[float],
+    centroide_consulta: list[float],
+    centroide_contato: list[float] | None,
+    temas_usuario: list[tuple[str, str, list[float]]],
+    conversavel: float,
+    limiares: ConectorLimiares,
+    termos_consulta: list[tuple[str, list[float]]] | None = None,
+    tags_contato: list[tuple[str, list[float]]] | None = None,
+) -> Avaliacao:
+    """Pontuação em que o contexto da consulta é o sinal principal; contato e usuário só enriquecem."""
+    aderencia_consulta = max(cosseno(centroide_assunto, centroide_consulta), 0.0)
+    aderencia_contato = (
+        max(cosseno(centroide_assunto, centroide_contato), 0.0) if centroide_contato is not None else 0.0
+    )
+
+    aderencia_usuario = 0.0
+    for _nome, nivel, embedding_tema in temas_usuario:
+        ponderado = max(cosseno(centroide_assunto, embedding_tema), 0.0) * limiares.peso_nivel[nivel]
+        aderencia_usuario = max(aderencia_usuario, ponderado)
+
+    # Quem sustenta o "conector": (nome, cosseno) de cada sinal que passou do seu limiar.
+    sustentos: list[tuple[str, float]] = []
+    if aderencia_consulta >= limiares.consulta.minima:
+        pares_contexto = termos_consulta or []
+        melhor_termo = max(
+            ((nome, cosseno(centroide_assunto, vetor)) for nome, vetor in pares_contexto),
+            key=lambda par: par[1],
+            default=None,
+        )
+        sustentos.append(melhor_termo if melhor_termo is not None else ("", aderencia_consulta))
+    for nome, nivel, embedding_tema in temas_usuario:
+        cos_bruto = cosseno(centroide_assunto, embedding_tema)
+        if nivel in ("dominio", "interesse") and cos_bruto >= limiares.adjacencia_minima:
+            sustentos.append((nome, cos_bruto))
+    if tags_contato:
+        for nome, embedding_tag in tags_contato:
+            cos_bruto = cosseno(centroide_assunto, embedding_tag)
+            if cos_bruto >= limiares.adjacencia_minima:
+                sustentos.append((nome, cos_bruto))
+    elif centroide_contato is not None and aderencia_contato >= limiares.adjacencia_minima:
+        sustentos.append(("", aderencia_contato))
+
+    ponto_de_apoio: str | None
+    if sustentos:
+        tipo: TipoConector = "conector"
+        nome_apoio = max(sustentos, key=lambda par: par[1])[0]
+        ponto_de_apoio = nome_apoio or None
+    elif conversavel >= limiares.conversavel_viavel:
+        tipo = "viavel_com_esforco"
+        ponto_de_apoio = None
+    else:
+        tipo = "fora_do_dominio"
+        ponto_de_apoio = None
+
+    score = (
+        limiares.consulta.peso_consulta * aderencia_consulta
+        + limiares.consulta.peso_contato * aderencia_contato
+        + limiares.consulta.peso_usuario * aderencia_usuario
+        + limiares.consulta.peso_conversavel * conversavel
+    )
+
+    return Avaliacao(
+        aderencia_contato=aderencia_contato,
+        aderencia_usuario=aderencia_usuario,
+        conversavel=conversavel,
+        score=score,
+        tipo=tipo,
+        ponto_de_apoio=ponto_de_apoio,
+        aderencia_consulta=aderencia_consulta,
     )

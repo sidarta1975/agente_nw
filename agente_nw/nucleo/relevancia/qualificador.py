@@ -37,10 +37,13 @@ def _itens_recentes_resumidos(conexao: sqlite3.Connection, assunto_id: int) -> l
 
 
 def qualificar_pendentes(
-    cliente_llm: ClienteQualificacao, conexao: sqlite3.Connection, limite: int
+    cliente_llm: ClienteQualificacao,
+    conexao: sqlite3.Connection,
+    limite: int,
+    vetores_extras: list[list[float]] | None = None,
 ) -> ResumoQualificacao:
     resumo = ResumoQualificacao()
-    candidatos = assuntos.listar_candidatos_qualificacao(conexao, limite)
+    candidatos = assuntos.listar_candidatos_qualificacao(conexao, limite, vetores_extras)
     resumo.candidatos = len(candidatos)
 
     nomes_temas_conhecidos = [tema.nome for tema in queries_temas.listar(conexao)]

@@ -107,10 +107,35 @@ class QualificacaoLimiares(BaseModel):
     teto_por_dia: int
 
 
+class ConsultaLimiares(BaseModel):
+    """Calibração do caminho por consulta (brief 034/035)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    minima: float
+    peso_consulta: float
+    peso_contato: float
+    peso_usuario: float
+    peso_conversavel: float
+    selecao_peso_consulta: float
+    selecao_peso_contato: float
+
+    @model_validator(mode="after")
+    def pesos_somam_o_esperado(self) -> ConsultaLimiares:
+        soma_score = self.peso_consulta + self.peso_contato + self.peso_usuario + self.peso_conversavel
+        if abs(soma_score - 100) > 1e-9:
+            raise ValueError(f"pesos do score devem somar 100, somam {soma_score}")
+        soma_selecao = self.selecao_peso_consulta + self.selecao_peso_contato
+        if abs(soma_selecao - 1) > 1e-9:
+            raise ValueError(f"pesos da seleção devem somar 1, somam {soma_selecao}")
+        return self
+
+
 class ConectorLimiares(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     adjacencia_minima: float
+    consulta: ConsultaLimiares
     conversavel_viavel: float
     peso_aderencia_contato: float
     peso_aderencia_usuario: float

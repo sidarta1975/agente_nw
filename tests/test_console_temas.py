@@ -15,6 +15,7 @@ from agente_nw.nucleo.modelos.configuracao import (
     CartaoLimiares,
     ColetaLimiares,
     ConectorLimiares,
+    ConsultaLimiares,
     Limiares,
     QualificacaoLimiares,
 )
@@ -41,6 +42,15 @@ def _limiares() -> Limiares:
             peso_nivel={"dominio": 1.0, "interesse": 0.7, "curiosidade": 0.4},
             candidatos_por_contato=10,
             itens_no_menu=5,
+            consulta=ConsultaLimiares(
+                minima=0.45,
+                peso_consulta=50,
+                peso_contato=25,
+                peso_usuario=10,
+                peso_conversavel=15,
+                selecao_peso_consulta=0.7,
+                selecao_peso_contato=0.3,
+            ),
         ),
         coleta=ColetaLimiares(
             teaser_minimo_caracteres=400,

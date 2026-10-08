@@ -8,7 +8,13 @@ import yaml
 from pydantic import ValidationError
 
 from agente_nw.cli import modelos_obrigatorios
-from agente_nw.nucleo.modelos.configuracao import Configuracao, Limiares, Roteamento, TemasArquivo
+from agente_nw.nucleo.modelos.configuracao import (
+    Configuracao,
+    ConsultaLimiares,
+    Limiares,
+    Roteamento,
+    TemasArquivo,
+)
 from config import container
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -143,6 +149,39 @@ def test_limiares_carrega_e_tem_todas_as_chaves() -> None:
     assert limiares.conector.peso_nivel == {"dominio": 1.0, "interesse": 0.7, "curiosidade": 0.4}
     assert limiares.conector.candidatos_por_contato == 10
     assert limiares.conector.itens_no_menu == 5
+
+
+def _consulta_limiares(**mudancas: float) -> ConsultaLimiares:
+    base = {
+        "minima": 0.45,
+        "peso_consulta": 50,
+        "peso_contato": 25,
+        "peso_usuario": 10,
+        "peso_conversavel": 15,
+        "selecao_peso_consulta": 0.7,
+        "selecao_peso_contato": 0.3,
+    }
+    return ConsultaLimiares.model_validate({**base, **mudancas})
+
+
+def test_consulta_limiares_valida_com_pesos_corretos() -> None:
+    assert _consulta_limiares().peso_consulta == 50
+
+
+def test_consulta_limiares_rejeita_pesos_do_score_que_nao_somam_100() -> None:
+    with pytest.raises(ValidationError, match="100"):
+        _consulta_limiares(peso_usuario=20)
+
+
+def test_consulta_limiares_rejeita_pesos_da_selecao_que_nao_somam_1() -> None:
+    with pytest.raises(ValidationError, match="seleção"):
+        _consulta_limiares(selecao_peso_contato=0.5)
+
+
+def test_limiares_versionados_trazem_o_bloco_consulta() -> None:
+    limiares = Limiares.model_validate(_carregar(RAIZ / "config" / "limiares.yaml"))
+    assert limiares.conector.consulta.minima == 0.45
+    assert limiares.conector.consulta.peso_consulta == 50
 
 
 def test_tema_com_nivel_invalido_falha() -> None:

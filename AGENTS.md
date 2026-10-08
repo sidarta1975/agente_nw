@@ -105,7 +105,7 @@ Requisitos que continuam valendo em toda execução, mesmo sob demanda: idempot�
 
 ## 7. Comportamento do software
 
-O usuário aciona uma consulta para um contato específico com um contexto (motivo, ocasião, o que quer descobrir). O sistema busca em paralelo notícia filtrada pelos temas do contato, faz uma leitura de rede social por automação de navegador com a sessão do próprio usuário e usa o que já está registrado sobre o contato; o motor de cruzamento avalia os candidatos, monta um menu de assuntos com o "por quê" de cada um, e grava a resposta no histórico permanente daquele contato. Não existe geração nem envio de mensagem: o usuário decide o que fazer com o menu. Nunca rodam sozinhos: git, leitura de rede social, alteração de ficha de contato.
+O usuário aciona uma consulta para um contato específico com um contexto (motivo, ocasião, o que quer descobrir). O sistema busca em paralelo notícia filtrada pelos temas do contato, faz uma leitura de rede social por automação de navegador com a sessão do próprio usuário e usa o que já está registrado sobre o contato; o motor de cruzamento avalia os candidatos, monta um menu de assuntos com o "por quê" de cada um, e grava a resposta no histórico permanente daquele contato. Não existe geração nem envio de mensagem: o usuário decide o que fazer com o menu. Nunca rodam sozinhos: git, leitura de rede social, alteração de ficha de contato. O contexto digitado na consulta é o sinal principal do cruzamento; tags, fatos e temas enriquecem quando existem e nunca bloqueiam. Um assunto só deixa de ser candidato para um contato quando o usuário o marca como usado ou como não serve; reconsultar no mesmo dia substitui o menu do dia.
 
 ## 8. Relatório final obrigatório
 

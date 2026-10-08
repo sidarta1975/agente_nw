@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
 from agente_nw.nucleo.modelos.cruzamento import RespostaCruzarPorQue
 
 ESQUEMA = RespostaCruzarPorQue
@@ -30,6 +31,7 @@ def construir_prompt(
     temas_contato: list[str],
     temas_usuario_com_nivel: list[tuple[str, str]],
     assuntos: list[tuple[str, str, str | None]],
+    contexto: ContextoConsulta | None = None,
 ) -> str:
     lista_temas_contato = ", ".join(temas_contato) if temas_contato else "(nenhum)"
     lista_temas_usuario = (
@@ -48,6 +50,19 @@ def construir_prompt(
         f'{indice}. "{titulo}" — tipo: {tipo}, ponto de apoio do usuário: {ponto_de_apoio}'
         for indice, (titulo, tipo, ponto_de_apoio) in enumerate(_EXEMPLO_ASSUNTOS, start=1)
     )
+
+    bloco_contexto = ""
+    if contexto is not None:
+        interessa = ", ".join(contexto.interessa) if contexto.interessa else "(nada informado)"
+        evitar = ", ".join(contexto.evitar) if contexto.evitar else "(nada informado)"
+        bloco_contexto = f"""\
+Contexto da consulta: assunto: {contexto.assunto}; objetivo: {contexto.objetivo};
+interessa: {interessa}; evitar: {evitar}.
+O "por quê" deve dizer por que o assunto serve para essa consulta (o que o usuário quer com o
+contato e o que a notícia traz sobre isso). Quando o assunto também tiver conexão com um tema do
+contato ou do usuário, cite essa conexão além da consulta. Sem tema nenhum, a consulta basta.
+
+"""
 
     return f"""\
 Você recebe o nome de um contato, os temas dele, os temas do usuário (com o
@@ -69,7 +84,7 @@ Assuntos:
 {lista_exemplo_assuntos}
 JSON: {_EXEMPLO_SAIDA}
 
-Contato: {apelido_ou_nome}
+{bloco_contexto}Contato: {apelido_ou_nome}
 Temas do contato: {lista_temas_contato}
 Temas do usuário: {lista_temas_usuario}
 Assuntos:

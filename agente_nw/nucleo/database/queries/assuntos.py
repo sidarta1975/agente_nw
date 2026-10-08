@@ -132,7 +132,9 @@ def obter_centroide(conexao: sqlite3.Connection, assunto_id: int) -> list[float]
     return _desserializar(linha["centroide"]) if linha is not None else None
 
 
-def listar_candidatos_qualificacao(conexao: sqlite3.Connection, limite: int) -> list[Assunto]:
+def listar_candidatos_qualificacao(
+    conexao: sqlite3.Connection, limite: int, vetores_extras: list[list[float]] | None = None
+) -> list[Assunto]:
     linhas_temas = conexao.execute(
         "SELECT DISTINCT vt.embedding FROM perfil_tema pt "
         "JOIN perfil p ON p.id = pt.perfil_id "
@@ -140,6 +142,7 @@ def listar_candidatos_qualificacao(conexao: sqlite3.Connection, limite: int) -> 
         "WHERE p.tipo = 'usuario' OR p.ativo = 1"
     ).fetchall()
     embeddings_temas = [_desserializar(linha["embedding"]) for linha in linhas_temas]
+    embeddings_temas.extend(vetores_extras or [])
     if not embeddings_temas:
         return []
 

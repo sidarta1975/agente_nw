@@ -92,3 +92,23 @@ def listar_confirmados_com_embedding(
         (perfil_id,),
     ).fetchall()
     return [(linha["nome"], linha["nivel"], _desserializar(linha["embedding"])) for linha in linhas]
+
+
+def listar_do_contato_com_embedding(
+    conexao: sqlite3.Connection, perfil_id: int
+) -> list[tuple[str, list[float], bool]]:
+    """Tags do contato com embedding: as confirmadas, ou, na ausência delas, as sugeridas.
+
+    Devolve (nome, embedding, confirmado), das mais pesadas para as mais leves."""
+    linhas = conexao.execute(
+        "SELECT t.nome AS nome, pt.confirmado AS confirmado, vt.embedding AS embedding FROM perfil_tema pt "
+        "JOIN tema t ON t.id = pt.tema_id "
+        "JOIN vetor_tema vt ON vt.tema_id = pt.tema_id "
+        "WHERE pt.perfil_id = ? ORDER BY pt.peso DESC, t.nome",
+        (perfil_id,),
+    ).fetchall()
+    confirmadas = [linha for linha in linhas if linha["confirmado"] == 1]
+    escolhidas = confirmadas if confirmadas else list(linhas)
+    return [
+        (linha["nome"], _desserializar(linha["embedding"]), linha["confirmado"] == 1) for linha in escolhidas
+    ]

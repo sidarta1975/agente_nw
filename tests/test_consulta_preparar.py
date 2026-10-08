@@ -22,6 +22,7 @@ from agente_nw.nucleo.modelos.configuracao import (
     CartaoLimiares,
     ColetaLimiares,
     ConectorLimiares,
+    ConsultaLimiares,
     Limiares,
     QualificacaoLimiares,
 )
@@ -49,6 +50,15 @@ def _limiares() -> Limiares:
             peso_nivel={"dominio": 1.0, "interesse": 0.7, "curiosidade": 0.4},
             candidatos_por_contato=10,
             itens_no_menu=5,
+            consulta=ConsultaLimiares(
+                minima=0.45,
+                peso_consulta=50,
+                peso_contato=25,
+                peso_usuario=10,
+                peso_conversavel=15,
+                selecao_peso_consulta=0.7,
+                selecao_peso_contato=0.3,
+            ),
         ),
         coleta=ColetaLimiares(
             teaser_minimo_caracteres=400,
@@ -66,6 +76,11 @@ def conn(tmp_path: Path) -> sqlite3.Connection:
     conexao_aberta = conexao.abrir(tmp_path / "teste.db")
     migracoes.aplicar(conexao_aberta)
     return conexao_aberta
+
+
+class _ClienteLLMFalso:
+    def embeddar(self, textos: list[str]) -> list[list[float]]:
+        return [[1.0] + [0.0] * 1023 for _ in textos]
 
 
 def _pagina_dummy(_pasta: Path) -> Pagina:
@@ -86,7 +101,7 @@ def _instalar_mocks_pipeline(
     )
     monkeypatch.setattr(
         consulta_mod.cruzamento,
-        "cruzar_contato",
+        "cruzar_contato_por_consulta",
         hook_cruzar if hook_cruzar is not None else (lambda *_a, **_kw: None),
     )
 
@@ -131,7 +146,9 @@ def test_preparar_com_rede_social_e_historico_grava_consulta_e_menu(
         ),
     )
 
-    def _cruzar_falso(_llm: Any, conexao: sqlite3.Connection, perfil_id: int, _l: Any, agora: str) -> None:
+    def _cruzar_falso(
+        _llm: Any, conexao: sqlite3.Connection, perfil_id: int, _ctx: Any, _vetor: Any, _l: Any, agora: str
+    ) -> None:
         registro = AssuntoContato(
             assunto_id=assunto_id,
             perfil_id=perfil_id,
@@ -160,7 +177,7 @@ def test_preparar_com_rede_social_e_historico_grava_consulta_e_menu(
     contexto = _contexto_padrao()
     resultado = consulta_mod.preparar(
         conexao=conn,
-        cliente_llm=object(),
+        cliente_llm=_ClienteLLMFalso(),
         cliente_http=object(),  # type: ignore[arg-type]
         perfil_id=contato.id,
         contexto=contexto,
@@ -211,7 +228,7 @@ def test_preparar_sem_rede_social_e_sem_historico_devolve_aviso_e_grava_consulta
     contexto = _contexto_padrao()
     resultado = consulta_mod.preparar(
         conexao=conn,
-        cliente_llm=object(),
+        cliente_llm=_ClienteLLMFalso(),
         cliente_http=object(),  # type: ignore[arg-type]
         perfil_id=contato.id,
         contexto=contexto,
@@ -236,7 +253,7 @@ def test_preparar_sem_rede_social_e_sem_historico_devolve_aviso_e_grava_consulta
     assert assuntos_gravados == []
 
 
-def test_preparar_pula_coleta_quando_fontes_yaml_ausente(
+def test_preparar_coleta_so_com_feeds_do_contexto_quando_fontes_yaml_ausente(
     monkeypatch: pytest.MonkeyPatch, conn: sqlite3.Connection, tmp_path: Path
 ) -> None:
     contato = perfis.inserir_ou_atualizar_contato(
@@ -245,10 +262,10 @@ def test_preparar_pula_coleta_quando_fontes_yaml_ausente(
     assert contato.id is not None
     conn.commit()
 
-    chamou_coletar = {"count": 0}
+    chamadas: list[tuple[tuple[Any, ...], dict[str, Any]]] = []
 
-    def _coletar_espia(*_a: Any, **_kw: Any) -> None:
-        chamou_coletar["count"] += 1
+    def _coletar_espia(*args: Any, **kwargs: Any) -> None:
+        chamadas.append((args, kwargs))
 
     monkeypatch.setattr(consulta_mod.leitor_rss, "coletar", _coletar_espia)
     monkeypatch.setattr(consulta_mod.extrator_perfil, "processar_fila", lambda *_a, **_kw: None)
@@ -259,11 +276,11 @@ def test_preparar_pula_coleta_quando_fontes_yaml_ausente(
         "ler_redes_sociais_do_contato",
         lambda *_a, **_kw: ResumoLeitura(perfil_id=contato.id),
     )
-    monkeypatch.setattr(consulta_mod.cruzamento, "cruzar_contato", lambda *_a, **_kw: None)
+    monkeypatch.setattr(consulta_mod.cruzamento, "cruzar_contato_por_consulta", lambda *_a, **_kw: None)
 
     consulta_mod.preparar(
         conexao=conn,
-        cliente_llm=object(),
+        cliente_llm=_ClienteLLMFalso(),
         cliente_http=object(),  # type: ignore[arg-type]
         perfil_id=contato.id,
         contexto=_contexto_padrao(),
@@ -275,7 +292,11 @@ def test_preparar_pula_coleta_quando_fontes_yaml_ausente(
         agora=AGORA,
     )
 
-    assert chamou_coletar["count"] == 0
+    assert len(chamadas) == 1
+    args, kwargs = chamadas[0]
+    assert args[2] is None  # sem fontes.yaml: só os feeds do contexto
+    nomes = [feed.nome for feed in kwargs["feeds_extras"]]
+    assert any("mercado" in nome or "reunião trimestral" in nome for nome in nomes)
 
 
 def test_preparar_com_rodar_coleta_falso_pula_coleta_mesmo_com_fontes_existente(
@@ -302,11 +323,11 @@ def test_preparar_com_rodar_coleta_falso_pula_coleta_mesmo_com_fontes_existente(
         "ler_redes_sociais_do_contato",
         lambda *_a, **_kw: ResumoLeitura(perfil_id=contato.id),
     )
-    monkeypatch.setattr(consulta_mod.cruzamento, "cruzar_contato", lambda *_a, **_kw: None)
+    monkeypatch.setattr(consulta_mod.cruzamento, "cruzar_contato_por_consulta", lambda *_a, **_kw: None)
 
     consulta_mod.preparar(
         conexao=conn,
-        cliente_llm=object(),
+        cliente_llm=_ClienteLLMFalso(),
         cliente_http=object(),  # type: ignore[arg-type]
         perfil_id=contato.id,
         contexto=_contexto_padrao(),

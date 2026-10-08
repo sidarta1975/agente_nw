@@ -11,12 +11,14 @@ import httpx
 
 from agente_nw.coleta.capturas import leitor as leitor_capturas
 from agente_nw.coleta.capturas.navegador import Pagina
+from agente_nw.coleta.rss import google_news
 from agente_nw.coleta.rss import leitor as leitor_rss
 from agente_nw.nucleo import historico as historico_mod
 from agente_nw.nucleo.agrupamento import agrupador
 from agente_nw.nucleo.database.queries import assunto_contato as assunto_contato_q
 from agente_nw.nucleo.database.queries import assuntos as assuntos_q
 from agente_nw.nucleo.database.queries import consulta_contato as consulta_contato_q
+from agente_nw.nucleo.database.queries import perfil_tema as perfil_tema_q
 from agente_nw.nucleo.modelos.configuracao import Limiares
 from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
 from agente_nw.nucleo.relevancia import cruzamento, qualificador
@@ -67,6 +69,11 @@ def _resumo_rede_para_texto(resumo: ResumoRedeSocial) -> str | None:
     return " · ".join(partes)
 
 
+def _texto_da_consulta(contexto: ContextoConsulta) -> str:
+    partes = [contexto.assunto, contexto.objetivo, *contexto.interessa, contexto.livre]
+    return "\n".join(parte for parte in partes if parte.strip())
+
+
 def preparar(
     conexao: sqlite3.Connection,
     cliente_llm: Any,
@@ -92,16 +99,32 @@ def preparar(
     ou sem histórico anterior não interrompe o fluxo; o resultado devolve um
     `aviso` quando não há assunto qualificado.
 
-    O motor de cruzamento e a pontuação são reaproveitados sem alteração.
-    O `contexto` inteiro é serializado em `contexto_json`; hoje não é lido pelo
-    motor — briefs futuros podem passar a usá-lo via `historico.formatar`.
+    O contexto lido pelo motor desde o brief 034: vira o centroide da consulta
+    (sinal principal), gera consultas ao Google News, filtra `evitar` e entra no
+    "por quê". Tags e fatos do contato e temas do usuário enriquecem quando
+    existem e nunca bloqueiam. O `contexto` inteiro também é serializado em
+    `contexto_json`.
     """
-    if rodar_coleta and caminho_fontes.exists():
-        leitor_rss.coletar(conexao, cliente_http, caminho_fontes, limiares.coleta, caminho_sentinela)
+    centroide_consulta = cliente_llm.embeddar([_texto_da_consulta(contexto)])[0]
+
+    if rodar_coleta:
+        termos_contato = [
+            nome for nome, _, _ in perfil_tema_q.listar_do_contato_com_embedding(conexao, perfil_id)
+        ]
+        leitor_rss.coletar(
+            conexao,
+            cliente_http,
+            caminho_fontes if caminho_fontes.exists() else None,
+            limiares.coleta,
+            caminho_sentinela,
+            feeds_extras=google_news.gerar_consultas_da_consulta(contexto, termos_contato),
+        )
 
     extrator_perfil.processar_fila(cliente_llm, conexao)
     agrupador.agrupar(cliente_llm, conexao, limiares, caminho_sentinela, agora)
-    qualificador.qualificar_pendentes(cliente_llm, conexao, limiares.qualificacao.teto_por_dia)
+    qualificador.qualificar_pendentes(
+        cliente_llm, conexao, limiares.qualificacao.teto_por_dia, vetores_extras=[centroide_consulta]
+    )
 
     resumo_leitor = leitor_capturas.ler_redes_sociais_do_contato(
         cliente_llm,
@@ -122,7 +145,9 @@ def preparar(
         motivos_sem_sessao=list(resumo_leitor.motivos_sem_sessao),
     )
 
-    cruzamento.cruzar_contato(cliente_llm, conexao, perfil_id, limiares, agora)
+    cruzamento.cruzar_contato_por_consulta(
+        cliente_llm, conexao, perfil_id, contexto, centroide_consulta, limiares, agora
+    )
 
     data_hoje = agora[:10]
     registros = assunto_contato_q.listar_do_dia(conexao, perfil_id, data_hoje)

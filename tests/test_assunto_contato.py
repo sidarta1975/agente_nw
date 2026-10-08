@@ -76,7 +76,7 @@ def test_listar_do_dia_traz_so_o_dia_pedido(conn: sqlite3.Connection) -> None:
     assert assunto_contato.listar_do_dia(conn, perfil_id, "2026-09-20") == []
 
 
-def test_listar_assunto_ids_ja_vistos_pega_qualquer_status(conn: sqlite3.Connection) -> None:
+def test_listar_assunto_ids_ja_vistos_so_pega_o_que_o_usuario_decidiu(conn: sqlite3.Connection) -> None:
     perfil_id = _criar_contato(conn, "+5511900000000")
     assunto_novo = _criar_assunto(conn)
     assunto_descartado = _criar_assunto(conn)
@@ -105,7 +105,9 @@ def test_listar_assunto_ids_ja_vistos_pega_qualquer_status(conn: sqlite3.Connect
 
     vistos = assunto_contato.listar_assunto_ids_ja_vistos(conn, perfil_id)
 
-    assert vistos == {assunto_novo, assunto_descartado, assunto_usado}
+    assert vistos == {assunto_usado}
+    assert assunto_novo not in vistos
+    assert assunto_descartado not in vistos
 
 
 def test_listar_assunto_ids_ja_vistos_nao_pega_de_outro_contato(conn: sqlite3.Connection) -> None:
@@ -115,6 +117,7 @@ def test_listar_assunto_ids_ja_vistos_nao_pega_de_outro_contato(conn: sqlite3.Co
     conn.commit()
 
     assunto_contato.inserir(conn, _assunto_contato(assunto_id, perfil_a))
+    conn.execute("UPDATE assunto_contato SET status = 'nao_serve' WHERE assunto_id = ?", (assunto_id,))
     conn.commit()
 
     assert assunto_contato.listar_assunto_ids_ja_vistos(conn, perfil_a) == {assunto_id}

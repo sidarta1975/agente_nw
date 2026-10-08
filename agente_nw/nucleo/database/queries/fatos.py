@@ -15,3 +15,23 @@ def inserir(conexao: sqlite3.Connection, fato: Fato) -> int:
     )
     assert cursor.lastrowid is not None
     return cursor.lastrowid
+
+
+def listar_recentes(conexao: sqlite3.Connection, perfil_id: int, limite: int) -> list[Fato]:
+    linhas = conexao.execute(
+        "SELECT id, perfil_id, data_do_fato, tipo, conteudo, fonte, registrado_em FROM fato "
+        "WHERE perfil_id = ? ORDER BY COALESCE(data_do_fato, registrado_em) DESC, id DESC LIMIT ?",
+        (perfil_id, limite),
+    ).fetchall()
+    return [
+        Fato(
+            id=linha["id"],
+            perfil_id=linha["perfil_id"],
+            data_do_fato=linha["data_do_fato"],
+            tipo=linha["tipo"],
+            conteudo=linha["conteudo"],
+            fonte=linha["fonte"],
+            registrado_em=linha["registrado_em"],
+        )
+        for linha in linhas
+    ]

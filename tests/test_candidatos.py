@@ -47,7 +47,7 @@ def _criar_contato(conn: sqlite3.Connection, telefone: str) -> int:
     return contato.id
 
 
-def test_assunto_ja_visto_nao_volta_a_ser_candidato(conn: sqlite3.Connection) -> None:
+def test_assunto_ja_decidido_pelo_usuario_nao_volta_a_ser_candidato(conn: sqlite3.Connection) -> None:
     perfil_id = _criar_contato(conn, "+5511900000000")
     ja_visto = _criar_assunto_qualificado(conn, _vetor(1.0, 0.0))
     novo = _criar_assunto_qualificado(conn, _vetor(1.0, 0.0))
@@ -62,7 +62,7 @@ def test_assunto_ja_visto_nao_volta_a_ser_candidato(conn: sqlite3.Connection) ->
         aderencia_usuario=0.6,
         conversavel=0.5,
         score=65.0,
-        status="novo",
+        status="usado",
     )
     assunto_contato.inserir(conn, registro)
     conn.commit()
