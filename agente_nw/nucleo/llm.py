@@ -74,14 +74,15 @@ class ClienteOllama:
         return perfil.tarefas[nome]
 
     def _chamar_generate(self, tarefa: TarefaRoteamento, prompt: str, temperature: float) -> str:
-        corpo = {
+        corpo: dict[str, object] = {
             "model": tarefa.modelo,
             "prompt": prompt,
             "format": tarefa.format,
-            "think": tarefa.think,
             "stream": False,
             "options": {"num_ctx": tarefa.num_ctx, "temperature": temperature},
         }
+        if self._roteamento.perfis[self._roteamento.perfil_ativo].enviar_think:
+            corpo["think"] = tarefa.think
         resposta = self._http.post(f"{self._ollama_url}/api/generate", json=corpo)
         if resposta.status_code == 500:
             try:

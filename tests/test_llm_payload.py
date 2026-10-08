@@ -48,3 +48,32 @@ def test_corpo_da_chamada_tem_think_false_e_parametros_da_tarefa(tmp_path: Path)
     assert corpo["options"]["temperature"] == tarefa_qualificar.temperature
 
     conexao_bd.close()
+
+
+def test_payload_omite_think_quando_perfil_pede(tmp_path: Path) -> None:
+    dados_roteamento = yaml.safe_load((RAIZ / "config" / "llm_routing.yaml").read_text(encoding="utf-8"))
+    dados_roteamento["perfil_ativo"] = "pro48"
+    roteamento = Roteamento.model_validate(dados_roteamento)
+
+    capturado: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        capturado["corpo"] = json.loads(request.content)
+        return httpx.Response(200, json={"response": json.dumps({"ok": True})})
+
+    cliente_http = httpx.Client(transport=httpx.MockTransport(handler))
+    conexao_bd = conexao.abrir(tmp_path / "teste.db")
+    migracoes.aplicar(conexao_bd)
+
+    cliente = ClienteOllama(
+        cliente_http, conexao_bd, roteamento, "http://ollama.invalido", tmp_path / "chamadas_llm.jsonl"
+    )
+    cliente.gerar_json("qualificar", "prompt de teste", _EsquemaTeste)
+
+    corpo = capturado["corpo"]
+    assert isinstance(corpo, dict)
+    assert "think" not in corpo
+    assert corpo["model"] == "qwen2.5:14b"
+    assert corpo["format"] == "json"
+
+    conexao_bd.close()

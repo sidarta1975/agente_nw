@@ -27,7 +27,7 @@ from agente_nw.nucleo.agrupamento.agrupador import ClienteEmbeddagem
 from agente_nw.nucleo.database import backup, conexao
 from agente_nw.nucleo.database.queries import assunto_contato, assuntos, perfil_tema, perfis, sistema
 from agente_nw.nucleo.database.queries import temas as queries_temas
-from agente_nw.nucleo.modelos.configuracao import TemasArquivo
+from agente_nw.nucleo.modelos.configuracao import PerfilRoteamento, Roteamento, TemasArquivo
 from agente_nw.nucleo.relevancia import cartoes, cruzamento, qualificador
 from agente_nw.nucleo.saidas import markdown
 from agente_nw.perfil import agenda_google_csv, agenda_macos, extrator
@@ -47,9 +47,8 @@ from config.container import (
     configuracao,
     http,
     llm,
+    origem_perfil_llm,
 )
-
-MODELOS_OBRIGATORIOS: list[str] = ["qwen3:4b", "bge-m3", "qwen3:8b"]
 
 COMANDOS_RESERVADOS: dict[str, int] = {
     "calibrar-conector": 9,
@@ -105,23 +104,50 @@ def _verificar_ollama(cliente: httpx.Client, ollama_url: str) -> ItemVerificacao
     return ItemVerificacao("Ollama responde", nomes is not None, ollama_url, obrigatorio=True)
 
 
-def _verificar_modelos(cliente: httpx.Client, ollama_url: str) -> list[ItemVerificacao]:
+def modelos_obrigatorios(perfil: PerfilRoteamento) -> list[str]:
+    geracao = sorted({tarefa.modelo for tarefa in perfil.tarefas.values()})
+    return [*geracao, perfil.embeddings.modelo]
+
+
+def _verificar_modelos(
+    cliente: httpx.Client, ollama_url: str, perfil: PerfilRoteamento
+) -> list[ItemVerificacao]:
+    obrigatorios = modelos_obrigatorios(perfil)
     nomes_instalados = _buscar_tags_ollama(cliente, ollama_url)
     if nomes_instalados is None:
         detalhe = "não verificado — Ollama não respondeu"
         return [
-            ItemVerificacao(f"Modelo {modelo}", False, detalhe, obrigatorio=True)
-            for modelo in MODELOS_OBRIGATORIOS
+            ItemVerificacao(f"Modelo {modelo}", False, detalhe, obrigatorio=True) for modelo in obrigatorios
         ]
 
     itens: list[ItemVerificacao] = []
-    for modelo in MODELOS_OBRIGATORIOS:
+    for modelo in obrigatorios:
         presente = any(
             instalado == modelo or instalado.startswith(f"{modelo}:") for instalado in nomes_instalados
         )
         detalhe = "presente" if presente else f"ausente — ollama pull {modelo}"
         itens.append(ItemVerificacao(f"Modelo {modelo}", presente, detalhe, obrigatorio=True))
     return itens
+
+
+def _verificar_perfil_llm(roteamento: Roteamento, origem: str) -> ItemVerificacao:
+    qualificador = "definido em" if origem == "config/local.yaml" else "padrão de"
+    detalhe = f"{roteamento.perfil_ativo} ({qualificador} {origem})"
+    return ItemVerificacao("Perfil LLM ativo", True, detalhe, obrigatorio=True)
+
+
+def _verificar_memoria(perfil: PerfilRoteamento) -> ItemVerificacao:
+    nome = "Memória física suficiente para o perfil"
+    try:
+        saida = subprocess.run(
+            ["sysctl", "-n", "hw.memsize"], capture_output=True, text=True, timeout=5, check=True
+        ).stdout
+        fisica_gb = int(saida.strip()) / 2**30
+    except Exception:
+        return ItemVerificacao(nome, True, "não verificado", obrigatorio=False)
+
+    detalhe = f"{fisica_gb:.0f} GB físicos, mínimo do perfil {perfil.memoria_minima_gb} GB"
+    return ItemVerificacao(nome, fisica_gb >= perfil.memoria_minima_gb, detalhe, obrigatorio=True)
 
 
 def _verificar_ollama_app_na_porta() -> ItemVerificacao:
@@ -155,11 +181,14 @@ def verificar_ambiente() -> int:
         return 1
 
     cliente = http()
+    perfil = config.roteamento.perfis[config.roteamento.perfil_ativo]
     itens = [
+        _verificar_perfil_llm(config.roteamento, origem_perfil_llm()),
         _verificar_python(),
         _verificar_sqlite_vec(),
         _verificar_ollama(cliente, ollama_url),
-        *_verificar_modelos(cliente, ollama_url),
+        _verificar_memoria(perfil),
+        *_verificar_modelos(cliente, ollama_url, perfil),
         _verificar_ollama_app_na_porta(),
         _verificar_arquivo_existe("temas.yaml existe", RAIZ / "temas.yaml"),
         _verificar_arquivo_existe("fontes.yaml existe", RAIZ / "fontes.yaml"),

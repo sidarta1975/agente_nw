@@ -33,9 +33,16 @@ def configuracao() -> ConfiguracaoCarregada:
         caminho_local = RAIZ / "config" / "local.exemplo.yaml"
 
     local = Configuracao.model_validate(_carregar_yaml(caminho_local))
-    roteamento = Roteamento.model_validate(_carregar_yaml(RAIZ / "config" / "llm_routing.yaml"))
+    dados_roteamento = _carregar_yaml(RAIZ / "config" / "llm_routing.yaml")
+    if local.perfil_llm is not None:
+        dados_roteamento["perfil_ativo"] = local.perfil_llm
+    roteamento = Roteamento.model_validate(dados_roteamento)
     limiares = Limiares.model_validate(_carregar_yaml(RAIZ / "config" / "limiares.yaml"))
     return ConfiguracaoCarregada(local=local, roteamento=roteamento, limiares=limiares)
+
+
+def origem_perfil_llm() -> str:
+    return "config/local.yaml" if configuracao().local.perfil_llm is not None else "config/llm_routing.yaml"
 
 
 @functools.lru_cache(maxsize=1)

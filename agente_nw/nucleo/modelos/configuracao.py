@@ -14,6 +14,7 @@ class Configuracao(BaseModel):
     pasta_saida: str
     pasta_backups: str
     ollama_url: str
+    perfil_llm: str | None = None
 
 
 class EmbeddingsRoteamento(BaseModel):
@@ -49,6 +50,8 @@ class NovaTentativaRoteamento(BaseModel):
 class PerfilRoteamento(BaseModel):
     model_config = ConfigDict(frozen=True)
 
+    memoria_minima_gb: int = Field(ge=1)
+    enviar_think: bool = True
     embeddings: EmbeddingsRoteamento
     tarefas: dict[str, TarefaRoteamento]
     nova_tentativa: NovaTentativaRoteamento
@@ -64,6 +67,25 @@ class Roteamento(BaseModel):
     def perfil_ativo_existe(self) -> Roteamento:
         if self.perfil_ativo not in self.perfis:
             raise ValueError(f"perfil_ativo '{self.perfil_ativo}' não está declarado em perfis")
+        return self
+
+    @model_validator(mode="after")
+    def perfis_declaram_as_mesmas_tarefas(self) -> Roteamento:
+        referencia_nome, referencia = next(iter(self.perfis.items()))
+        esperadas = set(referencia.tarefas)
+        for nome, perfil in self.perfis.items():
+            faltando = esperadas - set(perfil.tarefas)
+            sobrando = set(perfil.tarefas) - esperadas
+            if faltando or sobrando:
+                raise ValueError(
+                    f"perfil '{nome}' difere de '{referencia_nome}' nas tarefas: "
+                    f"faltando {sorted(faltando)}, sobrando {sorted(sobrando)}"
+                )
+            if perfil.embeddings.modelo != referencia.embeddings.modelo:
+                raise ValueError(
+                    f"perfil '{nome}' usa embeddings '{perfil.embeddings.modelo}', "
+                    f"diferente de '{referencia_nome}' ('{referencia.embeddings.modelo}')"
+                )
         return self
 
 

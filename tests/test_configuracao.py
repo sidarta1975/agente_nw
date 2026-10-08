@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
 from pydantic import ValidationError
 
+from agente_nw.cli import modelos_obrigatorios
 from agente_nw.nucleo.modelos.configuracao import Configuracao, Limiares, Roteamento, TemasArquivo
+from config import container
 
 RAIZ = Path(__file__).resolve().parent.parent
 
@@ -53,6 +56,73 @@ def test_perfil_sem_campo_think_e_recusado() -> None:
     del dados["perfis"]["air16"]["tarefas"]["rotular"]["think"]
     with pytest.raises(ValidationError):
         Roteamento.model_validate(dados)
+
+
+def test_pro48_sem_think_false_e_recusado() -> None:
+    dados = _carregar(RAIZ / "config" / "llm_routing.yaml")
+    dados["perfis"]["pro48"]["tarefas"]["qualificar"]["think"] = True
+    with pytest.raises(ValidationError):
+        Roteamento.model_validate(dados)
+
+
+def test_pro48_sem_campo_think_e_recusado() -> None:
+    dados = _carregar(RAIZ / "config" / "llm_routing.yaml")
+    del dados["perfis"]["pro48"]["tarefas"]["rotular"]["think"]
+    with pytest.raises(ValidationError):
+        Roteamento.model_validate(dados)
+
+
+def test_perfis_declaram_as_mesmas_tarefas() -> None:
+    dados = _carregar(RAIZ / "config" / "llm_routing.yaml")
+    del dados["perfis"]["pro48"]["tarefas"]["cartao"]
+    with pytest.raises(ValidationError, match="pro48"):
+        Roteamento.model_validate(dados)
+
+
+def _configuracao_com_local(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, extra: str) -> Any:
+    (tmp_path / "config").mkdir()
+    for nome in ("llm_routing.yaml", "limiares.yaml"):
+        (tmp_path / "config" / nome).write_text(
+            (RAIZ / "config" / nome).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    base = (RAIZ / "config" / "local.exemplo.yaml").read_text(encoding="utf-8")
+    (tmp_path / "config" / "local.yaml").write_text(base + extra, encoding="utf-8")
+    monkeypatch.setattr(container, "RAIZ", tmp_path)
+    container.configuracao.cache_clear()
+    return container.configuracao
+
+
+def test_perfil_llm_do_local_sobrescreve_padrao(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    configuracao = _configuracao_com_local(monkeypatch, tmp_path, "perfil_llm: pro48\n")
+    try:
+        assert configuracao().roteamento.perfil_ativo == "pro48"
+        assert container.origem_perfil_llm() == "config/local.yaml"
+    finally:
+        configuracao.cache_clear()
+
+
+def test_sem_perfil_llm_vale_o_padrao_versionado(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    configuracao = _configuracao_com_local(monkeypatch, tmp_path, "")
+    try:
+        assert configuracao().roteamento.perfil_ativo == "air16"
+        assert container.origem_perfil_llm() == "config/llm_routing.yaml"
+    finally:
+        configuracao.cache_clear()
+
+
+def test_perfil_llm_inexistente_falha_na_carga(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    configuracao = _configuracao_com_local(monkeypatch, tmp_path, "perfil_llm: pro40\n")
+    try:
+        with pytest.raises(ValidationError, match="pro40"):
+            configuracao()
+    finally:
+        configuracao.cache_clear()
+
+
+def test_modelos_obrigatorios_derivados_do_perfil() -> None:
+    roteamento = Roteamento.model_validate(_carregar(RAIZ / "config" / "llm_routing.yaml"))
+    assert modelos_obrigatorios(roteamento.perfis["pro48"]) == ["qwen2.5:14b", "bge-m3"]
+    assert modelos_obrigatorios(roteamento.perfis["air16"]) == ["qwen3:4b", "qwen3:8b", "bge-m3"]
 
 
 def test_limiares_carrega_e_tem_todas_as_chaves() -> None:

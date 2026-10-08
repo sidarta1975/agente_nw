@@ -66,7 +66,7 @@ Nome do pacote e da pasta é sempre `agente_nw` — nunca `agente_relacionamento
 
 - Python 3.12 do Homebrew; Bash para utilitários.
 - SQLite em modo WAL, `busy_timeout` e `foreign_keys` ligados, arquivo único em `dados/agente.db`. Nunca compartilhado entre processos. `sqlite-vec` carregado na abertura da conexão.
-- Ollama para inferência local, `http://localhost:11434`, subido pelo LaunchAgent do projeto (`scripts/launchd/br.agente_nw.ollama.plist`) — nunca pelo aplicativo do Ollama. Modelo por tarefa definido em `config/llm_routing.yaml` — verificar com `ollama list` antes de sugerir download. `qwen3:4b` com modo de raciocínio desligado (`think: false`) obrigatório em toda chamada, e `bge-m3` para embeddings. Dois modelos carregados ao mesmo tempo (`OLLAMA_MAX_LOADED_MODELS=2`, `OLLAMA_KEEP_ALIVE=30m`).
+- Ollama para inferência local, `http://localhost:11434`, subido pelo LaunchAgent do projeto (`scripts/launchd/br.agente_nw.ollama.plist`) — nunca pelo aplicativo do Ollama. Modelo por tarefa vem do **perfil ativo** de `config/llm_routing.yaml`, escolhido por `perfil_llm` em `config/local.yaml` (ausente = `air16`): `air16` no Air (produção), `pro48` no Pro (desenvolvimento) — verificar com `ollama list` antes de sugerir download. `think: false` obrigatório em toda tarefa (o perfil pode omitir a chave do payload com `enviar_think: false`, para modelos sem modo de raciocínio); `bge-m3` para embeddings nos dois perfis. Dois modelos carregados ao mesmo tempo (`OLLAMA_MAX_LOADED_MODELS=2`, `OLLAMA_KEEP_ALIVE=30m`).
 - Embeddings: `bge-m3` (1024 dimensões, multilíngue).
 - Índice vetorial: `sqlite-vec`, no mesmo arquivo do banco.
 - Contratos: Pydantic v2 com `frozen=True`.
