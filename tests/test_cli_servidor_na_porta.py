@@ -9,16 +9,15 @@ BREW = "/opt/homebrew/bin/ollama serve"
 
 
 def test_classifica_ollama_app() -> None:
-    assert _classificar_processo(APP, 100, {}) == "Ollama.app"
+    assert _classificar_processo(APP) == "Ollama.app"
 
 
-def test_classifica_launchagent_do_projeto_quando_pid_coincide() -> None:
-    assert _classificar_processo(BREW, 200, {"br.agente_nw.ollama": 200}) == "LaunchAgent do projeto"
+def test_classifica_outra_instancia() -> None:
+    assert _classificar_processo(BREW) == "outra instância"
 
 
-def test_classifica_outra_instancia_sem_rotulo_ou_com_pid_diferente() -> None:
-    assert _classificar_processo(BREW, 300, {}) == "outra instância"
-    assert _classificar_processo(BREW, 300, {"br.agente_nw.ollama": 999}) == "outra instância"
+def test_classifica_desconhecido() -> None:
+    assert _classificar_processo("/usr/bin/python3 servidor.py") == "desconhecido"
 
 
 @pytest.mark.parametrize(

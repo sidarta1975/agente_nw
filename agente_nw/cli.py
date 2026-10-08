@@ -1,16 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import io
 import json
-import re
 import sqlite3
 import subprocess
 import sys
-import time
-import traceback
-from collections.abc import Callable
-from contextlib import redirect_stdout
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import NamedTuple
@@ -157,34 +151,17 @@ def _verificar_memoria(perfil: PerfilRoteamento) -> ItemVerificacao:
     return ItemVerificacao(nome, fisica_gb >= perfil.memoria_minima_gb, detalhe, obrigatorio=True)
 
 
-ROTULO_LAUNCHAGENT_PROJETO = "br.agente_nw.ollama"
-
-
 def _porta_de(ollama_url: str) -> int:
     porta = urlparse(ollama_url).port
     return porta if porta is not None else 11434
 
 
-def _classificar_processo(comando: str, pid: int, rotulos_launchctl: dict[str, int]) -> str:
+def _classificar_processo(comando: str) -> str:
     if "Ollama.app" in comando:
         return "Ollama.app"
-    if rotulos_launchctl.get(ROTULO_LAUNCHAGENT_PROJETO) == pid:
-        return "LaunchAgent do projeto"
     if "ollama" in comando:
         return "outra instância"
     return "desconhecido"
-
-
-def _rotulos_launchctl() -> dict[str, int]:
-    saida = subprocess.run(
-        ["launchctl", "list"], capture_output=True, text=True, timeout=5, check=True
-    ).stdout
-    rotulos: dict[str, int] = {}
-    for linha in saida.splitlines()[1:]:
-        colunas = linha.split("\t")
-        if len(colunas) == 3 and colunas[0].isdigit():
-            rotulos[colunas[2]] = int(colunas[0])
-    return rotulos
 
 
 class ServidorNaPorta(NamedTuple):
@@ -209,11 +186,7 @@ def _inspecionar_porta(porta: int) -> ServidorNaPorta | None:
         comando = subprocess.run(
             ["ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True, timeout=5
         ).stdout.strip()
-        try:
-            rotulos = _rotulos_launchctl()
-        except Exception:
-            rotulos = {}
-        return ServidorNaPorta(_classificar_processo(comando, pid, rotulos), pid, comando)
+        return ServidorNaPorta(_classificar_processo(comando), pid, comando)
     except Exception:
         return None
 
@@ -225,7 +198,7 @@ def _verificar_servidor_na_porta(ollama_url: str, servidor: ServidorNaPorta | No
     if servidor.tipo == "Ollama.app":
         detalhe = (
             f"Ollama.app (PID {servidor.pid}) escuta em {ollama_url} — aponte ollama_url para outra "
-            "instância ou suba 'ollama serve' pelo LaunchAgent do projeto"
+            "instância ou suba 'ollama serve' manualmente num terminal"
         )
         return ItemVerificacao(nome, False, detalhe, obrigatorio=False)
     return ItemVerificacao(nome, True, f"{servidor.tipo} (PID {servidor.pid})", obrigatorio=False)
@@ -235,6 +208,36 @@ def _verificar_arquivo_existe(nome: str, caminho: Path) -> ItemVerificacao:
     existe = caminho.exists()
     detalhe = str(caminho) if existe else f"{caminho} não existe"
     return ItemVerificacao(nome, existe, detalhe, obrigatorio=False)
+
+
+def _verificar_playwright_chromium() -> ItemVerificacao:
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as erro:
+        return ItemVerificacao(
+            "Playwright + Chromium instalados",
+            False,
+            f"lib Playwright ausente: {erro} — rode 'pip install -e .[dev]'",
+            obrigatorio=True,
+        )
+    try:
+        with sync_playwright() as p:
+            caminho = Path(p.chromium.executable_path)
+    except Exception as erro:
+        return ItemVerificacao(
+            "Playwright + Chromium instalados",
+            False,
+            f"erro ao consultar Chromium: {erro} — rode 'playwright install chromium'",
+            obrigatorio=True,
+        )
+    if not caminho.exists():
+        return ItemVerificacao(
+            "Playwright + Chromium instalados",
+            False,
+            f"{caminho} não existe — rode 'playwright install chromium'",
+            obrigatorio=True,
+        )
+    return ItemVerificacao("Playwright + Chromium instalados", True, str(caminho), obrigatorio=True)
 
 
 def verificar_ambiente() -> int:
@@ -256,6 +259,7 @@ def verificar_ambiente() -> int:
         _verificar_memoria(perfil),
         *_verificar_modelos(cliente, ollama_url, perfil),
         _verificar_servidor_na_porta(ollama_url, servidor),
+        _verificar_playwright_chromium(),
         _verificar_arquivo_existe("temas.yaml existe", RAIZ / "temas.yaml"),
         _verificar_arquivo_existe("fontes.yaml existe", RAIZ / "fontes.yaml"),
     ]
@@ -299,28 +303,15 @@ def importar_temas(
             print(f"Termos a ignorar: {', '.join(temas_arquivo.ignorar)}")
         return 0
 
+    from agente_nw.perfil.configurador import salvar_perfil_usuario
+
     conn = conexao_bd if conexao_bd is not None else banco()
     cliente = cliente_llm if cliente_llm is not None else llm()
     agora = datetime.now(UTC).isoformat()
 
-    usuario = perfis.upsert_usuario(conn, temas_arquivo.usuario.nome, agora)
-    assert usuario.id is not None
-    for tema in temas_arquivo.usuario.temas:
-        tema_gravado = queries_temas.obter_ou_criar(conn, tema.nome, tema.descricao, tema.sinonimos, agora)
-        assert tema_gravado.id is not None
-        vetor = cliente.embeddar([f"{tema.nome}: {tema.descricao}"])[0]
-        queries_temas.gravar_embedding(conn, tema_gravado.id, vetor)
-        perfil_tema.vincular(
-            conn,
-            usuario.id,
-            tema_gravado.id,
-            tema.peso,
-            "declarada",
-            tema.nivel,
-            True,
-            agora,
-        )
-    conn.commit()
+    usuario = salvar_perfil_usuario(
+        conn, cliente, temas_arquivo.usuario.nome, temas_arquivo.usuario.temas, agora
+    )
 
     print(f"Usuário: {usuario.nome}")
     print(f"{len(temas_arquivo.usuario.temas)} tema(s) gravados no banco.")
@@ -565,116 +556,104 @@ def ler_marcacoes_cmd(data: str | None) -> int:
     return 0
 
 
-class _LogCiclo:
-    def __init__(self, caminho: Path) -> None:
-        caminho.parent.mkdir(parents=True, exist_ok=True)
-        self._arquivo = caminho.open("a", encoding="utf-8")
-
-    def escrever(self, texto: str) -> None:
-        if not texto:
-            return
-        print(texto)
-        self._arquivo.write(texto + "\n")
-        self._arquivo.flush()
-
-    def fechar(self) -> None:
-        self._arquivo.close()
+def _lista_de_csv(bruto: str) -> list[str]:
+    return [pedaco.strip() for pedaco in bruto.split(",") if pedaco.strip()]
 
 
-def _gerar_cartoes_cmd() -> int:
+def preparar_cmd(
+    telefone: str, assunto: str, meio: str, objetivo: str, interessa: str, evitar: str, livre: str
+) -> int:
+    telefone_normalizado = telefone_e164(telefone)
+    conn = banco()
+    perfil = perfis.obter_por_telefone_ou_email(conn, telefone_normalizado, None)
+    if perfil is None:
+        print(f"FALHA: nenhum contato encontrado com o telefone '{telefone}'")
+        return 1
+    assert perfil.id is not None
+
+    from agente_nw.coleta.capturas.playwright_backend import abrir_pagina_playwright
+    from agente_nw.nucleo.consulta import preparar
+    from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta, MeioContato
+
+    if meio not in ("pessoalmente", "telefone", "whatsapp", "carta", "outro"):
+        print(f"FALHA: meio inválido '{meio}'")
+        return 1
+
+    contexto = ContextoConsulta(
+        assunto=assunto,
+        meio=meio,  # type: ignore[arg-type]
+        objetivo=objetivo,
+        interessa=_lista_de_csv(interessa),
+        evitar=_lista_de_csv(evitar),
+        livre=livre,
+    )
+    _ = MeioContato  # mantém o import usado pelo type: ignore acima
+
     cfg = configuracao()
-    resumo = cartoes.gerar_pendentes(llm(), banco(), cfg.limiares.cartao.teto_por_dia)
-    print(f"Candidatos: {resumo.candidatos}")
-    print(f"Cartões gerados: {resumo.gerados}")
-    print(f"Erros: {resumo.erros}")
+    agora = datetime.now(UTC).isoformat()
+    resultado = preparar(
+        conexao=conn,
+        cliente_llm=llm(),
+        cliente_http=http(),
+        perfil_id=perfil.id,
+        contexto=contexto,
+        limiares=cfg.limiares,
+        caminho_fontes=RAIZ / "fontes.yaml",
+        caminho_sentinela=caminho_sentinela(),
+        abrir_pagina=abrir_pagina_playwright,
+        pasta_navegador=RAIZ / "dados" / "navegador",
+        agora=agora,
+    )
+
+    print(f"Consulta #{resultado.consulta_id} gravada para {perfil.nome}.")
+    resumo_rede = resultado.resumo_rede_social
+    print(
+        f"Rede social — redes lidas: {resumo_rede.redes_lidas}, "
+        f"blocos: {resumo_rede.blocos_capturados}, fatos: {resumo_rede.fatos_gravados}, "
+        f"sem sessão: {resumo_rede.redes_sem_sessao}"
+    )
+    for motivo in resumo_rede.motivos_sem_sessao:
+        print(f"  - {motivo}")
+
+    if resultado.aviso:
+        print(f"AVISO: {resultado.aviso}")
+
+    for item in resultado.itens_menu:
+        print(f"[{item.tipo}] {item.titulo} (score={item.score:.1f})")
+        if item.por_que:
+            print(f"  por quê: {item.por_que}")
+
+    if resultado.historico_texto:
+        print("--- Histórico recente ---")
+        print(resultado.historico_texto)
+
     return 0
 
 
-def _rodar_etapa(
-    log: _LogCiclo,
-    conn: sqlite3.Connection,
-    nome_etapa: str,
-    nome_exibicao: str,
-    hoje: str,
-    funcao_cmd: Callable[[], int],
-) -> bool:
-    if caminho_sentinela().exists():
-        log.escrever(f"Sentinela encontrada, parando antes de {nome_exibicao}.")
-        return False
-
-    progresso = sistema.progresso_obter(conn, nome_etapa)
-    if progresso is not None and progresso["data_ciclo"] == hoje:
-        log.escrever(f"{nome_exibicao}: já concluída hoje, pulando.")
-        return True
-
-    inicio = time.monotonic()
-    log.escrever(f"[{datetime.now(UTC).isoformat()}] Iniciando {nome_exibicao}")
-
-    buffer = io.StringIO()
-    try:
-        with redirect_stdout(buffer):
-            codigo = funcao_cmd()
-        if codigo != 0:
-            raise RuntimeError(f"{nome_exibicao} devolveu código {codigo}")
-    except Exception:
-        log.escrever(buffer.getvalue().rstrip("\n"))
-        duracao = time.monotonic() - inicio
-        log.escrever(f"[FALHA após {duracao:.1f}s] {nome_exibicao}")
-        log.escrever(traceback.format_exc())
-        raise
-
-    log.escrever(buffer.getvalue().rstrip("\n"))
-    duracao = time.monotonic() - inicio
-    log.escrever(f"[concluída em {duracao:.1f}s] {nome_exibicao}")
-    sistema.progresso_gravar(conn, nome_etapa, None, hoje, datetime.now(UTC).isoformat())
-    conn.commit()
-    return True
-
-
-def ciclo_cmd() -> int:
+def ler_rede_social_cmd(telefone: str) -> int:
+    telefone_normalizado = telefone_e164(telefone)
     conn = banco()
-    hoje = datetime.now(UTC).date().isoformat()
-
-    progresso_backup = sistema.progresso_obter(conn, "ciclo:backup")
-    if progresso_backup is not None and progresso_backup["data_ciclo"] == hoje:
-        print(f"Ciclo já rodou hoje (concluído às {progresso_backup['atualizado_em']}).")
-        return 0
-
-    timestamp_log = datetime.now(UTC).isoformat().replace(":", "-")
-    caminho_log = RAIZ / "dados" / "logs" / f"ciclo_{timestamp_log}.log"
-    log = _LogCiclo(caminho_log)
-
-    try:
-        ontem = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
-        caminho_ontem = caminho_pasta_saida() / f"menu_{ontem}.md"
-        if caminho_ontem.exists():
-            buffer = io.StringIO()
-            with redirect_stdout(buffer):
-                ler_marcacoes_cmd(ontem)
-            log.escrever(buffer.getvalue().rstrip("\n"))
-        else:
-            log.escrever(f"Sem arquivo de ontem ({caminho_ontem}), pulando leitura de marcações.")
-
-        etapas: list[tuple[str, str, Callable[[], int]]] = [
-            ("ciclo:coleta", "coleta", coletar),
-            ("ciclo:extracao", "extração", processar_fila_cmd),
-            ("ciclo:agrupamento", "agrupamento", agrupar_cmd),
-            ("ciclo:qualificacao", "qualificação", lambda: qualificar_cmd(None)),
-            ("ciclo:cruzamento", "cruzamento", cruzar_cmd),
-            ("ciclo:cartoes", "geração de cartões", _gerar_cartoes_cmd),
-            ("ciclo:exportacao", "exportação do menu", lambda: exportar_menu_cmd(None)),
-            ("ciclo:backup", "backup", fazer_backup_cmd),
-        ]
-
-        for nome_etapa, nome_exibicao, funcao_cmd in etapas:
-            continuar = _rodar_etapa(log, conn, nome_etapa, nome_exibicao, hoje, funcao_cmd)
-            if not continuar:
-                return 0
-    except Exception:
+    perfil = perfis.obter_por_telefone_ou_email(conn, telefone_normalizado, None)
+    if perfil is None:
+        print(f"FALHA: nenhum contato encontrado com o telefone '{telefone}'")
         return 1
-    finally:
-        log.fechar()
+    assert perfil.id is not None
 
+    from agente_nw.coleta.capturas.leitor import ler_redes_sociais_do_contato
+    from agente_nw.coleta.capturas.playwright_backend import abrir_pagina_playwright
+
+    agora = datetime.now(UTC).isoformat()
+    pasta_navegador = RAIZ / "dados" / "navegador"
+    resumo = ler_redes_sociais_do_contato(
+        llm(), conn, perfil.id, abrir_pagina_playwright, pasta_navegador, agora
+    )
+
+    print(f"Redes lidas: {resumo.redes_lidas}")
+    print(f"Redes sem sessão: {resumo.redes_sem_sessao}")
+    print(f"Blocos capturados: {resumo.blocos_capturados}")
+    print(f"Fatos gravados: {resumo.fatos_gravados}")
+    for motivo in resumo.motivos_sem_sessao:
+        print(f"  - {motivo}")
     return 0
 
 
@@ -687,22 +666,6 @@ def _dias_no_intervalo(desde: str, ate: str) -> list[str]:
         dias.append(atual.isoformat())
         atual += timedelta(days=1)
     return dias
-
-
-def _ler_log_ciclo(dia: str) -> tuple[float, list[tuple[str, float]]] | None:
-    pasta = RAIZ / "dados" / "logs"
-    arquivos = sorted(pasta.glob(f"ciclo_{dia}T*.log"))
-    if not arquivos:
-        return None
-
-    texto = arquivos[-1].read_text(encoding="utf-8")
-    duracoes: list[tuple[str, float]] = []
-    for linha in texto.splitlines():
-        correspondencia = re.search(r"\[conclu[ií]da em ([\d.]+)s\] (.+)", linha)
-        if correspondencia:
-            duracoes.append((correspondencia.group(2), float(correspondencia.group(1))))
-    total = sum(duracao for _nome, duracao in duracoes)
-    return total, duracoes
 
 
 def _ler_chamadas_llm(desde: str, ate: str) -> list[dict[str, object]]:
@@ -728,15 +691,6 @@ def certificar_cmd(desde: str, ate: str) -> int:
 
     for dia in dias:
         print(f"=== {dia} ===")
-        resultado_log = _ler_log_ciclo(dia)
-        if resultado_log is None:
-            print("  Sem log de ciclo para este dia.")
-        else:
-            duracao_total, etapas = resultado_log
-            print(f"  Duração total do ciclo: {duracao_total:.1f}s")
-            for nome_etapa, duracao in etapas:
-                print(f"    {nome_etapa}: {duracao:.1f}s")
-
         contagens_status = assunto_contato.contar_por_status(conn, dia)
         contagens_tipo = assunto_contato.contar_por_perfil_e_tipo(conn, dia)
         perfis_com_sugestao = {perfil_id for perfil_id, _tipo, _quantidade in contagens_tipo}
@@ -948,7 +902,6 @@ def _montar_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("processar-fila")
     subparsers.add_parser("agrupar")
     subparsers.add_parser("calibrar-agrupamento")
-    subparsers.add_parser("ciclo")
 
     certificar_parser = subparsers.add_parser("certificar")
     certificar_parser.add_argument("--desde", required=True)
@@ -998,6 +951,20 @@ def _montar_parser() -> argparse.ArgumentParser:
     console_parser.add_argument("--banco", required=True)
     console_parser.add_argument("--porta", type=int, default=8765)
 
+    ler_rede_social_parser = subparsers.add_parser("ler-rede-social")
+    ler_rede_social_parser.add_argument("telefone")
+
+    preparar_parser = subparsers.add_parser("preparar")
+    preparar_parser.add_argument("--telefone", required=True)
+    preparar_parser.add_argument("--assunto", required=True)
+    preparar_parser.add_argument(
+        "--meio", required=True, choices=["pessoalmente", "telefone", "whatsapp", "carta", "outro"]
+    )
+    preparar_parser.add_argument("--objetivo", required=True)
+    preparar_parser.add_argument("--interessa", default="")
+    preparar_parser.add_argument("--evitar", default="")
+    preparar_parser.add_argument("--livre", default="")
+
     for nome in COMANDOS_RESERVADOS:
         subparsers.add_parser(nome)
 
@@ -1024,8 +991,6 @@ def main(argv: list[str] | None = None) -> int:
         return agrupar_cmd()
     if args.comando == "calibrar-agrupamento":
         return calibrar_agrupamento_cmd()
-    if args.comando == "ciclo":
-        return ciclo_cmd()
     if args.comando == "certificar":
         return certificar_cmd(args.desde, args.ate)
     if args.comando == "qualificar":
@@ -1054,6 +1019,18 @@ def main(argv: list[str] | None = None) -> int:
         return confirmar_tags_cmd(args.telefone, args.todas, args.ids)
     if args.comando == "console":
         return console_cmd(args.banco, args.porta)
+    if args.comando == "ler-rede-social":
+        return ler_rede_social_cmd(args.telefone)
+    if args.comando == "preparar":
+        return preparar_cmd(
+            args.telefone,
+            args.assunto,
+            args.meio,
+            args.objetivo,
+            args.interessa,
+            args.evitar,
+            args.livre,
+        )
     if args.comando in COMANDOS_RESERVADOS:
         return _comando_reservado(args.comando, COMANDOS_RESERVADOS[args.comando])
 

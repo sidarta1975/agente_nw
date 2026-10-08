@@ -26,4 +26,15 @@
   {% else %}
     <p class="vazio">Nenhum contato importado ainda.</p>
   {% endif %}
+
+  <h2>Novo contato</h2>
+  <form class="bloco" method="post" action="{{ url_for('novo_contato') }}">
+    <label for="nome">Nome</label>
+    <input id="nome" type="text" name="nome" required placeholder="Ex.: Maria Silva">
+    <label for="telefone">Telefone (opcional, formato internacional)</label>
+    <input id="telefone" type="text" name="telefone" placeholder="Ex.: +5511900000000">
+    <label for="email">E-mail (opcional)</label>
+    <input id="email" type="text" name="email" placeholder="Ex.: maria@exemplo.com">
+    <p><button type="submit" class="primario">Criar contato</button></p>
+  </form>
 {% endblock %}

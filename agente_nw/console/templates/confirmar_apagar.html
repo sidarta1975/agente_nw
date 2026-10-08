@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block titulo %}Apagar {{ perfil.apelido or perfil.nome }}{% endblock %}
+{% block conteudo %}
+  <h1>Apagar contato — {{ perfil.apelido or perfil.nome }}</h1>
+
+  {% if bloqueado %}
+    <p class="lacunas">
+      Este contato tem histórico permanente ({{ n_fatos }} fato(s), {{ n_consultas }} consulta(s))
+      e não pode ser apagado diretamente — as tabelas de histórico são imutáveis por decisão de auditoria do projeto.
+    </p>
+    <p>Alternativas:</p>
+    <ul class="simples">
+      <li>Marcar como inativo pela ficha, se o objetivo é só tirar da rotina de consultas.</li>
+      <li>Se for de fato um duplicado de outro contato, use a opção "Unir com outro contato" na ficha para preservar o histórico sob o contato canônico.</li>
+    </ul>
+    <p><a class="item-link" href="{{ url_for('ficha', perfil_id=perfil.id) }}">Voltar para a ficha</a></p>
+  {% else %}
+    <p>
+      Confirmar apaga o contato e tudo que estava ligado a ele (redes sociais cadastradas,
+      tags, itens da fila de extração, centroide). Não há histórico permanente associado.
+    </p>
+    <form class="bloco" method="post" action="{{ url_for('apagar_contato', perfil_id=perfil.id) }}">
+      <input type="hidden" name="confirmar" value="sim">
+      <button type="submit" class="perigo">Confirmar apagar</button>
+    </form>
+    <p><a class="item-link" href="{{ url_for('ficha', perfil_id=perfil.id) }}">Cancelar</a></p>
+  {% endif %}
+{% endblock %}

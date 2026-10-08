@@ -14,6 +14,7 @@ dependencies = [
     "python-dateutil",
     "phonenumbers",
     "pyobjc-framework-Contacts",
+    "playwright",
 ]
 
 [project.optional-dependencies]
@@ -46,7 +47,7 @@ strict = true
 python_version = "3.12"
 
 [[tool.mypy.overrides]]
-module = ["feedparser.*", "trafilatura.*", "sqlite_vec.*", "Contacts.*"]
+module = ["feedparser.*", "trafilatura.*", "sqlite_vec.*", "Contacts.*", "playwright.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

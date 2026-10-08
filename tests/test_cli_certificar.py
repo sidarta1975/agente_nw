@@ -58,13 +58,6 @@ def test_certificar_bate_com_os_numeros_fabricados(
 
     pasta_logs = tmp_path / "dados" / "logs"
     pasta_logs.mkdir(parents=True)
-    (pasta_logs / f"ciclo_{DIA}T06-07-41+00-00.log").write_text(
-        "[2026-09-19T06:07:41+00:00] Iniciando coleta\n"
-        "[concluída em 10.0s] coleta\n"
-        "[2026-09-19T06:07:51+00:00] Iniciando backup\n"
-        "[concluída em 2.0s] backup\n",
-        encoding="utf-8",
-    )
     registros_llm = [
         {"tarefa": "qualificar", "tentativas_usadas": 1, "sucesso": True, "quando": f"{DIA}T06:10:00+00:00"},
         {"tarefa": "qualificar", "tentativas_usadas": 2, "sucesso": True, "quando": f"{DIA}T06:11:00+00:00"},
@@ -87,7 +80,6 @@ def test_certificar_bate_com_os_numeros_fabricados(
 
     assert resultado == 0
     saida = capsys.readouterr().out
-    assert "Duração total do ciclo: 12.0s" in saida
     assert "Contatos com sugestão: 1" in saida
     assert "Assuntos entregues: 2 (usado: 1, não serve: 1, novo/pendente: 0)" in saida
     assert "Aproveitamento geral: 1/2 (50.0%)" in saida
@@ -96,7 +88,7 @@ def test_certificar_bate_com_os_numeros_fabricados(
     assert "órfãos (deveria ser sempre 0): 0" in saida
 
 
-def test_certificar_sem_log_de_ciclo_nao_trava(
+def test_certificar_sem_dados_nao_trava(
     monkeypatch: pytest.MonkeyPatch,
     conn: sqlite3.Connection,
     tmp_path: Path,
@@ -108,5 +100,4 @@ def test_certificar_sem_log_de_ciclo_nao_trava(
 
     assert resultado == 0
     saida = capsys.readouterr().out
-    assert "Sem log de ciclo para este dia." in saida
     assert "Nenhuma chamada de LLM registrada no período." in saida

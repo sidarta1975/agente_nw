@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block titulo %}eu{% endblock %}
+{% block conteudo %}
+  <h1>{{ usuario.apelido or usuario.nome }}</h1>
+  <p>Perfil do usuário — as redes cadastradas aqui são as contas cuja sessão o navegador usa para ler páginas de contatos na hora da consulta.</p>
+
+  <h2>Redes sociais</h2>
+  {% if redes %}
+    <ul class="simples" style="list-style: none; padding-left: 0;">
+      {% for rs in redes %}
+        <li>
+          <strong>{{ rs.rede }}</strong> — <a class="item-link" href="{{ rs.link }}" target="_blank" rel="noopener noreferrer">{{ rs.link }}</a>
+          <form class="acao" method="post" action="{{ url_for('remover_rede_social_usuario', rede_social_id=rs.id) }}">
+            <button type="submit" class="perigo">Remover</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="vazio">Nenhuma cadastrada.</p>
+  {% endif %}
+  <form class="bloco" method="post" action="{{ url_for('adicionar_rede_social_usuario') }}">
+    <label for="rede-usuario">Rede</label>
+    <input id="rede-usuario" type="text" name="rede" placeholder="instagram, linkedin, facebook, x, outro">
+    <label for="link-usuario">Link (https://…)</label>
+    <input id="link-usuario" type="text" name="link" placeholder="https://…">
+    <p><button type="submit">Adicionar rede social</button></p>
+  </form>
+{% endblock %}

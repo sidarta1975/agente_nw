@@ -10,6 +10,7 @@ perfis:
       cartao:                {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.3, format: json, think: false}
       cruzar_por_que:        {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.3, format: json, think: false}
       extrair_de_texto:      {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.2, format: json, think: false}
+      extrair_captura_rede_social: {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.2, format: json, think: false}
       prerotular_calibracao: {modelo: qwen3:8b, num_ctx: 2048, temperature: 0.1, format: json, think: false}
     nova_tentativa:
       temperature: 0.1
@@ -25,6 +26,7 @@ perfis:
       cartao:                {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.3, format: json, think: false}
       cruzar_por_que:        {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.3, format: json, think: false}
       extrair_de_texto:      {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.2, format: json, think: false}
+      extrair_captura_rede_social: {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.2, format: json, think: false}
       prerotular_calibracao: {modelo: qwen2.5:14b, num_ctx: 8192, temperature: 0.1, format: json, think: false}
     nova_tentativa:
       temperature: 0.1

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block titulo %}Unir {{ duplicado.apelido or duplicado.nome }} em {{ canonico.apelido or canonico.nome }}{% endblock %}
+{% block conteudo %}
+  <h1>Unir contatos</h1>
+  <p>
+    Vai unir <strong>{{ duplicado.apelido or duplicado.nome }}</strong> (id {{ duplicado.id }}, absorvido)
+    em <strong>{{ canonico.apelido or canonico.nome }}</strong> (id {{ canonico.id }}, mantido).
+  </p>
+  <p>
+    Depois da união:
+  </p>
+  <ul class="simples">
+    <li>Todas as redes sociais, tags, itens de fila e centroide do duplicado passam para o canônico.</li>
+    <li>Todo o histórico permanente do duplicado ({{ n_fatos_dup }} fato(s), {{ n_consultas_dup }} consulta(s)) é reatribuído ao canônico.</li>
+    <li>Campos vazios do canônico são preenchidos pelo valor do duplicado, sem sobrescrever nada já preenchido.</li>
+    <li>O registro do duplicado é apagado.</li>
+  </ul>
+  <p class="lacunas">
+    Não é possível desfazer esta operação sem restaurar backup.
+    Confirme apenas se tiver certeza de que são a mesma pessoa.
+  </p>
+
+  <form class="bloco" method="post" action="{{ url_for('unir_contato', perfil_id=canonico.id) }}">
+    <input type="hidden" name="outro_id" value="{{ duplicado.id }}">
+    <input type="hidden" name="confirmar" value="sim">
+    <button type="submit" class="perigo">Confirmar união</button>
+  </form>
+  <p><a class="item-link" href="{{ url_for('ficha', perfil_id=canonico.id) }}">Cancelar</a></p>
+{% endblock %}
