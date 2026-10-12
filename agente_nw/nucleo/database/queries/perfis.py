@@ -159,6 +159,9 @@ def apagar_contato_completo(conexao: sqlite3.Connection, perfil_id: int) -> None
     consulta_contato — o gatilho continua bloqueando DELETE em ambas."""
     conexao.execute("DELETE FROM assunto_contato WHERE perfil_id = ?", (perfil_id,))
     conexao.execute("DELETE FROM rede_social WHERE perfil_id = ?", (perfil_id,))
+    # Histórico de pedidos e cache das listas sobrevivem ao contato, só perdem o vínculo.
+    conexao.execute("UPDATE pedido SET perfil_id = NULL WHERE perfil_id = ?", (perfil_id,))
+    conexao.execute("UPDATE lista_rede_social SET perfil_id = NULL WHERE perfil_id = ?", (perfil_id,))
     conexao.execute("DELETE FROM perfil_tema WHERE perfil_id = ?", (perfil_id,))
     conexao.execute("DELETE FROM fila_extracao WHERE perfil_id = ?", (perfil_id,))
     conexao.execute("DELETE FROM descarte_sensivel WHERE perfil_id = ?", (perfil_id,))
@@ -258,6 +261,10 @@ def unir_contatos(conexao: sqlite3.Connection, canonico_id: int, duplicado_id: i
 
     # Reatribuições simples nas demais tabelas.
     conexao.execute("UPDATE rede_social SET perfil_id = ? WHERE perfil_id = ?", (canonico_id, duplicado_id))
+    conexao.execute("UPDATE pedido SET perfil_id = ? WHERE perfil_id = ?", (canonico_id, duplicado_id))
+    conexao.execute(
+        "UPDATE lista_rede_social SET perfil_id = ? WHERE perfil_id = ?", (canonico_id, duplicado_id)
+    )
     conexao.execute("UPDATE fila_extracao SET perfil_id = ? WHERE perfil_id = ?", (canonico_id, duplicado_id))
     conexao.execute(
         "UPDATE descarte_sensivel SET perfil_id = ? WHERE perfil_id = ?", (canonico_id, duplicado_id)

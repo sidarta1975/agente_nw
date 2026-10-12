@@ -7,6 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from agente_nw.nucleo.modelos.contexto_consulta import MeioContato
+from agente_nw.nucleo.modelos.localizacao import Localizacao, Opcao
 from agente_nw.nucleo.modelos.perfil import Perfil
 from agente_nw.nucleo.texto import sem_acento_e_caixa
 
@@ -91,3 +92,5 @@ class ResultadoPedido:
     contato_criado: bool = False
     contato_ambiguo: bool = False
     candidatos: list[Perfil] = field(default_factory=list)
+    localizacao: Localizacao | None = None  # brief 037: só quando o contato ainda não tem rede gravada
+    link_gravado: Opcao | None = None  # o pedido trouxe o link da pessoa e ele foi gravado direto

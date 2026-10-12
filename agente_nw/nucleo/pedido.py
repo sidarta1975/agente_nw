@@ -6,7 +6,8 @@ from typing import Protocol, TypeVar
 
 from pydantic import BaseModel
 
-from agente_nw.nucleo.database.queries import pedidos, perfis
+from agente_nw.nucleo import localizacao as localizacao_mod
+from agente_nw.nucleo.database.queries import pedidos, perfis, redes_sociais
 from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido, ResultadoPedido
 from agente_nw.nucleo.modelos.perfil import Perfil
@@ -134,6 +135,8 @@ def processar(
     frase: str,
     agora: str,
     contato_id_forcado: int | None = None,
+    navegacao: localizacao_mod.ContextoNavegacao | None = None,
+    trocar_perfil: bool = False,
 ) -> ResultadoPedido:
     pedido_id = registrar(conexao, frase, agora)
 
@@ -146,7 +149,7 @@ def processar(
     pedidos.gravar_resolucao(conexao, pedido_id, perfil.id if perfil is not None else None, criado, ambiguo)
     conexao.commit()
 
-    return ResultadoPedido(
+    resultado = ResultadoPedido(
         pedido_id=pedido_id,
         pedido=pedido,
         perfil=perfil,
@@ -154,3 +157,34 @@ def processar(
         contato_ambiguo=ambiguo,
         candidatos=candidatos,
     )
+    _localizar_na_rede(cliente_llm, conexao, resultado, agora, navegacao, trocar_perfil)
+    return resultado
+
+
+def _localizar_na_rede(
+    cliente_llm: ClientePedido,
+    conexao: sqlite3.Connection,
+    resultado: ResultadoPedido,
+    agora: str,
+    navegacao: localizacao_mod.ContextoNavegacao | None,
+    trocar_perfil: bool,
+) -> None:
+    """Brief 037: acha a pessoa nas redes do usuário. Link no pedido grava direto; contato que já tem
+    rede gravada não é procurado de novo (a menos que o usuário peça para trocar)."""
+    perfil = resultado.perfil
+    pedido = resultado.pedido
+    if perfil is None or perfil.id is None or not pedido.pessoa_nome:
+        return
+
+    link = pedido.pessoa_pistas.get("link_rede_social")
+    if link:
+        resultado.link_gravado = localizacao_mod.gravar_link_do_pedido(
+            conexao, perfil.id, link, agora, substituir=trocar_perfil
+        )
+        if resultado.link_gravado is not None:
+            return
+    if navegacao is None:
+        return
+    if redes_sociais.listar_por_perfil(conexao, perfil.id) and not trocar_perfil:
+        return
+    resultado.localizacao = localizacao_mod.localizar(conexao, cliente_llm, pedido, navegacao, agora)

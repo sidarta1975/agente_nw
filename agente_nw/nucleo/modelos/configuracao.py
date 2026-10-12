@@ -7,6 +7,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 NivelTema = Literal["dominio", "interesse", "curiosidade"]
 
 
+class RedeLocal(BaseModel):
+    """Dados da conta do usuário numa rede (config/local.yaml, bloco `redes`)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    usuario: str | None = None
+
+
 class Configuracao(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -15,6 +23,7 @@ class Configuracao(BaseModel):
     pasta_backups: str
     ollama_url: str
     perfil_llm: str | None = None
+    redes: dict[str, RedeLocal] = Field(default_factory=dict)
 
 
 class EmbeddingsRoteamento(BaseModel):
@@ -161,6 +170,16 @@ class CartaoLimiares(BaseModel):
     teto_por_dia: int
 
 
+class ListasLimiares(BaseModel):
+    """Leitura das listas do próprio usuário nas redes (brief 037)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    maximo_entradas: int = Field(ge=1)
+    pausa_rolagem_s: float = Field(ge=0)
+    validade_dias: int = Field(ge=1)
+
+
 class Limiares(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -169,6 +188,7 @@ class Limiares(BaseModel):
     conector: ConectorLimiares
     coleta: ColetaLimiares
     cartao: CartaoLimiares
+    listas: ListasLimiares
 
 
 class TemaUsuario(BaseModel):

@@ -41,6 +41,22 @@ def configuracao() -> ConfiguracaoCarregada:
     return ConfiguracaoCarregada(local=local, roteamento=roteamento, limiares=limiares)
 
 
+def gravar_usuario_rede(rede: str, usuario: str) -> None:
+    """Grava `redes.<rede>.usuario` em config/local.yaml (criando o arquivo a partir do exemplo)."""
+    caminho = RAIZ / "config" / "local.yaml"
+    origem = caminho if caminho.exists() else RAIZ / "config" / "local.exemplo.yaml"
+    texto = origem.read_text(encoding="utf-8")
+    dados = yaml.safe_load(texto) or {}
+    if not dados.get("redes"):
+        # Anexa o bloco novo e preserva os comentários do arquivo.
+        bloco = f"\nredes:\n  {rede}:\n    usuario: {usuario}\n"
+        caminho.write_text(texto.rstrip("\n") + bloco, encoding="utf-8")
+    else:
+        dados["redes"].setdefault(rede, {})["usuario"] = usuario
+        caminho.write_text(yaml.safe_dump(dados, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    configuracao.cache_clear()
+
+
 def origem_perfil_llm() -> str:
     return "config/local.yaml" if configuracao().local.perfil_llm is not None else "config/llm_routing.yaml"
 

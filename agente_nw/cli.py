@@ -5,15 +5,18 @@ import json
 import sqlite3
 import subprocess
 import sys
+from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, cast
 from urllib.parse import urlparse
 
 import httpx
 import yaml
 from pydantic import ValidationError
 
+from agente_nw.coleta.capturas.busca import REDES_SUPORTADAS
+from agente_nw.coleta.capturas.listas import PaginaLista
 from agente_nw.coleta.rss import leitor
 from agente_nw.console.app import criar_app
 from agente_nw.nucleo.agrupamento import agrupador
@@ -21,7 +24,9 @@ from agente_nw.nucleo.agrupamento import calibracao as calibracao_agrupamento
 from agente_nw.nucleo.agrupamento.agrupador import ClienteEmbeddagem
 from agente_nw.nucleo.database import backup, conexao
 from agente_nw.nucleo.database.queries import assunto_contato, assuntos, perfil_tema, perfis, sistema
+from agente_nw.nucleo.database.queries import listas as queries_listas
 from agente_nw.nucleo.database.queries import temas as queries_temas
+from agente_nw.nucleo.localizacao import ContextoNavegacao, atualizar_lista
 from agente_nw.nucleo.modelos.configuracao import PerfilRoteamento, Roteamento, TemasArquivo
 from agente_nw.nucleo.modelos.pedido import ResultadoPedido
 from agente_nw.nucleo.relevancia import cartoes, cruzamento, qualificador
@@ -41,6 +46,7 @@ from config.container import (
     caminho_pasta_saida,
     caminho_sentinela,
     configuracao,
+    gravar_usuario_rede,
     http,
     llm,
     origem_perfil_llm,
@@ -672,14 +678,50 @@ def _imprimir_pedido(resultado: ResultadoPedido, frase: str) -> None:
         print(f'Para trocar: agente_nw pedir --contato <id> "{frase}"')
 
 
-def pedir_cmd(frase: str, preparar_depois: bool, saida_json: bool, contato_id: int | None) -> int:
+def _contexto_de_navegacao(
+    abrir_pagina: Callable[[Path], PaginaLista] | None, perguntar: bool, aguardar_login: bool = False
+) -> ContextoNavegacao:
+    from agente_nw.coleta.capturas.playwright_backend import abrir_pagina_playwright
+
+    cfg = configuracao()
+    return ContextoNavegacao(
+        abrir_pagina=abrir_pagina or cast(Callable[[Path], PaginaLista], abrir_pagina_playwright),
+        pasta_navegador=RAIZ / "dados" / "navegador",
+        limiares=cfg.limiares.listas,
+        usuarios_rede={r: v.usuario for r, v in cfg.local.redes.items() if v.usuario},
+        gravar_usuario=gravar_usuario_rede,
+        perguntar_usuario=(
+            (lambda rede: input(f"Qual é o seu usuário no {rede}? (Enter = pular) ")) if perguntar else None
+        ),
+        avisar=print,
+        aguardar_login=aguardar_login,
+    )
+
+
+def pedir_cmd(
+    frase: str,
+    preparar_depois: bool,
+    saida_json: bool,
+    contato_id: int | None,
+    sem_perguntar: bool = False,
+    trocar_perfil: bool = False,
+    entrada: Callable[[str], str] = input,
+    abrir_pagina: Callable[[Path], PaginaLista] | None = None,
+    aguardar_login: bool = False,
+) -> int:
+    from agente_nw.nucleo import confirmacao
     from agente_nw.nucleo import pedido as pedido_mod
     from agente_nw.nucleo.llm import FalhaJsonInvalido
 
     conn = banco()
     agora = datetime.now(UTC).isoformat()
+    navegacao = (
+        None if saida_json else _contexto_de_navegacao(abrir_pagina, not sem_perguntar, aguardar_login)
+    )
     try:
-        resultado = pedido_mod.processar(llm(), conn, frase, agora, contato_id)
+        resultado = pedido_mod.processar(
+            llm(), conn, frase, agora, contato_id, navegacao=navegacao, trocar_perfil=trocar_perfil
+        )
     except FalhaJsonInvalido as erro:
         print(f"FALHA: não consegui entender o pedido ({erro})")
         return 1
@@ -692,6 +734,18 @@ def pedir_cmd(frase: str, preparar_depois: bool, saida_json: bool, contato_id: i
         return 0
 
     _imprimir_pedido(resultado, frase)
+    if resultado.link_gravado is not None:
+        print(f"Rede social gravada a partir do link do pedido: {resultado.link_gravado.link}")
+    if resultado.localizacao is not None and resultado.perfil is not None and resultado.perfil.id is not None:
+        confirmacao.conduzir(
+            conn,
+            resultado.perfil.id,
+            resultado.localizacao,
+            agora,
+            entrada=entrada,
+            sem_perguntar=sem_perguntar,
+            substituir=trocar_perfil,
+        )
     if not preparar_depois:
         return 0
     if resultado.perfil is None or resultado.perfil.id is None:
@@ -723,6 +777,37 @@ def pedir_cmd(frase: str, preparar_depois: bool, saida_json: bool, contato_id: i
         print(f"[{item.tipo}] {item.titulo} (score={item.score:.1f})")
         if item.por_que:
             print(f"  por quê: {item.por_que}")
+    return 0
+
+
+def listas_atualizar_cmd(rede: str | None, forcar: bool) -> int:
+    redes = [rede] if rede else list(REDES_SUPORTADAS)
+    conn = banco()
+    contexto = _contexto_de_navegacao(None, True, aguardar_login=True)
+    agora = datetime.now(UTC).isoformat()
+    for nome_rede in redes:
+        resultado = atualizar_lista(conn, nome_rede, contexto, agora, forcar=forcar)
+        if resultado.motivo:
+            print(f"{nome_rede}: não li a lista — {resultado.motivo}")
+        elif resultado.usou_cache:
+            quando = queries_listas.ultima_leitura(conn, nome_rede)
+            print(f"{nome_rede}: cache válido de {quando}, {resultado.total} entradas (--forcar relê)")
+        else:
+            print(f"{nome_rede}: {resultado.total} entradas lidas")
+    return 0
+
+
+def listas_ver_cmd(rede: str, filtro: str | None) -> int:
+    conn = banco()
+    entradas = (
+        queries_listas.filtrar_por_texto(conn, rede, filtro)
+        if filtro
+        else queries_listas.listar_por_rede(conn, rede)
+    )
+    for entrada in entradas:
+        cabecalho = f" — {entrada.cabecalho}" if entrada.cabecalho else ""
+        print(f"{entrada.nome}{cabecalho} {entrada.link}")
+    print(f"{len(entradas)} entradas em {rede}")
     return 0
 
 
@@ -1052,9 +1137,29 @@ def _montar_parser() -> argparse.ArgumentParser:
 
     pedir_parser = subparsers.add_parser("pedir")
     pedir_parser.add_argument("frase")
+    pedir_parser.add_argument(
+        "--sem-perguntar", action="store_true", help="aceita o candidato claro e pula os demais casos"
+    )
+    pedir_parser.add_argument(
+        "--trocar-perfil", action="store_true", help="reabre a escolha da rede social do contato"
+    )
     pedir_parser.add_argument("--preparar", action="store_true", help="encadeia a consulta e imprime o menu")
     pedir_parser.add_argument("--json", action="store_true", help="imprime só o pedido extraído, em JSON")
     pedir_parser.add_argument("--contato", type=int, default=None, help="id do contato (força a escolha)")
+    pedir_parser.add_argument(
+        "--aguardar-login",
+        action="store_true",
+        help="espera você entrar nas redes sem sessão (padrão: rede sem sessão é pulada na hora)",
+    )
+
+    listas_parser = subparsers.add_parser("listas")
+    listas_sub = listas_parser.add_subparsers(dest="acao", required=True)
+    listas_atualizar = listas_sub.add_parser("atualizar")
+    listas_atualizar.add_argument("--rede", choices=REDES_SUPORTADAS, default=None)
+    listas_atualizar.add_argument("--forcar", action="store_true", help="relê mesmo com cache válido")
+    listas_ver = listas_sub.add_parser("ver")
+    listas_ver.add_argument("--rede", choices=REDES_SUPORTADAS, required=True)
+    listas_ver.add_argument("--filtro", default=None)
 
     preparar_parser = subparsers.add_parser("preparar")
     preparar_parser.add_argument("--telefone", required=True)
@@ -1123,8 +1228,20 @@ def main(argv: list[str] | None = None) -> int:
         return console_cmd(args.banco, args.porta)
     if args.comando == "ler-rede-social":
         return ler_rede_social_cmd(args.telefone)
+    if args.comando == "listas":
+        if args.acao == "atualizar":
+            return listas_atualizar_cmd(args.rede, args.forcar)
+        return listas_ver_cmd(args.rede, args.filtro)
     if args.comando == "pedir":
-        return pedir_cmd(args.frase, args.preparar, args.json, args.contato)
+        return pedir_cmd(
+            args.frase,
+            args.preparar,
+            args.json,
+            args.contato,
+            sem_perguntar=args.sem_perguntar,
+            trocar_perfil=args.trocar_perfil,
+            aguardar_login=args.aguardar_login,
+        )
     if args.comando == "preparar":
         return preparar_cmd(
             args.telefone,

@@ -4,3 +4,8 @@ pasta_backups: dados/backups
 ollama_url: http://127.0.0.1:11434
 # perfil_llm: pro48   # perfil de config/llm_routing.yaml desta máquina; ausente = air16
 # URLs identificadoras da conta (alerts, iCal) entram só em config/local.yaml, fora do git
+# redes:                 # usuário da conta do próprio usuário; o sistema grava aqui sozinho na primeira leitura
+#   instagram:
+#     usuario: seu_usuario
+#   x:
+#     usuario: seu_usuario

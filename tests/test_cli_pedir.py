@@ -47,6 +47,8 @@ def conn(tmp_path: Path) -> sqlite3.Connection:
 def _ambiente(conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cli, "banco", lambda: conn)
     monkeypatch.setattr(cli, "llm", lambda: _ClienteFalso())
+    # Estes testes não exercitam a localização nas redes (brief 037): sem navegador.
+    monkeypatch.setattr(cli, "_contexto_de_navegacao", lambda *_a, **_k: None)
 
 
 def test_saida_traz_os_blocos_principais(capsys: pytest.CaptureFixture[str]) -> None:

@@ -16,6 +16,7 @@ from agente_nw.nucleo.modelos.configuracao import (
     ConectorLimiares,
     ConsultaLimiares,
     Limiares,
+    ListasLimiares,
     QualificacaoLimiares,
 )
 from agente_nw.nucleo.modelos.extracao import RespostaExtracaoTexto
@@ -58,6 +59,7 @@ def _limiares() -> Limiares:
             dias_alerta_feed_vazio=2,
         ),
         cartao=CartaoLimiares(teto_por_dia=40),
+        listas=ListasLimiares(maximo_entradas=2000, pausa_rolagem_s=0, validade_dias=30),
     )
 
 
