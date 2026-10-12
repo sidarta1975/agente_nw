@@ -195,7 +195,7 @@ def test_ordem_das_redes() -> None:
     assert localizacao_mod.ordem_das_redes("proximo", {})[0] == "instagram"
     assert localizacao_mod.ordem_das_redes("proximo", {"profissao": "médico"})[0] == "linkedin"
     todas = localizacao_mod.ordem_das_redes("cordial", {})
-    assert sorted(todas) == ["facebook", "instagram", "linkedin", "x"]
+    assert sorted(todas) == ["facebook", "instagram", "linkedin"]
 
 
 def test_confirmar_grava_rede_notas_vinculo_e_fato(conn: sqlite3.Connection) -> None:
@@ -275,3 +275,11 @@ def test_trocar_perfil_reabre_a_localizacao(conn: sqlite3.Connection) -> None:
 
     assert resultado.localizacao is not None
     assert resultado.localizacao.status == "claro"
+
+
+def test_x_nunca_entra_na_leitura_automatica(capsys: pytest.CaptureFixture[str]) -> None:
+    import agente_nw.cli as cli
+
+    assert "x" not in localizacao_mod.ordem_das_redes("proximo", {})
+    assert cli.listas_atualizar_cmd("x", forcar=True) == 1
+    assert "bloqueia navegador automatizado" in capsys.readouterr().out

@@ -43,6 +43,10 @@ _CONFIG_BUSCA: dict[str, _ConfigRede] = {
 
 REDES_SUPORTADAS: tuple[str, ...] = tuple(sorted(_CONFIG_BUSCA.keys()))
 
+# O X bloqueia navegador automatizado: nunca é lido nem buscado sozinho. Só entra por link colado.
+REDES_SO_POR_LINK: frozenset[str] = frozenset({"x"})
+REDES_AUTOMATICAS: tuple[str, ...] = tuple(r for r in REDES_SUPORTADAS if r not in REDES_SO_POR_LINK)
+
 
 class PaginaBusca(Protocol):
     """Superfície que o algoritmo de busca consome. O backend real (Playwright)

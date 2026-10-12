@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 from pydantic import BaseModel
 
 from agente_nw.coleta.capturas import busca, listas
-from agente_nw.coleta.capturas.busca import REDES_SUPORTADAS
+from agente_nw.coleta.capturas.busca import REDES_AUTOMATICAS
 from agente_nw.coleta.capturas.listas import PaginaLista, ResultadoAtualizacao
 from agente_nw.nucleo.database.queries import fatos, perfis, redes_sociais
 from agente_nw.nucleo.database.queries import listas as queries_listas
@@ -77,10 +77,10 @@ def rede_do_link(link: str) -> str | None:
 
 def ordem_das_redes(registro: str, pistas: dict[str, str]) -> list[str]:
     """LinkedIn primeiro para registro cordial/formal ou pista de profissão/empresa; Instagram
-    primeiro para registro próximo; as demais na ordem de REDES_SUPORTADAS."""
+    primeiro para registro próximo; as demais na ordem de REDES_AUTOMATICAS (o X só entra por link)."""
     profissional = registro in ("cordial", "formal") or "profissao" in pistas or "empresa" in pistas
     primeira = "linkedin" if profissional else ("instagram" if registro == "proximo" else None)
-    restantes = [r for r in REDES_SUPORTADAS if r != primeira]
+    restantes = [r for r in REDES_AUTOMATICAS if r != primeira]
     return ([primeira] if primeira else []) + restantes
 
 

@@ -15,7 +15,7 @@ import httpx
 import yaml
 from pydantic import ValidationError
 
-from agente_nw.coleta.capturas.busca import REDES_SUPORTADAS
+from agente_nw.coleta.capturas.busca import REDES_AUTOMATICAS, REDES_SO_POR_LINK, REDES_SUPORTADAS
 from agente_nw.coleta.capturas.listas import PaginaLista
 from agente_nw.coleta.rss import leitor
 from agente_nw.console.app import criar_app
@@ -787,7 +787,10 @@ def pedir_cmd(
 
 
 def listas_atualizar_cmd(rede: str | None, forcar: bool) -> int:
-    redes = [rede] if rede else list(REDES_SUPORTADAS)
+    if rede in REDES_SO_POR_LINK:
+        print(f"{rede}: bloqueia navegador automatizado; não leio a lista. Use o link do perfil (c).")
+        return 1
+    redes = [rede] if rede else list(REDES_AUTOMATICAS)
     conn = banco()
     contexto = _contexto_de_navegacao(None, True, aguardar_login=True)
     agora = datetime.now(UTC).isoformat()
