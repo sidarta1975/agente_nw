@@ -240,4 +240,12 @@ def test_ficha_sem_busca_mostra_botoes_de_busca_por_rede(
     assert "Buscar em linkedin" in texto
     assert "Buscar em instagram" in texto
     assert "Buscar em facebook" in texto
-    assert "Buscar em x" in texto
+    assert "Buscar em x" not in texto
+
+
+def test_busca_na_rede_x_e_recusada(client: FlaskClient, conn: sqlite3.Connection) -> None:
+    perfil_id = _criar_contato(conn, "Carla")
+
+    resposta = client.post(f"/contatos/{perfil_id}/redes-sociais/buscar", data={"rede": "x"})
+
+    assert resposta.status_code == 400

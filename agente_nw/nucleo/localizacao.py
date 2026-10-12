@@ -193,6 +193,14 @@ def _ler_e_gravar(
 
     if not resultado.autenticado:
         return ResultadoAtualizacao(rede=rede, lida=False, usou_cache=False, total=0, motivo=resultado.motivo)
+    if not resultado.entradas:
+        return ResultadoAtualizacao(
+            rede=rede,
+            lida=False,
+            usou_cache=False,
+            total=0,
+            motivo=f"abri a lista de {rede} mas não achei ninguém nela (a página pode ter mudado)",
+        )
     queries_listas.substituir_lista(conexao, rede, resultado.entradas, agora)
     conexao.commit()
     return ResultadoAtualizacao(rede=rede, lida=True, usou_cache=False, total=len(resultado.entradas))

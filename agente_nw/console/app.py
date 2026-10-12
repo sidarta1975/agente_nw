@@ -138,7 +138,7 @@ def criar_app(
             confirmadas=confirmadas,
             nao_confirmadas=nao_confirmadas,
             redes=redes,
-            redes_buscaveis=busca.REDES_SUPORTADAS,
+            redes_buscaveis=busca.REDES_AUTOMATICAS,
             rede_busca=rede_busca,
             resultado_busca=resultado_busca,
             outros_contatos=outros_contatos,
@@ -399,7 +399,7 @@ def criar_app(
 
         perfil = _perfil_ou_404(perfil_id)
         rede = request.form.get("rede", "").strip().lower()
-        if rede not in busca.REDES_SUPORTADAS:
+        if rede not in busca.REDES_AUTOMATICAS:
             abort(400)
 
         pasta_rede = caminho_banco.parent / "navegador" / rede

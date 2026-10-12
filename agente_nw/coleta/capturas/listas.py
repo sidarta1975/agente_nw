@@ -42,6 +42,15 @@ _RESERVADOS_INSTAGRAM = frozenset(
         "legal",
         "web",
         "tv",
+        "popular",
+        "nametag",
+        "challenge",
+        "emails",
+        "session",
+        "developer",
+        "privacy",
+        "terms",
+        "directory",
     }
 )
 _RESERVADOS_X = frozenset(

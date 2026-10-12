@@ -209,3 +209,15 @@ def test_usuario_aceita_arroba_e_url_do_perfil(bruto: str) -> None:
 def test_usuario_vazio_e_none() -> None:
     assert listas.normalizar_usuario("  ") is None
     assert listas.normalizar_usuario(None) is None
+
+
+def test_links_de_navegacao_do_instagram_nao_sao_pessoas() -> None:
+    links = [
+        ("https://www.instagram.com/popular", "Popular"),
+        ("https://www.instagram.com/explore/", "Explorar"),
+        ("https://www.instagram.com/ana.lima/", "ana.lima\nAna Lima"),
+    ]
+
+    entradas = listas.parse_links("instagram", links)
+
+    assert [e.link for e in entradas] == ["https://www.instagram.com/ana.lima"]
