@@ -83,3 +83,19 @@ def test_extrair_monta_prompt_com_a_frase_e_chama_a_tarefa(conn: sqlite3.Connect
     pedido = pedido_mod.extrair(cliente, conn, "Café com o Renato amanhã")
     assert pedido.pessoa_nome == "Renato"
     assert "Café com o Renato amanhã" in cliente.prompts[0]
+
+
+def test_rotulo_inventado_pelo_modelo_vira_neutro_sem_derrubar_o_pedido() -> None:
+    pedido = PedidoExtraido(**base(objetivo="conversar", meio="Zap", registro="Descontraído"))
+
+    assert pedido.objetivo == "outro"
+    assert pedido.meio == "outro"
+    assert pedido.registro == "cordial"
+    assert pedido.objetivo_texto == "retomar o contato"
+
+
+def test_rotulo_valido_com_caixa_diferente_e_aceito() -> None:
+    pedido = PedidoExtraido(**base(objetivo="Retomar", registro="FORMAL"))
+
+    assert pedido.objetivo == "retomar"
+    assert pedido.registro == "formal"

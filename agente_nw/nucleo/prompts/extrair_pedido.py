@@ -49,6 +49,7 @@ JSON, sem texto antes ou depois, sem raciocínio, com exatamente estes campos:
 "empresa", "cidade", "vinculo" (como o usuário conhece a pessoa),
 "tempo_sem_contato", "link_rede_social". Nunca invente uma chave.
 "objetivo" — um de: retomar, agradecer, pedir, manter, apresentar, responder, outro.
+(conversar, puxar assunto e bater papo são "manter"; use só esses valores.)
 "objetivo_texto" — o objetivo nas palavras do usuário.
 "meio" — um de: pessoalmente, telefone, whatsapp, carta, outro. Almoço, encontro e
 reunião são "pessoalmente". Se a frase não diz, use "whatsapp".

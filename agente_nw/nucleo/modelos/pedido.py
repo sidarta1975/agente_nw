@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal, get_args
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 from agente_nw.nucleo.modelos.contexto_consulta import MeioContato
 from agente_nw.nucleo.modelos.localizacao import Localizacao, Opcao
@@ -50,6 +50,19 @@ class PedidoExtraido(BaseModel):
     termos_busca: list[str]
     continuacao: bool = False
     confianca: float = Field(ge=0, le=1)
+
+    @field_validator("objetivo", "meio", "registro", mode="before")
+    @classmethod
+    def rotulo_desconhecido_vira_neutro(cls, valor: Any, info: ValidationInfo) -> Any:
+        """O modelo às vezes inventa um rótulo ("conversar"). O sentido fica em `objetivo_texto`; o
+        rótulo cai no valor neutro em vez de derrubar o pedido inteiro."""
+        permitidos = {
+            "objetivo": (get_args(ObjetivoPedido), "outro"),
+            "meio": (get_args(MeioContato), "outro"),
+            "registro": (get_args(RegistroPedido), "cordial"),
+        }[str(info.field_name)]
+        normalizado = sem_acento_e_caixa(valor) if isinstance(valor, str) else valor
+        return normalizado if normalizado in permitidos[0] else permitidos[1]
 
     @field_validator("pessoa_nome")
     @classmethod
