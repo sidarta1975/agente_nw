@@ -18,7 +18,7 @@ _URL_LOGIN_SUBSTRINGS: tuple[str, ...] = (
 _MIN_CHARS_AUTENTICADO = 500
 _BLOCO_TAMANHO_MINIMO = 30
 _BLOCO_TAMANHO_MAXIMO = 5000
-_MAX_ESPERAS_LOGIN = 36  # 36 × 5s = 3 min
+_MAX_ESPERAS_LOGIN = 0  # sem espera: o usuário já está logado no próprio Chrome (brief 044)
 _ESPERA_LOGIN_S = 5.0
 _MAX_ROLAGENS = 5
 _INTERVALO_MIN_S = 4.0
@@ -28,9 +28,9 @@ _INTERVALO_MAX_S = 9.0
 class Pagina(Protocol):
     """Superfície mínima da página de navegador que o algoritmo consome.
 
-    O backend real (Playwright, em `playwright_backend.py`) implementa este
-    protocolo; os testes injetam uma `Pagina` falsa para exercitar o algoritmo
-    sem depender do Chromium.
+    O backend real (extensão do Chrome do usuário, em `extensao_backend.py`) implementa
+    este protocolo; os testes injetam uma `Pagina` falsa para exercitar o algoritmo
+    sem depender do navegador.
     """
 
     def ir_para(self, url: str) -> None: ...
@@ -92,7 +92,7 @@ def ler(
         if not entrou:
             return CapturaBlocos(
                 autenticado=False,
-                motivo="sem sessão ativa e prazo de login esgotou",
+                motivo="sem sessão ativa — entre na rede no seu Chrome e repita",
                 blocos=[],
             )
 

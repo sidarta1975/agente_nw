@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import sqlite3
 import time
-from collections.abc import Callable
-from dataclasses import dataclass, replace
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol, TypeVar
 from urllib.parse import urlparse
@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 from pydantic import BaseModel
 
 from agente_nw.coleta.capturas import busca, listas
-from agente_nw.coleta.capturas.busca import REDES_AUTOMATICAS
+from agente_nw.coleta.capturas.busca import redes_automaticas
 from agente_nw.coleta.capturas.listas import PaginaLista, ResultadoAtualizacao
 from agente_nw.nucleo.database.queries import fatos, perfis, redes_sociais
 from agente_nw.nucleo.database.queries import listas as queries_listas
@@ -52,15 +52,6 @@ class ContextoNavegacao:
     perguntar_usuario: Callable[[str], str | None] | None = None
     avisar: Callable[[str], None] | None = None
     dorme: Callable[[float], None] = time.sleep
-    perguntar_login: Callable[[str], bool] | None = None
-    """Chamado quando a rede está sem sessão: True = o usuário quer logar agora e a leitura espera."""
-    aguardar_login: bool = False
-    """False: rede sem sessão é descartada na hora (a localização nunca prende o pedido esperando
-    login). True: espera o login como na leitura de perfil (brief 017) — uso explícito do usuário."""
-
-    @property
-    def max_esperas_login(self) -> int:
-        return listas.MAX_ESPERAS_LOGIN if self.aguardar_login else 0
 
 
 def canonicalizar_link(link: str) -> str:
@@ -75,12 +66,13 @@ def rede_do_link(link: str) -> str | None:
     return _HOSTS_POR_REDE.get(host)
 
 
-def ordem_das_redes(registro: str, pistas: dict[str, str]) -> list[str]:
+def ordem_das_redes(registro: str, pistas: dict[str, str], so_por_link: Iterable[str] = ()) -> list[str]:
     """LinkedIn primeiro para registro cordial/formal ou pista de profissão/empresa; Instagram
-    primeiro para registro próximo; as demais na ordem de REDES_AUTOMATICAS (o X só entra por link)."""
+    primeiro para registro próximo; as demais na ordem das redes automáticas (as de
+    `redes_so_por_link` só entram por link)."""
     profissional = registro in ("cordial", "formal") or "profissao" in pistas or "empresa" in pistas
     primeira = "linkedin" if profissional else ("instagram" if registro == "proximo" else None)
-    restantes = [r for r in REDES_AUTOMATICAS if r != primeira]
+    restantes = [r for r in redes_automaticas(so_por_link) if r != primeira]
     return ([primeira] if primeira else []) + restantes
 
 
@@ -152,20 +144,7 @@ def atualizar_lista(
         return ResultadoAtualizacao(
             rede=rede, lida=False, usou_cache=True, total=queries_listas.contar_por_rede(conexao, rede)
         )
-    if contexto.perguntar_login is None or contexto.aguardar_login:
-        return _ler_e_gravar(conexao, rede, contexto, agora)
 
-    # Primeiro sem esperar e sem perguntar o usuário; se faltar sessão, oferece o login com tempo.
-    rapido = replace(contexto, perguntar_usuario=None)
-    resultado = _ler_e_gravar(conexao, rede, rapido, agora)
-    if resultado.motivo is None or not contexto.perguntar_login(rede):
-        return resultado
-    return _ler_e_gravar(conexao, rede, replace(contexto, aguardar_login=True), agora)
-
-
-def _ler_e_gravar(
-    conexao: sqlite3.Connection, rede: str, contexto: ContextoNavegacao, agora: str
-) -> ResultadoAtualizacao:
     usuario = listas.resolver_usuario(
         rede,
         contexto.usuarios_rede.get(rede),
@@ -174,10 +153,9 @@ def _ler_e_gravar(
         contexto.gravar_usuario,
         contexto.perguntar_usuario,
         dorme=contexto.dorme,
-        max_esperas_login=contexto.max_esperas_login,
     )
     if contexto.avisar is not None:
-        contexto.avisar(f"Lendo a lista de {rede} — vai demorar; deixe a janela do navegador aberta.")
+        contexto.avisar(f"Lendo a lista de {rede} no seu Chrome — vai demorar; deixe a aba da ponte aberta.")
     pagina = contexto.abrir_pagina(contexto.pasta_navegador / rede)
     try:
         resultado = listas.ler_lista(
@@ -186,7 +164,6 @@ def _ler_e_gravar(
             usuario,
             contexto.limiares,
             dorme=contexto.dorme,
-            max_esperas_login=contexto.max_esperas_login,
         )
     finally:
         pagina.fechar()
@@ -242,7 +219,7 @@ def localizar(
     sem_sessao: set[str] = set()
     acumuladas: list[Opcao] = []
 
-    for rede in ordem_das_redes(pedido.registro, pedido.pessoa_pistas):
+    for rede in ordem_das_redes(pedido.registro, pedido.pessoa_pistas, contexto.limiares.redes_so_por_link):
         atualizacao = atualizar_lista(conexao, rede, contexto, agora)
         if atualizacao.motivo:
             avisos.append(f"{rede}: {atualizacao.motivo}")
@@ -275,7 +252,7 @@ def localizar(
         return Localizacao(status="ambiguo", opcoes=acumuladas, fonte="lista", avisos=avisos)
 
     opcoes_busca: list[Opcao] = []
-    for rede in ordem_das_redes(pedido.registro, pedido.pessoa_pistas):
+    for rede in ordem_das_redes(pedido.registro, pedido.pessoa_pistas, contexto.limiares.redes_so_por_link):
         if rede in sem_sessao:
             continue
         achadas, motivo = _busca_geral(rede, pedido, contexto)

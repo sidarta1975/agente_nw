@@ -8,14 +8,14 @@ import sys
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import NamedTuple, cast
+from typing import NamedTuple
 from urllib.parse import urlparse
 
 import httpx
 import yaml
 from pydantic import ValidationError
 
-from agente_nw.coleta.capturas.busca import REDES_AUTOMATICAS, REDES_SO_POR_LINK, REDES_SUPORTADAS
+from agente_nw.coleta.capturas.busca import REDES_SUPORTADAS, redes_automaticas
 from agente_nw.coleta.capturas.listas import PaginaLista
 from agente_nw.coleta.rss import leitor
 from agente_nw.console.app import criar_app
@@ -217,34 +217,22 @@ def _verificar_arquivo_existe(nome: str, caminho: Path) -> ItemVerificacao:
     return ItemVerificacao(nome, existe, detalhe, obrigatorio=False)
 
 
-def _verificar_playwright_chromium() -> ItemVerificacao:
+def _verificar_extensao() -> ItemVerificacao:
+    """Sobe a ponte, abre a página-ponte e espera a extensão dizer "ola" (brief 044)."""
+    from agente_nw.ponte import ErroDaExtensao, PonteIndisponivel, obter_ponte
+
+    nome = "Extensão do navegador"
     try:
-        from playwright.sync_api import sync_playwright
-    except ImportError as erro:
+        limiares = configuracao().limiares.extensao
+        dados = obter_ponte(limiares.espera_extensao_s).enviar({"acao": "ola"}, limiares.espera_extensao_s)
+    except (PonteIndisponivel, ErroDaExtensao) as erro:
         return ItemVerificacao(
-            "Playwright + Chromium instalados",
+            nome,
             False,
-            f"lib Playwright ausente: {erro} — rode 'pip install -e .[dev]'",
+            f"extensão não respondeu ({erro}) — rode 'agente_nw extensao instalar'",
             obrigatorio=True,
         )
-    try:
-        with sync_playwright() as p:
-            caminho = Path(p.chromium.executable_path)
-    except Exception as erro:
-        return ItemVerificacao(
-            "Playwright + Chromium instalados",
-            False,
-            f"erro ao consultar Chromium: {erro} — rode 'playwright install chromium'",
-            obrigatorio=True,
-        )
-    if not caminho.exists():
-        return ItemVerificacao(
-            "Playwright + Chromium instalados",
-            False,
-            f"{caminho} não existe — rode 'playwright install chromium'",
-            obrigatorio=True,
-        )
-    return ItemVerificacao("Playwright + Chromium instalados", True, str(caminho), obrigatorio=True)
+    return ItemVerificacao(nome, True, f"versão {dados.get('versao', '?')}", obrigatorio=True)
 
 
 def verificar_ambiente() -> int:
@@ -266,7 +254,7 @@ def verificar_ambiente() -> int:
         _verificar_memoria(perfil),
         *_verificar_modelos(cliente, ollama_url, perfil),
         _verificar_servidor_na_porta(ollama_url, servidor),
-        _verificar_playwright_chromium(),
+        _verificar_extensao(),
         _verificar_arquivo_existe("temas.yaml existe", RAIZ / "temas.yaml"),
         _verificar_arquivo_existe("fontes.yaml existe", RAIZ / "fontes.yaml"),
     ]
@@ -578,7 +566,7 @@ def preparar_cmd(
         return 1
     assert perfil.id is not None
 
-    from agente_nw.coleta.capturas.playwright_backend import abrir_pagina_playwright
+    from agente_nw.coleta.capturas.extensao_backend import abrir_pagina_extensao
     from agente_nw.nucleo.consulta import preparar
     from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta, MeioContato
 
@@ -607,7 +595,7 @@ def preparar_cmd(
         limiares=cfg.limiares,
         caminho_fontes=RAIZ / "fontes.yaml",
         caminho_sentinela=caminho_sentinela(),
-        abrir_pagina=abrir_pagina_playwright,
+        abrir_pagina=abrir_pagina_extensao,
         pasta_navegador=RAIZ / "dados" / "navegador",
         agora=agora,
     )
@@ -678,19 +666,14 @@ def _imprimir_pedido(resultado: ResultadoPedido, frase: str) -> None:
         print(f'Para trocar: agente_nw pedir --contato <id> "{frase}"')
 
 
-def _perguntar_login(rede: str) -> bool:
-    resposta = input(f"Sem sessão em {rede}. Entrar agora? Você tem 3 minutos na janela que abrir. [s/N] ")
-    return resposta.strip().lower() in ("s", "sim")
-
-
 def _contexto_de_navegacao(
-    abrir_pagina: Callable[[Path], PaginaLista] | None, perguntar: bool, aguardar_login: bool = False
+    abrir_pagina: Callable[[Path], PaginaLista] | None, perguntar: bool
 ) -> ContextoNavegacao:
-    from agente_nw.coleta.capturas.playwright_backend import abrir_pagina_playwright
+    from agente_nw.coleta.capturas.extensao_backend import abrir_pagina_extensao
 
     cfg = configuracao()
     return ContextoNavegacao(
-        abrir_pagina=abrir_pagina or cast(Callable[[Path], PaginaLista], abrir_pagina_playwright),
+        abrir_pagina=abrir_pagina or abrir_pagina_extensao,
         pasta_navegador=RAIZ / "dados" / "navegador",
         limiares=cfg.limiares.listas,
         usuarios_rede={r: v.usuario for r, v in cfg.local.redes.items() if v.usuario},
@@ -698,9 +681,7 @@ def _contexto_de_navegacao(
         perguntar_usuario=(
             (lambda rede: input(f"Qual é o seu usuário no {rede}? (Enter = pular) ")) if perguntar else None
         ),
-        perguntar_login=_perguntar_login if perguntar else None,
         avisar=print,
-        aguardar_login=aguardar_login,
     )
 
 
@@ -713,7 +694,6 @@ def pedir_cmd(
     trocar_perfil: bool = False,
     entrada: Callable[[str], str] = input,
     abrir_pagina: Callable[[Path], PaginaLista] | None = None,
-    aguardar_login: bool = False,
 ) -> int:
     from agente_nw.nucleo import confirmacao
     from agente_nw.nucleo import pedido as pedido_mod
@@ -721,9 +701,7 @@ def pedir_cmd(
 
     conn = banco()
     agora = datetime.now(UTC).isoformat()
-    navegacao = (
-        None if saida_json else _contexto_de_navegacao(abrir_pagina, not sem_perguntar, aguardar_login)
-    )
+    navegacao = None if saida_json else _contexto_de_navegacao(abrir_pagina, not sem_perguntar)
     try:
         resultado = pedido_mod.processar(
             llm(), conn, frase, agora, contato_id, navegacao=navegacao, trocar_perfil=trocar_perfil
@@ -758,7 +736,7 @@ def pedir_cmd(
         print("AVISO: pedido sem pessoa — não há contato para preparar.")
         return 0
 
-    from agente_nw.coleta.capturas.playwright_backend import abrir_pagina_playwright
+    from agente_nw.coleta.capturas.extensao_backend import abrir_pagina_extensao
     from agente_nw.nucleo.consulta import preparar
 
     contexto = pedido_mod.para_contexto(resultado.pedido, frase)
@@ -771,7 +749,7 @@ def pedir_cmd(
         limiares=configuracao().limiares,
         caminho_fontes=RAIZ / "fontes.yaml",
         caminho_sentinela=caminho_sentinela(),
-        abrir_pagina=abrir_pagina_playwright,
+        abrir_pagina=abrir_pagina_extensao,
         pasta_navegador=RAIZ / "dados" / "navegador",
         agora=datetime.now(UTC).isoformat(),
     )
@@ -786,13 +764,32 @@ def pedir_cmd(
     return 0
 
 
+def extensao_instalar_cmd() -> int:
+    pasta = RAIZ / "extensao"
+    print(f"Pasta da extensão: {pasta}")
+    print()
+    print("Instalar (uma vez), no Chrome (ou Brave, Edge, Arc, Vivaldi) em que você já está logado:")
+    print("  1. Abra chrome://extensions")
+    print('  2. Ligue o "Modo do desenvolvedor" (canto superior direito)')
+    print('  3. Clique em "Carregar sem compactação" e escolha a pasta acima')
+    print("  4. Confira: agente_nw extensao testar")
+    return 0
+
+
+def extensao_testar_cmd() -> int:
+    item = _verificar_extensao()
+    print(f"{item.nome}: {'OK' if item.ok else 'FALHA'} — {item.detalhe}")
+    return 0 if item.ok else 1
+
+
 def listas_atualizar_cmd(rede: str | None, forcar: bool) -> int:
-    if rede in REDES_SO_POR_LINK:
-        print(f"{rede}: bloqueia navegador automatizado; não leio a lista. Use o link do perfil (c).")
+    so_por_link = configuracao().limiares.listas.redes_so_por_link
+    if rede in so_por_link:
+        print(f"{rede}: configurada para só entrar por link (listas.redes_so_por_link); não leio a lista.")
         return 1
-    redes = [rede] if rede else list(REDES_AUTOMATICAS)
+    redes = [rede] if rede else list(redes_automaticas(so_por_link))
     conn = banco()
-    contexto = _contexto_de_navegacao(None, True, aguardar_login=True)
+    contexto = _contexto_de_navegacao(None, True)
     agora = datetime.now(UTC).isoformat()
     for nome_rede in redes:
         resultado = atualizar_lista(conn, nome_rede, contexto, agora, forcar=forcar)
@@ -829,13 +826,13 @@ def ler_rede_social_cmd(telefone: str) -> int:
         return 1
     assert perfil.id is not None
 
+    from agente_nw.coleta.capturas.extensao_backend import abrir_pagina_extensao
     from agente_nw.coleta.capturas.leitor import ler_redes_sociais_do_contato
-    from agente_nw.coleta.capturas.playwright_backend import abrir_pagina_playwright
 
     agora = datetime.now(UTC).isoformat()
     pasta_navegador = RAIZ / "dados" / "navegador"
     resumo = ler_redes_sociais_do_contato(
-        llm(), conn, perfil.id, abrir_pagina_playwright, pasta_navegador, agora
+        llm(), conn, perfil.id, abrir_pagina_extensao, pasta_navegador, agora
     )
 
     print(f"Redes lidas: {resumo.redes_lidas}")
@@ -1155,11 +1152,11 @@ def _montar_parser() -> argparse.ArgumentParser:
     pedir_parser.add_argument("--preparar", action="store_true", help="encadeia a consulta e imprime o menu")
     pedir_parser.add_argument("--json", action="store_true", help="imprime só o pedido extraído, em JSON")
     pedir_parser.add_argument("--contato", type=int, default=None, help="id do contato (força a escolha)")
-    pedir_parser.add_argument(
-        "--aguardar-login",
-        action="store_true",
-        help="espera você entrar nas redes sem sessão (padrão: rede sem sessão é pulada na hora)",
-    )
+
+    extensao_parser = subparsers.add_parser("extensao")
+    extensao_sub = extensao_parser.add_subparsers(dest="acao", required=True)
+    extensao_sub.add_parser("instalar")
+    extensao_sub.add_parser("testar")
 
     listas_parser = subparsers.add_parser("listas")
     listas_sub = listas_parser.add_subparsers(dest="acao", required=True)
@@ -1237,6 +1234,8 @@ def main(argv: list[str] | None = None) -> int:
         return console_cmd(args.banco, args.porta)
     if args.comando == "ler-rede-social":
         return ler_rede_social_cmd(args.telefone)
+    if args.comando == "extensao":
+        return extensao_instalar_cmd() if args.acao == "instalar" else extensao_testar_cmd()
     if args.comando == "listas":
         if args.acao == "atualizar":
             return listas_atualizar_cmd(args.rede, args.forcar)
@@ -1249,7 +1248,6 @@ def main(argv: list[str] | None = None) -> int:
             args.contato,
             sem_perguntar=args.sem_perguntar,
             trocar_perfil=args.trocar_perfil,
-            aguardar_login=args.aguardar_login,
         )
     if args.comando == "preparar":
         return preparar_cmd(

@@ -76,12 +76,12 @@ class _ClienteLLMFake:
         return esquema()
 
 
-class _PaginaPlaywrightFake:
+class _PaginaFake:
     ultima_pasta: Path | None = None
     fechada: bool = False
 
-    def __init__(self, pasta_perfil: Path, headless: bool = False) -> None:
-        _PaginaPlaywrightFake.ultima_pasta = pasta_perfil
+    def __init__(self, pasta_perfil: Path) -> None:
+        _PaginaFake.ultima_pasta = pasta_perfil
 
     def ir_para(self, url: str) -> None:
         pass
@@ -93,7 +93,7 @@ class _PaginaPlaywrightFake:
         return []
 
     def fechar(self) -> None:
-        _PaginaPlaywrightFake.fechada = True
+        _PaginaFake.fechada = True
 
 
 @pytest.fixture
@@ -133,10 +133,10 @@ def _criar_contato(conn: sqlite3.Connection, nome: str, empresa: str | None = No
     return perfil.id
 
 
-def _monkey_playwright(monkeypatch: pytest.MonkeyPatch) -> None:
-    from agente_nw.coleta.capturas import playwright_backend
+def _monkey_extensao(monkeypatch: pytest.MonkeyPatch) -> None:
+    from agente_nw.coleta.capturas import extensao_backend
 
-    monkeypatch.setattr(playwright_backend, "PaginaPlaywright", _PaginaPlaywrightFake)
+    monkeypatch.setattr(extensao_backend, "abrir_pagina_extensao", _PaginaFake)
 
 
 def _monkey_buscar(monkeypatch: pytest.MonkeyPatch, resultado: ResultadoBusca) -> dict[str, Any]:
@@ -166,7 +166,7 @@ def test_busca_com_sessao_ativa_lista_candidatos_e_passa_empresa(
     client: FlaskClient, conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     perfil_id = _criar_contato(conn, "Joaquim Millan", empresa="Bienal")
-    _monkey_playwright(monkeypatch)
+    _monkey_extensao(monkeypatch)
     resultado = ResultadoBusca(
         autenticado=True,
         motivo=None,
@@ -198,7 +198,7 @@ def test_busca_sem_sessao_mostra_aviso_sem_estourar(
     client: FlaskClient, conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     perfil_id = _criar_contato(conn, "Ana")
-    _monkey_playwright(monkeypatch)
+    _monkey_extensao(monkeypatch)
     _monkey_buscar(
         monkeypatch,
         ResultadoBusca(autenticado=False, motivo="sem sessão ativa em linkedin", candidatos=[]),
@@ -240,12 +240,4 @@ def test_ficha_sem_busca_mostra_botoes_de_busca_por_rede(
     assert "Buscar em linkedin" in texto
     assert "Buscar em instagram" in texto
     assert "Buscar em facebook" in texto
-    assert "Buscar em x" not in texto
-
-
-def test_busca_na_rede_x_e_recusada(client: FlaskClient, conn: sqlite3.Connection) -> None:
-    perfil_id = _criar_contato(conn, "Carla")
-
-    resposta = client.post(f"/contatos/{perfil_id}/redes-sociais/buscar", data={"rede": "x"})
-
-    assert resposta.status_code == 400
+    assert "Buscar em x" in texto

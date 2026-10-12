@@ -12,9 +12,8 @@ from agente_nw.nucleo.modelos.configuracao import ListasLimiares
 from agente_nw.nucleo.modelos.lista_rede_social import EntradaLista
 
 REDES_COM_USUARIO: tuple[str, ...] = ("instagram", "x")
-_MAX_ESPERAS_LOGIN = 36  # 36 × 5s = 3 min, como na leitura de perfil (brief 017)
+_MAX_ESPERAS_LOGIN = 0  # sem espera: o usuário já está logado no próprio Chrome (brief 044)
 _ESPERA_LOGIN_S = 5.0
-MAX_ESPERAS_LOGIN = _MAX_ESPERAS_LOGIN  # exposto para quem decide esperar ou não
 _RODADAS_SEM_NOVIDADE = 3
 
 _URL_LISTA: dict[str, str] = {
@@ -333,7 +332,7 @@ def ler_lista(
         return ResultadoLista(autenticado=False, motivo=motivo)
 
     sem_sessao = ResultadoLista(
-        autenticado=False, motivo=f"sem sessão ativa em {rede} e prazo de login esgotou"
+        autenticado=False, motivo=f"sem sessão ativa em {rede} — entre nela no seu Chrome e repita"
     )
     if not _entrar_na_lista(pagina, url, dorme, max_esperas_login, espera_login_s):
         return sem_sessao

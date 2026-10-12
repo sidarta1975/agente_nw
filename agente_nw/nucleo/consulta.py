@@ -87,7 +87,7 @@ def preparar(
     pasta_navegador: Path,
     agora: str,
     rodar_coleta: bool = True,
-    max_esperas_login_rede_social: int = 36,
+    max_esperas_login_rede_social: int = 0,
     espera_login_s_rede_social: float = 5.0,
     max_rolagens_rede_social: int = 5,
 ) -> ResultadoConsulta:

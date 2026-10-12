@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import urllib.parse
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -43,13 +44,16 @@ _CONFIG_BUSCA: dict[str, _ConfigRede] = {
 
 REDES_SUPORTADAS: tuple[str, ...] = tuple(sorted(_CONFIG_BUSCA.keys()))
 
-# O X bloqueia navegador automatizado: nunca é lido nem buscado sozinho. Só entra por link colado.
-REDES_SO_POR_LINK: frozenset[str] = frozenset({"x"})
-REDES_AUTOMATICAS: tuple[str, ...] = tuple(r for r in REDES_SUPORTADAS if r not in REDES_SO_POR_LINK)
+
+def redes_automaticas(so_por_link: Iterable[str] = ()) -> tuple[str, ...]:
+    """Redes lidas e buscadas sozinhas: todas as suportadas, menos as que `listas.redes_so_por_link`
+    (limiares.yaml) deixa só por link colado. Vazio por padrão."""
+    excluidas = set(so_por_link)
+    return tuple(r for r in REDES_SUPORTADAS if r not in excluidas)
 
 
 class PaginaBusca(Protocol):
-    """Superfície que o algoritmo de busca consome. O backend real (Playwright)
+    """Superfície que o algoritmo de busca consome. O backend real (extensão do Chrome)
     implementa este protocolo com `coletar_links` além dos métodos que a leitura
     (brief 017) já usava; testes injetam um fake."""
 

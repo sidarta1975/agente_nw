@@ -43,10 +43,12 @@ agente_nw/
 │   │   └── saidas/           # cartão, menu, exportação Markdown
 │   ├── coleta/
 │   │   ├── rss/              # feedparser, trafilatura, canonicalização, google news
-│   │   └── capturas/         # recepção do que vem da leitura de rede social sob demanda
+│   │   └── capturas/         # leitura de rede social sob demanda (backend: extensao_backend.py)
+│   ├── ponte/                 # servidor local 127.0.0.1:8766 + página-ponte (brief 044)
 │   ├── perfil/                # importação da agenda, extração de texto, lacunas, centróide de perfil
 │   ├── console/                # Flask + templates + estáticos
 │   └── integracoes/          # (Etapa 3)
+├── extensao/                  # extensão do Chrome (manifest v3): lê rede social no navegador do usuário
 ├── scripts/
 │   ├── migracoes/             # 001_inicial.sql, 002_..., aplicados em ordem
 │   ├── instalar_macos.sh
@@ -71,7 +73,7 @@ Nome do pacote e da pasta é sempre `agente_nw`. Desvio de nomenclatura é corri
 - Arquitetura hexagonal; dependências via `config/container.py`.
 - Saída estruturada do LLM sempre em modo JSON com esquema (`format: json`); `num_ctx` explícito em toda chamada.
 - Interface: console web local em `console/`, Flask, `http://localhost:8765`, só em `127.0.0.1`.
-- Coleta em rede social: automação de navegador (Playwright), aberta na hora da consulta, com a sessão do próprio usuário, um contato por chamada.
+- Coleta em rede social: extensão do Chrome do usuário (`extensao/`), comandada pelo programa por uma ponte local (`ponte/`, `127.0.0.1:8766`, token por execução); nunca navegador separado. Abre aba em segundo plano, uma rede por vez, com pausa entre páginas, na hora da consulta, com a sessão do próprio usuário. Ações fixas: `ola`, `abrir`, `estado`, `rolar`, `links`, `fechar`.
 - Agendamento: não existe. Nenhuma tarefa periódica. Toda execução é disparada explicitamente por Sidarta pelo console ou pela CLI.
 - Testes: pytest. Tipagem: mypy strict. Lint: ruff. Suíte roda via `scripts/verificar.sh`, sempre por Sidarta no terminal — nunca pelo executor.
 
@@ -101,7 +103,7 @@ Não existem. Nenhuma etapa do sistema — coleta RSS, extração, agrupamento, 
 
 Requisitos que continuam valendo em toda execução, mesmo sob demanda: idempotência e retomada, log em arquivo, SQLite nunca compartilhado entre processos, desenvolvimento sempre em cópia (`agente_nw copiar-banco`) — o banco real só é tocado por operação autorizada por Sidarta.
 
-A leitura das listas do usuário nas redes (conexões, seguidos, amigos) é sob demanda e com cache local; nunca periódica.
+A leitura das listas do usuário nas redes (conexões, seguidos, amigos) é sob demanda e com cache local; nunca periódica. A extensão nunca abre mais de uma aba de rede social por vez, respeita `extensao.pausa_entre_paginas_s` entre páginas da mesma rede e só lê (abrir, rolar, ler texto e links): nenhuma ação na rede além disso.
 
 **Nunca rodam sozinhos:** git, leitura de rede social, alteração de ficha de contato, a suíte de testes padrão (`scripts/verificar.sh`, pytest, ruff, mypy) — o executor escreve e mantém o script; quem roda é Sidarta, no terminal dele.
 

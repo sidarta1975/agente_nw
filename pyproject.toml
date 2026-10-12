@@ -14,7 +14,6 @@ dependencies = [
     "python-dateutil",
     "phonenumbers",
     "pyobjc-framework-Contacts",
-    "playwright",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +34,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["agente_nw*", "config*"]
 
+[tool.setuptools.package-data]
+"agente_nw.ponte" = ["ponte.html"]
+
 [tool.ruff]
 line-length = 110
 extend-exclude = ["docs"]
@@ -47,7 +49,7 @@ strict = true
 python_version = "3.12"
 
 [[tool.mypy.overrides]]
-module = ["feedparser.*", "trafilatura.*", "sqlite_vec.*", "Contacts.*", "playwright.*"]
+module = ["feedparser.*", "trafilatura.*", "sqlite_vec.*", "Contacts.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

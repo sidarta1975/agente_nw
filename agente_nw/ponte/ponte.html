@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<title>agente_nw — ponte (não feche enquanto estiver em uso)</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 3rem auto; padding: 0 1rem; }
+  #estado { padding: .6rem .9rem; border-radius: .4rem; background: #eef; }
+  #estado.erro { background: #fee; }
+</style>
+</head>
+<body>
+<h1>agente_nw — ponte</h1>
+<p>Esta aba liga o programa à extensão do Chrome. Deixe-a aberta enquanto o agente_nw estiver lendo
+redes sociais; pode fechar depois.</p>
+<p id="estado">Aguardando o programa…</p>
+<script>
+const TOKEN = "__TOKEN__";
+const ID_EXTENSAO = "__ID_EXTENSAO__";
+const TEMPO_RESPOSTA_MS = 90000;
+const estado = document.getElementById("estado");
+const pendentes = new Map();
+let sequencia = 0;
+
+function mostrar(texto, erro) {
+  estado.textContent = texto;
+  estado.className = erro ? "erro" : "";
+}
+
+// Via 1: direto para a extensão (externally_connectable). Via 2: pelo relé injetado na página.
+function porRele(tarefa) {
+  return new Promise((resolver) => {
+    const id = ++sequencia;
+    const fim = setTimeout(() => {
+      pendentes.delete(id);
+      resolver({ ok: false, erro: "a extensão não respondeu — ela está instalada e ativa no Chrome?" });
+    }, TEMPO_RESPOSTA_MS);
+    pendentes.set(id, (resposta) => { clearTimeout(fim); resolver(resposta); });
+    window.postMessage({ tipo: "agente_nw_tarefa", id, tarefa }, "*");
+  });
+}
+
+window.addEventListener("message", (evento) => {
+  const dados = evento.data;
+  if (evento.source !== window || !dados || dados.tipo !== "agente_nw_resposta") return;
+  const resolver = pendentes.get(dados.id);
+  if (resolver) { pendentes.delete(dados.id); resolver(dados.resposta); }
+});
+
+function direto(tarefa) {
+  return new Promise((resolver) => {
+    if (!(window.chrome && chrome.runtime && chrome.runtime.sendMessage)) { resolver(null); return; }
+    try {
+      chrome.runtime.sendMessage(ID_EXTENSAO, { tarefa }, (resposta) => {
+        resolver(chrome.runtime.lastError || !resposta ? null : resposta);
+      });
+    } catch (e) { resolver(null); }
+  });
+}
+
+async function executar(tarefa) {
+  return (await direto(tarefa)) || (await porRele(tarefa));
+}
+
+const dorme = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function laco() {
+  for (;;) {
+    try {
+      const resposta = await fetch("/tarefa?token=" + TOKEN);
+      if (resposta.status === 403) { mostrar("Token inválido — feche esta aba e rode o comando de novo.", true); return; }
+      const tarefa = await resposta.json();
+      if (!tarefa.id) continue;
+      mostrar("Executando: " + tarefa.tarefa.acao);
+      const resultado = await executar(tarefa.tarefa);
+      await fetch("/resultado?token=" + TOKEN, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: tarefa.id, ...resultado }),
+      });
+      mostrar("Aguardando o programa…");
+    } catch (e) {
+      mostrar("Sem contato com o programa — ele terminou? Pode fechar esta aba.", true);
+      await dorme(3000);
+    }
+  }
+}
+laco();
+</script>
+</body>
+</html>

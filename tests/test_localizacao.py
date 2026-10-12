@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from agente_nw.coleta.capturas import busca
 from agente_nw.coleta.capturas.listas import PaginaLista
 from agente_nw.nucleo import localizacao as localizacao_mod
 from agente_nw.nucleo import pedido as pedido_mod
@@ -195,7 +196,7 @@ def test_ordem_das_redes() -> None:
     assert localizacao_mod.ordem_das_redes("proximo", {})[0] == "instagram"
     assert localizacao_mod.ordem_das_redes("proximo", {"profissao": "médico"})[0] == "linkedin"
     todas = localizacao_mod.ordem_das_redes("cordial", {})
-    assert sorted(todas) == ["facebook", "instagram", "linkedin"]
+    assert sorted(todas) == ["facebook", "instagram", "linkedin", "x"]
 
 
 def test_confirmar_grava_rede_notas_vinculo_e_fato(conn: sqlite3.Connection) -> None:
@@ -277,9 +278,7 @@ def test_trocar_perfil_reabre_a_localizacao(conn: sqlite3.Connection) -> None:
     assert resultado.localizacao.status == "claro"
 
 
-def test_x_nunca_entra_na_leitura_automatica(capsys: pytest.CaptureFixture[str]) -> None:
-    import agente_nw.cli as cli
-
-    assert "x" not in localizacao_mod.ordem_das_redes("proximo", {})
-    assert cli.listas_atualizar_cmd("x", forcar=True) == 1
-    assert "bloqueia navegador automatizado" in capsys.readouterr().out
+def test_rede_so_por_link_fica_fora_da_ordem_automatica() -> None:
+    assert "x" not in localizacao_mod.ordem_das_redes("proximo", {}, so_por_link=("x",))
+    assert busca.redes_automaticas(("x", "instagram")) == ("facebook", "linkedin")
+    assert busca.redes_automaticas() == ("facebook", "instagram", "linkedin", "x")

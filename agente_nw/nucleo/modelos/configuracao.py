@@ -180,6 +180,27 @@ class ListasLimiares(BaseModel):
     validade_dias: int = Field(ge=1)
     similaridade_minima: float = Field(default=0.8, ge=0, le=1)
     maximo_parecidas: int = Field(default=5, ge=1)
+    redes_so_por_link: tuple[str, ...] = ()
+    """Redes que não são lidas nem buscadas sozinhas (só por link colado). Vazio por padrão (brief 044)."""
+
+
+class ExtensaoLimiares(BaseModel):
+    """Leitura de rede social pela extensão do Chrome do usuário (brief 044)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tempo_limite_tarefa_s: float = Field(default=60.0, gt=0)
+    pausa_entre_paginas_s: float = Field(default=2.0, ge=0)
+    maximo_caracteres_pagina: int = Field(default=200000, ge=1000)
+    textos_botao_mostrar_mais: tuple[str, ...] = (
+        "mostrar mais",
+        "ver mais",
+        "carregar mais",
+        "show more",
+        "load more",
+    )
+    aba_em_segundo_plano: bool = True
+    espera_extensao_s: float = Field(default=20.0, gt=0)
 
 
 class Limiares(BaseModel):
@@ -191,6 +212,7 @@ class Limiares(BaseModel):
     coleta: ColetaLimiares
     cartao: CartaoLimiares
     listas: ListasLimiares
+    extensao: ExtensaoLimiares = Field(default_factory=ExtensaoLimiares)
 
 
 class TemaUsuario(BaseModel):

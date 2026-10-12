@@ -299,3 +299,12 @@ def test_repetir_o_pedido_nao_pergunta_e_trocar_perfil_reabre(
 
     _pedir(monkeypatch, _pedido(pistas=PISTA), _respostas("n", "2"), trocar_perfil=True)
     assert _redes_do_contato(conn) == [("linkedin", "https://exemplo.test/linkedin/marcos-lima")]
+
+
+def test_extensao_instalar_mostra_a_pasta_e_o_passo_a_passo(capsys: pytest.CaptureFixture[str]) -> None:
+    assert cli.extensao_instalar_cmd() == 0
+
+    saida = capsys.readouterr().out
+    assert "extensao" in saida
+    assert "chrome://extensions" in saida
+    assert "Carregar sem compactação" in saida

@@ -31,7 +31,7 @@ def ler_redes_sociais_do_contato(
     pasta_navegador: Path,
     agora: str,
     dorme: Callable[[float], None] = time.sleep,
-    max_esperas_login: int = 36,
+    max_esperas_login: int = 0,
     espera_login_s: float = 5.0,
     max_rolagens: int = 5,
 ) -> ResumoLeitura:
@@ -41,8 +41,8 @@ def ler_redes_sociais_do_contato(
     Ausência de sessão ativa numa rede não interrompe a leitura das demais —
     é registrada em `motivos_sem_sessao` e o fluxo continua. Os parâmetros
     `dorme`, `max_esperas_login`, `espera_login_s` e `max_rolagens` são passados
-    para `navegador.ler`; produção usa os padrões (3 min de espera por login,
-    5 rolagens); testes injetam valores curtos."""
+    para `navegador.ler`; produção usa os padrões (sem espera de login — a sessão é a
+    do Chrome do usuário —, 5 rolagens); testes injetam valores curtos."""
     resumo = ResumoLeitura(perfil_id=perfil_id)
     lista = redes_sociais.listar_por_perfil(conexao, perfil_id)
 

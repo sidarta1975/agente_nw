@@ -138,7 +138,7 @@ def criar_app(
             confirmadas=confirmadas,
             nao_confirmadas=nao_confirmadas,
             redes=redes,
-            redes_buscaveis=busca.REDES_AUTOMATICAS,
+            redes_buscaveis=busca.redes_automaticas(limiares.listas.redes_so_por_link),
             rede_busca=rede_busca,
             resultado_busca=resultado_busca,
             outros_contatos=outros_contatos,
@@ -285,7 +285,7 @@ def criar_app(
     def preparar_acao(perfil_id: int) -> Response:
         import httpx
 
-        from agente_nw.coleta.capturas.playwright_backend import abrir_pagina_playwright
+        from agente_nw.coleta.capturas.extensao_backend import abrir_pagina_extensao
         from agente_nw.nucleo import consulta as consulta_mod
 
         perfil = _perfil_ou_404(perfil_id)
@@ -316,7 +316,7 @@ def criar_app(
                 limiares=limiares,
                 caminho_fontes=caminho_fontes,
                 caminho_sentinela=caminho_banco.parent / "PARE",
-                abrir_pagina=abrir_pagina_playwright,
+                abrir_pagina=abrir_pagina_extensao,
                 pasta_navegador=pasta_navegador,
                 agora=agora,
             )
@@ -395,15 +395,15 @@ def criar_app(
 
     @app.route("/contatos/<int:perfil_id>/redes-sociais/buscar", methods=["POST"])
     def buscar_rede_social_contato(perfil_id: int) -> str:
-        from agente_nw.coleta.capturas.playwright_backend import PaginaPlaywright
+        from agente_nw.coleta.capturas import extensao_backend
 
         perfil = _perfil_ou_404(perfil_id)
         rede = request.form.get("rede", "").strip().lower()
-        if rede not in busca.REDES_AUTOMATICAS:
+        if rede not in busca.redes_automaticas(limiares.listas.redes_so_por_link):
             abort(400)
 
         pasta_rede = caminho_banco.parent / "navegador" / rede
-        pagina = PaginaPlaywright(pasta_rede, headless=False)
+        pagina = extensao_backend.abrir_pagina_extensao(pasta_rede)
         try:
             resultado = busca.buscar(pagina, rede, perfil.nome, perfil.empresa)
         finally:

@@ -183,7 +183,9 @@ def test_depois_do_login_a_lista_e_aberta_de_novo() -> None:
     logado = ("https://www.linkedin.com/feed/", "x" * 600)
     pagina = _PaginaFalsa([_links("linkedin")], estados=[login, login, logado])
 
-    resultado = listas.ler_lista(pagina, "linkedin", None, LIMIARES, dorme=lambda _s: None)
+    resultado = listas.ler_lista(
+        pagina, "linkedin", None, LIMIARES, dorme=lambda _s: None, max_esperas_login=3
+    )
 
     assert resultado.autenticado is True
     assert pagina.urls[:2] == [
