@@ -23,7 +23,11 @@ class _PaginaFalsa:
         rodadas: list[list[tuple[str, str]]],
         url: str = "https://www.linkedin.com/mynetwork/invite-connect/connections/",
         texto: str = "x" * 600,
+        estados: list[tuple[str, str]] | None = None,
+        falhas_ao_rolar: int = 0,
     ) -> None:
+        self._estados = estados or []
+        self._falhas_ao_rolar = falhas_ao_rolar
         self._rodadas = rodadas
         self._indice = 0
         self._url = url
@@ -36,9 +40,16 @@ class _PaginaFalsa:
         self.urls.append(url)
 
     def estado(self) -> tuple[str, str]:
+        if len(self._estados) > 1:
+            return self._estados.pop(0)
+        if self._estados:
+            return self._estados[0]
         return self._url, self._texto
 
     def rolar(self) -> None:
+        if self._falhas_ao_rolar > 0:
+            self._falhas_ao_rolar -= 1
+            raise RuntimeError("Execution context was destroyed, most likely because of a navigation")
         self.rolagens += 1
         self._indice = min(self._indice + 1, len(self._rodadas) - 1)
 
@@ -154,3 +165,28 @@ def test_descobrir_usuario_le_o_menu_da_pagina_inicial() -> None:
     pagina = _PaginaFalsa([menu], url="https://x.com/home")
 
     assert listas.descobrir_usuario(pagina, "x", dorme=lambda _s: None) == "eu_x"
+
+
+def test_navegacao_no_meio_da_rolagem_nao_derruba_a_leitura() -> None:
+    bruto = _links("linkedin")
+    pagina = _PaginaFalsa([[bruto[1], bruto[2]]], falhas_ao_rolar=2)
+
+    resultado = listas.ler_lista(pagina, "linkedin", None, LIMIARES, dorme=lambda _s: None)
+
+    assert resultado.autenticado is True
+    assert [e.nome for e in resultado.entradas] == ["Maria Souza", "Pedro Alves"]
+    assert len(pagina.urls) >= 3  # a lista foi reaberta depois de cada navegação inesperada
+
+
+def test_depois_do_login_a_lista_e_aberta_de_novo() -> None:
+    login = ("https://www.linkedin.com/login", "")
+    logado = ("https://www.linkedin.com/feed/", "x" * 600)
+    pagina = _PaginaFalsa([_links("linkedin")], estados=[login, login, logado])
+
+    resultado = listas.ler_lista(pagina, "linkedin", None, LIMIARES, dorme=lambda _s: None)
+
+    assert resultado.autenticado is True
+    assert pagina.urls[:2] == [
+        "https://www.linkedin.com/mynetwork/invite-connect/connections/",
+        "https://www.linkedin.com/mynetwork/invite-connect/connections/",
+    ]

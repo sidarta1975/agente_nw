@@ -254,6 +254,25 @@ def _esperar_login(
     return False
 
 
+def _entrar_na_lista(
+    pagina: PaginaLista,
+    url: str,
+    dorme: Callable[[float], None],
+    max_esperas: int,
+    espera_s: float,
+) -> bool:
+    """Abre a lista e espera o login, se preciso. Depois de um login a rede costuma mandar o usuário
+    para o início; por isso, se houve espera, abre a lista de novo."""
+    pagina.ir_para(url)
+    url_atual, texto = pagina.estado()
+    precisou_logar = _parece_pagina_de_login(url_atual, texto)
+    if not _esperar_login(pagina, dorme, max_esperas, espera_s):
+        return False
+    if precisou_logar:
+        pagina.ir_para(url)
+    return True
+
+
 def descobrir_usuario(
     pagina: PaginaLista,
     rede: str,
@@ -290,23 +309,33 @@ def ler_lista(
         )
         return ResultadoLista(autenticado=False, motivo=motivo)
 
-    pagina.ir_para(url)
-    if not _esperar_login(pagina, dorme, max_esperas_login, espera_login_s):
-        return ResultadoLista(
-            autenticado=False, motivo=f"sem sessão ativa em {rede} e prazo de login esgotou"
-        )
+    sem_sessao = ResultadoLista(
+        autenticado=False, motivo=f"sem sessão ativa em {rede} e prazo de login esgotou"
+    )
+    if not _entrar_na_lista(pagina, url, dorme, max_esperas_login, espera_login_s):
+        return sem_sessao
 
     acumuladas: dict[str, EntradaLista] = {}
     sem_novidade = 0
     while len(acumuladas) < limiares.maximo_entradas and sem_novidade < _RODADAS_SEM_NOVIDADE:
         antes = len(acumuladas)
-        for entrada in parse_links(rede, pagina.coletar_links()):
+        try:
+            links = pagina.coletar_links()
+        except Exception:
+            links = []
+        for entrada in parse_links(rede, links):
             acumuladas.setdefault(entrada.link, entrada)
         sem_novidade = 0 if len(acumuladas) > antes else sem_novidade + 1
         if len(acumuladas) >= limiares.maximo_entradas:
             break
         dorme(limiares.pausa_rolagem_s)
-        pagina.rolar()
+        try:
+            pagina.rolar()
+        except Exception:
+            # A página navegou no meio da rolagem (ex.: redirecionamento do login): confirma a
+            # sessão e volta para a lista. O que já foi acumulado fica.
+            if not _entrar_na_lista(pagina, url, dorme, max_esperas_login, espera_login_s):
+                return sem_sessao
 
     entradas = list(acumuladas.values())
     truncada = len(entradas) > limiares.maximo_entradas
