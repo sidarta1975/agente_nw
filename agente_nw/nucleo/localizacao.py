@@ -229,6 +229,17 @@ def localizar(
             opcao_da_entrada(e) for e in queries_listas.buscar_por_nome(conexao, rede, pedido.pessoa_nome)
         ]
         if not candidatas:
+            candidatas = [
+                opcao_da_entrada(e)
+                for e in queries_listas.buscar_parecidos(
+                    conexao,
+                    rede,
+                    pedido.pessoa_nome,
+                    contexto.limiares.similaridade_minima,
+                    contexto.limiares.maximo_parecidas,
+                )
+            ]
+        if not candidatas:
             continue
         escolhido, ordenadas = _avaliar(cliente_llm, pedido, candidatas)
         if escolhido is not None:

@@ -178,6 +178,8 @@ class ListasLimiares(BaseModel):
     maximo_entradas: int = Field(ge=1)
     pausa_rolagem_s: float = Field(ge=0)
     validade_dias: int = Field(ge=1)
+    similaridade_minima: float = Field(default=0.8, ge=0, le=1)
+    maximo_parecidas: int = Field(default=5, ge=1)
 
 
 class Limiares(BaseModel):

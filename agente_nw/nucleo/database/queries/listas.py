@@ -4,7 +4,7 @@ import sqlite3
 from datetime import datetime, timedelta
 
 from agente_nw.nucleo.modelos.lista_rede_social import EntradaGravada, EntradaLista
-from agente_nw.nucleo.texto import casa_nome, sem_acento_e_caixa
+from agente_nw.nucleo.texto import casa_nome, sem_acento_e_caixa, similaridade_nome
 
 _COLUNAS = "id, rede, nome, cabecalho, link, foto_url, lido_em, perfil_id"
 
@@ -81,12 +81,13 @@ def buscar_por_nome(conexao: sqlite3.Connection, rede: str | None, nome: str) ->
 
 def filtrar_por_texto(conexao: sqlite3.Connection, rede: str, texto: str) -> list[EntradaGravada]:
     """Filtro livre da opção "mostrar a lista": o texto aparece no nome ou no cabeçalho."""
-    alvo = sem_acento_e_caixa(texto)
-    return [
-        e
-        for e in listar_por_rede(conexao, rede)
-        if alvo in sem_acento_e_caixa(e.nome) or alvo in sem_acento_e_caixa(e.cabecalho)
-    ]
+    termos = sem_acento_e_caixa(texto).split()
+    resultado: list[EntradaGravada] = []
+    for e in listar_por_rede(conexao, rede):
+        conjunto = f"{sem_acento_e_caixa(e.nome)} {sem_acento_e_caixa(e.cabecalho)}"
+        if all(termo in conjunto for termo in termos):
+            resultado.append(e)
+    return resultado
 
 
 def vincular(conexao: sqlite3.Connection, link: str, perfil_id: int) -> bool:
@@ -106,3 +107,14 @@ def cache_valido(conexao: sqlite3.Connection, rede: str, validade_dias: int, ago
     if quando is None:
         return False
     return datetime.fromisoformat(agora) - datetime.fromisoformat(quando) < timedelta(days=validade_dias)
+
+
+def buscar_parecidos(
+    conexao: sqlite3.Connection, rede: str, nome: str, minimo: float, maximo: int
+) -> list[EntradaGravada]:
+    """As entradas mais prováveis para `nome` quando a regra rígida não achou ninguém: nota de
+    similaridade (apelido, erro de digitação, sufixos) de `minimo` para cima, da mais provável para a
+    menos, no máximo `maximo`."""
+    pontuadas = [(similaridade_nome(nome, e.nome), e) for e in listar_por_rede(conexao, rede)]
+    aprovadas = sorted((par for par in pontuadas if par[0] >= minimo), key=lambda par: -par[0])
+    return [e for _, e in aprovadas[:maximo]]

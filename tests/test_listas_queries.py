@@ -91,3 +91,52 @@ def test_filtrar_por_texto_olha_nome_e_cabecalho(conn: sqlite3.Connection) -> No
 
     assert [e.nome for e in listas.filtrar_por_texto(conn, "linkedin", "contadora")] == ["Ana Lima"]
     assert [e.nome for e in listas.filtrar_por_texto(conn, "linkedin", "nunes")] == ["Beto Nunes"]
+
+
+def test_filtro_tolera_quebra_de_linha_e_ordem_das_palavras(conn: sqlite3.Connection) -> None:
+    listas.substituir_lista(
+        conn,
+        "linkedin",
+        [_entrada("Leonardo Vasques, CFA", "Portfolio Manager"), _entrada("Beto Nunes")],
+        AGORA,
+    )
+
+    assert len(listas.filtrar_por_texto(conn, "linkedin", "leonardo \n  vasques")) == 1
+    assert len(listas.filtrar_por_texto(conn, "linkedin", "vasques leonardo")) == 1
+
+
+def test_nome_com_sufixo_e_pontuacao_ainda_casa(conn: sqlite3.Connection) -> None:
+    listas.substituir_lista(
+        conn,
+        "linkedin",
+        [_entrada("Leonardo Vasques, CFA"), _entrada("Samy Sanches de Almeida, JD, LL.M., MBA")],
+        AGORA,
+    )
+
+    assert [e.nome for e in listas.buscar_por_nome(conn, "linkedin", "Leonardo Vasques")] == [
+        "Leonardo Vasques, CFA"
+    ]
+    assert len(listas.buscar_por_nome(conn, "linkedin", "Samy Almeida")) == 1
+
+
+def test_parecidos_acha_apelido_e_erro_de_digitacao_do_mais_para_o_menos_provavel(
+    conn: sqlite3.Connection,
+) -> None:
+    listas.substituir_lista(
+        conn,
+        "linkedin",
+        [
+            _entrada("Leonardo Vasques, CFA"),
+            _entrada("Leonardo Alves"),
+            _entrada("Beto Nunes"),
+        ],
+        AGORA,
+    )
+
+    assert [e.nome for e in listas.buscar_parecidos(conn, "linkedin", "Leo Vasques", 0.8, 5)] == [
+        "Leonardo Vasques, CFA"
+    ]
+    assert [e.nome for e in listas.buscar_parecidos(conn, "linkedin", "Leonardo Vasquez", 0.8, 5)] == [
+        "Leonardo Vasques, CFA"
+    ]
+    assert listas.buscar_parecidos(conn, "linkedin", "Zeca Pagodinho", 0.8, 5) == []
