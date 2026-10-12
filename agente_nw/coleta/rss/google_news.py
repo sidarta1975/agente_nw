@@ -9,6 +9,7 @@ from agente_nw.nucleo.modelos.tema import Tema
 _MAXIMO_TERMOS_POR_TEMA = 4
 _MAXIMO_INTERESSA = 5
 _MAXIMO_TERMOS_CONTATO = 3
+_MAXIMO_TERMOS_BUSCA = 6
 
 
 def _url_google_news(consulta: str) -> str:
@@ -41,8 +42,10 @@ def _feed_de_termo(rotulo: str, termo: str) -> FeedFonte:
 
 
 def gerar_consultas_da_consulta(contexto: ContextoConsulta, termos_contato: list[str]) -> list[FeedFonte]:
-    """Uma consulta para o assunto, uma por item de `interessa` (até 5) e uma por termo do contato (até 3)."""
+    """Uma consulta para o assunto, uma por item de `interessa` (até 5), uma por termo de busca do pedido
+    (até 6) e uma por termo do contato (até 3)."""
     feeds = [_feed_de_termo("consulta", contexto.assunto)]
     feeds.extend(_feed_de_termo("interessa", termo) for termo in contexto.interessa[:_MAXIMO_INTERESSA])
+    feeds.extend(_feed_de_termo("busca", termo) for termo in contexto.termos_busca[:_MAXIMO_TERMOS_BUSCA])
     feeds.extend(_feed_de_termo("contato", termo) for termo in termos_contato[:_MAXIMO_TERMOS_CONTATO])
     return feeds

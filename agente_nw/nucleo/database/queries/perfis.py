@@ -9,6 +9,7 @@ import sqlite_vec
 
 from agente_nw.nucleo.database.queries import fatos
 from agente_nw.nucleo.modelos.perfil import Perfil
+from agente_nw.nucleo.texto import sem_acento_e_caixa
 from agente_nw.nucleo.vetores import centroide as calcular_media_ponderada
 
 _COLUNAS = (
@@ -282,6 +283,58 @@ def listar_ativos(conexao: sqlite3.Connection) -> list[Perfil]:
 def listar_todos(conexao: sqlite3.Connection) -> list[Perfil]:
     linhas = conexao.execute(f"SELECT {_COLUNAS} FROM perfil WHERE tipo = 'contato' ORDER BY nome").fetchall()
     return [_para_perfil(linha) for linha in linhas]
+
+
+def listar_contatos_recentes(conexao: sqlite3.Connection, limite: int) -> list[Perfil]:
+    linhas = conexao.execute(
+        f"SELECT {_COLUNAS} FROM perfil WHERE tipo = 'contato' ORDER BY atualizado_em DESC, id DESC LIMIT ?",
+        (limite,),
+    ).fetchall()
+    return [_para_perfil(linha) for linha in linhas]
+
+
+def buscar_por_nome(conexao: sqlite3.Connection, nome: str) -> list[Perfil]:
+    """Contatos cujo nome (ou apelido) casa com `nome`, sem acento nem caixa.
+
+    O primeiro nome precisa bater por inteiro; havendo sobrenome na busca, cada palavra dele
+    precisa ser prefixo de alguma palavra do nome do contato. "Marcos" sozinho casa todos os Marcos."""
+    busca = sem_acento_e_caixa(nome).split()
+    if not busca:
+        return []
+    primeiro, resto = busca[0], busca[1:]
+
+    resultado: list[Perfil] = []
+    for contato in listar_todos(conexao):
+        candidatos = [contato.nome] + ([contato.apelido] if contato.apelido else [])
+        for candidato in candidatos:
+            palavras = sem_acento_e_caixa(candidato).split()
+            if not palavras or palavras[0] != primeiro:
+                continue
+            if all(any(p.startswith(termo) for p in palavras[1:]) for termo in resto):
+                resultado.append(contato)
+                break
+    return resultado
+
+
+_CAMPOS_PREENCHIVEIS = ("empresa", "cargo", "cidade", "setor", "notas")
+
+
+def preencher_lacunas(
+    conexao: sqlite3.Connection, perfil_id: int, campos: dict[str, str], agora: str
+) -> list[str]:
+    """Grava cada campo só onde o contato ainda está vazio; devolve os campos efetivamente preenchidos."""
+    preenchidos: list[str] = []
+    for campo, valor in campos.items():
+        if campo not in _CAMPOS_PREENCHIVEIS or not valor.strip():
+            continue
+        cursor = conexao.execute(
+            f"UPDATE perfil SET {campo} = ?, atualizado_em = ? "
+            f"WHERE id = ? AND ({campo} IS NULL OR TRIM({campo}) = '')",
+            (valor.strip(), agora, perfil_id),
+        )
+        if cursor.rowcount > 0:
+            preenchidos.append(campo)
+    return preenchidos
 
 
 _CAMPOS_GUIADOS = (

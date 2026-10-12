@@ -23,6 +23,7 @@ from agente_nw.nucleo.database import backup, conexao
 from agente_nw.nucleo.database.queries import assunto_contato, assuntos, perfil_tema, perfis, sistema
 from agente_nw.nucleo.database.queries import temas as queries_temas
 from agente_nw.nucleo.modelos.configuracao import PerfilRoteamento, Roteamento, TemasArquivo
+from agente_nw.nucleo.modelos.pedido import ResultadoPedido
 from agente_nw.nucleo.relevancia import cartoes, cruzamento, qualificador
 from agente_nw.nucleo.saidas import markdown
 from agente_nw.perfil import agenda_google_csv, agenda_macos, extrator
@@ -630,6 +631,101 @@ def preparar_cmd(
     return 0
 
 
+def _descrever_pessoa(resultado: ResultadoPedido) -> str:
+    pedido = resultado.pedido
+    perfil = resultado.perfil
+    if perfil is None:
+        return "(nenhuma — pedido sobre um grupo ou tema geral)"
+    situacao = "contato novo" if resultado.contato_criado else "contato existente"
+    pistas = pedido.pessoa_pistas
+    descricao = ", ".join(pistas[chave] for chave in ("profissao", "empresa", "cidade") if chave in pistas)
+    texto = f"{perfil.nome} ({situacao})" + (f" — {descricao}" if descricao else "")
+    if "vinculo" in pistas:
+        texto += f"; vínculo: {pistas['vinculo']}"
+    if "tempo_sem_contato" in pistas:
+        texto += f"; sem contato {pistas['tempo_sem_contato']}"
+    return texto
+
+
+def _imprimir_pedido(resultado: ResultadoPedido, frase: str) -> None:
+    pedido = resultado.pedido
+    print(f"Pessoa: {_descrever_pessoa(resultado)}")
+    print(f'Objetivo: {pedido.objetivo} — "{pedido.objetivo_texto}"')
+    print(f"Meio: {pedido.meio} · Registro: {pedido.registro}")
+    print(f"Assunto principal: {pedido.assunto_principal}")
+    print(f"Interessa: {'; '.join(pedido.interessa) or '—'} · Evitar: {'; '.join(pedido.evitar) or '—'}")
+    print(f"Buscar notícia sobre: {'; '.join(pedido.termos_busca)}")
+    print(f"Confiança: {pedido.confianca:.2f}".replace(".", ","))
+    if pedido.continuacao:
+        print("Continuação de uma conversa já iniciada.")
+    if pedido.confianca < 0.5:
+        print("AVISO: confiança baixa — confira a leitura acima antes de seguir.")
+    if resultado.contato_ambiguo and resultado.perfil is not None:
+        escolhido = resultado.perfil
+        detalhe = f" ({escolhido.empresa})" if escolhido.empresa else ""
+        print(
+            f"AVISO: encontrei {len(resultado.candidatos)} contatos chamados {pedido.pessoa_nome}; "
+            f"usei {escolhido.nome}{detalhe} (#{escolhido.id})."
+        )
+        for candidato in resultado.candidatos:
+            print(f"  - #{candidato.id} {candidato.nome} {candidato.empresa or ''}".rstrip())
+        print(f'Para trocar: agente_nw pedir --contato <id> "{frase}"')
+
+
+def pedir_cmd(frase: str, preparar_depois: bool, saida_json: bool, contato_id: int | None) -> int:
+    from agente_nw.nucleo import pedido as pedido_mod
+    from agente_nw.nucleo.llm import FalhaJsonInvalido
+
+    conn = banco()
+    agora = datetime.now(UTC).isoformat()
+    try:
+        resultado = pedido_mod.processar(llm(), conn, frase, agora, contato_id)
+    except FalhaJsonInvalido as erro:
+        print(f"FALHA: não consegui entender o pedido ({erro})")
+        return 1
+    except ValueError as erro:
+        print(f"FALHA: {erro}")
+        return 1
+
+    if saida_json:
+        print(resultado.pedido.model_dump_json(indent=2))
+        return 0
+
+    _imprimir_pedido(resultado, frase)
+    if not preparar_depois:
+        return 0
+    if resultado.perfil is None or resultado.perfil.id is None:
+        print("AVISO: pedido sem pessoa — não há contato para preparar.")
+        return 0
+
+    from agente_nw.coleta.capturas.playwright_backend import abrir_pagina_playwright
+    from agente_nw.nucleo.consulta import preparar
+
+    contexto = pedido_mod.para_contexto(resultado.pedido, frase)
+    consulta = preparar(
+        conexao=conn,
+        cliente_llm=llm(),
+        cliente_http=http(),
+        perfil_id=resultado.perfil.id,
+        contexto=contexto,
+        limiares=configuracao().limiares,
+        caminho_fontes=RAIZ / "fontes.yaml",
+        caminho_sentinela=caminho_sentinela(),
+        abrir_pagina=abrir_pagina_playwright,
+        pasta_navegador=RAIZ / "dados" / "navegador",
+        agora=datetime.now(UTC).isoformat(),
+    )
+    print()
+    print(f"Consulta #{consulta.consulta_id} gravada para {resultado.perfil.nome}.")
+    if consulta.aviso:
+        print(f"AVISO: {consulta.aviso}")
+    for item in consulta.itens_menu:
+        print(f"[{item.tipo}] {item.titulo} (score={item.score:.1f})")
+        if item.por_que:
+            print(f"  por quê: {item.por_que}")
+    return 0
+
+
 def ler_rede_social_cmd(telefone: str) -> int:
     telefone_normalizado = telefone_e164(telefone)
     conn = banco()
@@ -954,6 +1050,12 @@ def _montar_parser() -> argparse.ArgumentParser:
     ler_rede_social_parser = subparsers.add_parser("ler-rede-social")
     ler_rede_social_parser.add_argument("telefone")
 
+    pedir_parser = subparsers.add_parser("pedir")
+    pedir_parser.add_argument("frase")
+    pedir_parser.add_argument("--preparar", action="store_true", help="encadeia a consulta e imprime o menu")
+    pedir_parser.add_argument("--json", action="store_true", help="imprime só o pedido extraído, em JSON")
+    pedir_parser.add_argument("--contato", type=int, default=None, help="id do contato (força a escolha)")
+
     preparar_parser = subparsers.add_parser("preparar")
     preparar_parser.add_argument("--telefone", required=True)
     preparar_parser.add_argument("--assunto", required=True)
@@ -1021,6 +1123,8 @@ def main(argv: list[str] | None = None) -> int:
         return console_cmd(args.banco, args.porta)
     if args.comando == "ler-rede-social":
         return ler_rede_social_cmd(args.telefone)
+    if args.comando == "pedir":
+        return pedir_cmd(args.frase, args.preparar, args.json, args.contato)
     if args.comando == "preparar":
         return preparar_cmd(
             args.telefone,
