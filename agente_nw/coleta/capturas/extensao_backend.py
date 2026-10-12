@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import shutil
+import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from agente_nw.coleta.capturas.navegador import MIN_CHARS_AUTENTICADO, URL_LOGIN_SUBSTRINGS
 from agente_nw.nucleo.modelos.configuracao import ExtensaoLimiares
 from agente_nw.ponte import ErroDaExtensao, Ponte, PonteIndisponivel, obter_ponte
 
 __all__ = ["PaginaExtensao", "PonteIndisponivel", "abrir_pagina_extensao", "arquivar_navegador_antigo"]
 
+_PASSO_RENDER_S = 1.0
 _URL_INDISPONIVEL = "ponte://indisponivel"  # lido como "sem sessão" por quem consome a página
 
 
@@ -19,8 +23,14 @@ class PaginaExtensao:
     "indisponível": `estado()` devolve uma URL e um texto que os chamadores já tratam como "sem
     sessão", `rolar`/`coletar_links` não fazem nada, e a ponte já avisou o usuário uma vez."""
 
-    def __init__(self, ponte: Ponte, limiares: ExtensaoLimiares) -> None:
+    def __init__(
+        self,
+        ponte: Ponte,
+        limiares: ExtensaoLimiares,
+        dorme: Callable[[float], None] = time.sleep,
+    ) -> None:
         self._ponte = ponte
+        self._dorme = dorme
         self._limiares = limiares
         self._aba_id: int | None = None
         self.motivo_indisponivel: str | None = None
@@ -47,6 +57,20 @@ class PaginaExtensao:
             self._aba_id = int(dados["aba_id"])
 
     def estado(self) -> tuple[str, str]:
+        """Lê a página; se o texto ainda for curto (X e Instagram desenham depois de carregar) e a
+        URL não for de login, espera até `espera_render_s` e lê de novo."""
+        esperado = 0.0
+        while True:
+            url, texto = self._ler_estado()
+            ainda_desenhando = len(texto.strip()) < MIN_CHARS_AUTENTICADO and not any(
+                marca in url.lower() for marca in URL_LOGIN_SUBSTRINGS
+            )
+            if not ainda_desenhando or url == _URL_INDISPONIVEL or esperado >= self._limiares.espera_render_s:
+                return url, texto
+            self._dorme(_PASSO_RENDER_S)
+            esperado += _PASSO_RENDER_S
+
+    def _ler_estado(self) -> tuple[str, str]:
         if self._aba_id is None:
             return _URL_INDISPONIVEL, ""
         dados = self._enviar(

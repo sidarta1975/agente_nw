@@ -7,7 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Protocol
 
-_URL_LOGIN_SUBSTRINGS: tuple[str, ...] = (
+URL_LOGIN_SUBSTRINGS: tuple[str, ...] = (
     "/login",
     "/signin",
     "/sign-in",
@@ -15,7 +15,7 @@ _URL_LOGIN_SUBSTRINGS: tuple[str, ...] = (
     "/accounts/login",
     "/session/new",
 )
-_MIN_CHARS_AUTENTICADO = 500
+MIN_CHARS_AUTENTICADO = 500
 _BLOCO_TAMANHO_MINIMO = 30
 _BLOCO_TAMANHO_MAXIMO = 5000
 _MAX_ESPERAS_LOGIN = 0  # sem espera: o usuário já está logado no próprio Chrome (brief 044)
@@ -48,9 +48,9 @@ class CapturaBlocos:
 
 def _parece_pagina_de_login(url: str, texto: str) -> bool:
     url_baixa = url.lower()
-    if any(marca in url_baixa for marca in _URL_LOGIN_SUBSTRINGS):
+    if any(marca in url_baixa for marca in URL_LOGIN_SUBSTRINGS):
         return True
-    return len(texto.strip()) < _MIN_CHARS_AUTENTICADO
+    return len(texto.strip()) < MIN_CHARS_AUTENTICADO
 
 
 def _extrair_blocos(texto: str) -> list[str]:

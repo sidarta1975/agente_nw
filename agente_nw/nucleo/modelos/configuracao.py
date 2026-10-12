@@ -202,6 +202,8 @@ class ExtensaoLimiares(BaseModel):
     aba_em_segundo_plano: bool = True
     espera_extensao_s: float = Field(default=20.0, gt=0)
     navegador_app: str | None = "Google Chrome"
+    espera_render_s: float = Field(default=0.0, ge=0)
+    """Espera máxima, em `estado()`, para a página (X, Instagram) terminar de desenhar o texto."""
 
 
 class Limiares(BaseModel):
