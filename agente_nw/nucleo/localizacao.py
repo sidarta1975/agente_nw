@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Protocol, TypeVar
 from urllib.parse import urlparse
@@ -52,6 +52,8 @@ class ContextoNavegacao:
     perguntar_usuario: Callable[[str], str | None] | None = None
     avisar: Callable[[str], None] | None = None
     dorme: Callable[[float], None] = time.sleep
+    perguntar_login: Callable[[str], bool] | None = None
+    """Chamado quando a rede está sem sessão: True = o usuário quer logar agora e a leitura espera."""
     aguardar_login: bool = False
     """False: rede sem sessão é descartada na hora (a localização nunca prende o pedido esperando
     login). True: espera o login como na leitura de perfil (brief 017) — uso explícito do usuário."""
@@ -150,7 +152,20 @@ def atualizar_lista(
         return ResultadoAtualizacao(
             rede=rede, lida=False, usou_cache=True, total=queries_listas.contar_por_rede(conexao, rede)
         )
+    if contexto.perguntar_login is None or contexto.aguardar_login:
+        return _ler_e_gravar(conexao, rede, contexto, agora)
 
+    # Primeiro sem esperar e sem perguntar o usuário; se faltar sessão, oferece o login com tempo.
+    rapido = replace(contexto, perguntar_usuario=None)
+    resultado = _ler_e_gravar(conexao, rede, rapido, agora)
+    if resultado.motivo is None or not contexto.perguntar_login(rede):
+        return resultado
+    return _ler_e_gravar(conexao, rede, replace(contexto, aguardar_login=True), agora)
+
+
+def _ler_e_gravar(
+    conexao: sqlite3.Connection, rede: str, contexto: ContextoNavegacao, agora: str
+) -> ResultadoAtualizacao:
     usuario = listas.resolver_usuario(
         rede,
         contexto.usuarios_rede.get(rede),

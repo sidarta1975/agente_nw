@@ -678,6 +678,11 @@ def _imprimir_pedido(resultado: ResultadoPedido, frase: str) -> None:
         print(f'Para trocar: agente_nw pedir --contato <id> "{frase}"')
 
 
+def _perguntar_login(rede: str) -> bool:
+    resposta = input(f"Sem sessão em {rede}. Entrar agora? Você tem 3 minutos na janela que abrir. [s/N] ")
+    return resposta.strip().lower() in ("s", "sim")
+
+
 def _contexto_de_navegacao(
     abrir_pagina: Callable[[Path], PaginaLista] | None, perguntar: bool, aguardar_login: bool = False
 ) -> ContextoNavegacao:
@@ -693,6 +698,7 @@ def _contexto_de_navegacao(
         perguntar_usuario=(
             (lambda rede: input(f"Qual é o seu usuário no {rede}? (Enter = pular) ")) if perguntar else None
         ),
+        perguntar_login=_perguntar_login if perguntar else None,
         avisar=print,
         aguardar_login=aguardar_login,
     )

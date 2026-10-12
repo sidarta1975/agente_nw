@@ -113,6 +113,17 @@ def conduzir(
             else:
                 saida("Candidatos com esse nome:")
                 escolhida = _menu(conexao, localizacao.opcoes, entrada, saida)
+    elif not sem_perguntar and len(localizacao.opcoes) == 1:
+        unica = localizacao.opcoes[0]
+        if localizacao.status == "nenhum":
+            saida("Não achei nas suas listas.")
+            saida("A busca geral das redes trouxe:")
+        saida(f"É esta pessoa? {_descrever(unica)}")
+        resposta = entrada("[S/n/p = pular] ").strip().lower()
+        if resposta in ("", "s", "sim", "1"):
+            escolhida = unica
+        elif resposta != "p":
+            escolhida = _menu(conexao, [unica], entrada, saida)
     elif not sem_perguntar:
         if localizacao.status == "nenhum":
             saida("Não achei nas suas listas.")

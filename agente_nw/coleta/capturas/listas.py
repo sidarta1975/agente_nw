@@ -158,12 +158,26 @@ class ResultadoLista:
     truncada: bool = False
 
 
+def normalizar_usuario(texto: str | None) -> str | None:
+    """Aceita "@fulano", "fulano" ou a URL do perfil ("https://www.instagram.com/fulano/") e devolve
+    só o usuário."""
+    if not texto or not texto.strip():
+        return None
+    bruto = texto.strip()
+    if "/" in bruto:
+        caminho = re.sub(r"^(?:https?://)?[^/]+/?", "", bruto.split("?")[0])
+        bruto = caminho.split("/")[0]
+    limpo = bruto.lstrip("@").strip()
+    return limpo or None
+
+
 def url_da_lista(rede: str, usuario: str | None) -> str | None:
     modelo = _URL_LISTA.get(rede)
     if modelo is None:
         return None
     if "{usuario}" in modelo:
-        return modelo.format(usuario=usuario) if usuario else None
+        limpo = normalizar_usuario(usuario)
+        return modelo.format(usuario=limpo) if limpo else None
     return modelo
 
 
@@ -376,7 +390,7 @@ def resolver_usuario(
         pagina.fechar()
     if achado is None and perguntar_usuario is not None:
         resposta = perguntar_usuario(rede)
-        achado = resposta.strip().lstrip("@") if resposta and resposta.strip() else None
+        achado = normalizar_usuario(resposta)
     if achado is not None and gravar_usuario is not None:
         gravar_usuario(rede, achado)
     return achado

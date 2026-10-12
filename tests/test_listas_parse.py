@@ -190,3 +190,22 @@ def test_depois_do_login_a_lista_e_aberta_de_novo() -> None:
         "https://www.linkedin.com/mynetwork/invite-connect/connections/",
         "https://www.linkedin.com/mynetwork/invite-connect/connections/",
     ]
+
+
+@pytest.mark.parametrize(
+    "bruto",
+    [
+        "sidarta.martins",
+        "@sidarta.martins",
+        "https://www.instagram.com/sidarta.martins/",
+        "instagram.com/sidarta.martins?x=1",
+    ],
+)
+def test_usuario_aceita_arroba_e_url_do_perfil(bruto: str) -> None:
+    assert listas.normalizar_usuario(bruto) == "sidarta.martins"
+    assert listas.url_da_lista("instagram", bruto) == "https://www.instagram.com/sidarta.martins/following/"
+
+
+def test_usuario_vazio_e_none() -> None:
+    assert listas.normalizar_usuario("  ") is None
+    assert listas.normalizar_usuario(None) is None
