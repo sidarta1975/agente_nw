@@ -201,6 +201,7 @@ class ExtensaoLimiares(BaseModel):
     )
     aba_em_segundo_plano: bool = True
     espera_extensao_s: float = Field(default=20.0, gt=0)
+    navegador_app: str | None = "Google Chrome"
 
 
 class Limiares(BaseModel):

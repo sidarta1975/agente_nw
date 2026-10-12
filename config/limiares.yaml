@@ -47,3 +47,4 @@ extensao:                         # brief 044: leitura de rede social pelo Chrom
   textos_botao_mostrar_mais: [mostrar mais, ver mais, carregar mais, show more, load more]
   aba_em_segundo_plano: true      # false = a aba abre em foco (se a rede carregar pela metade em segundo plano)
   espera_extensao_s: 20
+  navegador_app: Google Chrome    # macOS: aplicativo que abre a aba da ponte (o navegador padrão pode ser outro)

@@ -224,7 +224,8 @@ def _verificar_extensao() -> ItemVerificacao:
     nome = "Extensão do navegador"
     try:
         limiares = configuracao().limiares.extensao
-        dados = obter_ponte(limiares.espera_extensao_s).enviar({"acao": "ola"}, limiares.espera_extensao_s)
+        ponte = obter_ponte(limiares.espera_extensao_s, limiares.navegador_app)
+        dados = ponte.enviar({"acao": "ola"}, limiares.espera_extensao_s)
     except (PonteIndisponivel, ErroDaExtensao) as erro:
         return ItemVerificacao(
             nome,

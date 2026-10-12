@@ -103,4 +103,4 @@ def abrir_pagina_extensao(pasta_ignorada: Path) -> PaginaExtensao:
 
     limiares = configuracao().limiares.extensao
     arquivar_navegador_antigo(pasta_ignorada.parent)
-    return PaginaExtensao(obter_ponte(limiares.espera_extensao_s), limiares)
+    return PaginaExtensao(obter_ponte(limiares.espera_extensao_s, limiares.navegador_app), limiares)
