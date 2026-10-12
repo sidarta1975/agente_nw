@@ -37,8 +37,24 @@ class PaginaPlaywright:
         return url, texto
 
     def rolar(self) -> None:
-        self._pagina.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        self._pagina.wait_for_timeout(1000)
+        # Rola a janela e toda área com rolagem própria (listas em painel/modal) e aperta o botão
+        # de "mostrar mais", que é como o LinkedIn carrega o resto da lista.
+        script = (
+            "(() => { "
+            "window.scrollTo(0, document.body.scrollHeight); "
+            "document.querySelectorAll('*').forEach(e => { "
+            "  const o = getComputedStyle(e).overflowY; "
+            "  if ((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 20) "
+            "    e.scrollTop = e.scrollHeight; "
+            "}); "
+            "const rotulo = /^(show more|mostrar mais|ver mais|carregar mais|load more)/i; "
+            "Array.from(document.querySelectorAll('button')).forEach(b => { "
+            "  if (rotulo.test((b.innerText || '').trim())) b.click(); "
+            "}); "
+            "})()"
+        )
+        self._pagina.evaluate(script)
+        self._pagina.wait_for_timeout(1500)
 
     def coletar_links(self) -> list[tuple[str, str]]:
         """Devolve `[(href_absoluto, texto_visível_do_container)]` para cada
