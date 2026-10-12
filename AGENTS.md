@@ -113,6 +113,8 @@ O usuário escreve um pedido em texto livre sobre uma pessoa ou um grupo e um ob
 
 Todo brief termina com este bloco preenchido. Sem ele, a sessão é considerada incompleta.
 
+Pendência só pode ser (a) decisão de produto, que cabe a Sidarta, ou (b) algo que exige a máquina ou a presença dele — login em rede social, teste com pessoa real, aprovação de limiar. Defeito, inconsistência, limpeza ou verificação que o executor consiga resolver ou rodar sozinho é resolvido antes do relatório, não listado. Quando um critério de aceite depende de rede social ou do modelo real, o executor roda o que está ao seu alcance (por exemplo `agente_nw listas ver --rede instagram --filtro a`) e cola a saída no relatório; o que fica para Sidarta é só o que exige Sidarta.
+
 O executor não roda a suíte de testes padrão (pytest, ruff, mypy, `scripts/verificar.sh`) durante a sessão. Ele garante que o script está atualizado e funcional, e entrega no relatório o caminho completo, pronto para colar no terminal — quem roda e confirma o resultado é Sidarta.
 
 ```
