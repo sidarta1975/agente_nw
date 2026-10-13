@@ -186,6 +186,8 @@ class ListasLimiares(BaseModel):
     validade_dias: int = Field(ge=1)
     similaridade_minima: float = Field(default=0.8, ge=0, le=1)
     maximo_parecidas: int = Field(default=5, ge=1)
+    similaridade_contato_forcado: float = Field(default=0.5, ge=0, le=1)
+    """Abaixo disso, o nome do pedido não bate com o do contato dado em --contato e o usuário confirma."""
     rodadas_sem_novidade: int = Field(default=3, ge=1)
     """Rodadas de rolagem seguidas sem entrada nova antes de dar a lista por lida."""
     redes_so_por_link: tuple[str, ...] = ()

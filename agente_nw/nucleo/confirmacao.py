@@ -139,6 +139,8 @@ def conduzir(
     substituir: bool = False,
 ) -> Opcao | None:
     """Confirmação no terminal. Devolve a opção gravada no contato, ou None se o usuário pulou."""
+    if localizacao.rede is not None:
+        saida(f"\n=== Rede social: {localizacao.rede} ===")
     for aviso in localizacao.avisos:
         saida(f"AVISO: {aviso}")
 

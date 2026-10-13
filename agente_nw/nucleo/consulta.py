@@ -14,6 +14,7 @@ from agente_nw.coleta.capturas.navegador import Pagina
 from agente_nw.coleta.rss import google_news
 from agente_nw.coleta.rss import leitor as leitor_rss
 from agente_nw.nucleo import historico as historico_mod
+from agente_nw.nucleo import termos_contato as termos_contato_mod
 from agente_nw.nucleo.agrupamento import agrupador
 from agente_nw.nucleo.database.queries import assunto_contato as assunto_contato_q
 from agente_nw.nucleo.database.queries import assuntos as assuntos_q
@@ -93,9 +94,9 @@ def preparar(
 ) -> ResultadoConsulta:
     """Orquestra a consulta sob demanda sobre um contato.
 
-    Ordem: coleta de notícia (se `rodar_coleta`) → extração da fila → agrupamento
-    → qualificação → leitura de rede social → cruzamento por contato → montagem
-    do menu → gravação em `consulta_contato`. Contato sem rede social cadastrada
+    Ordem: leitura de rede social → coleta de notícia (se `rodar_coleta`; as buscas incluem termos
+    tirados do que o contato publica) → extração da fila → agrupamento → qualificação → cruzamento
+    por contato → montagem do menu → gravação em `consulta_contato`. Contato sem rede social cadastrada
     ou sem histórico anterior não interrompe o fluxo; o resultado devolve um
     `aviso` quando não há assunto qualificado.
 
@@ -112,26 +113,6 @@ def preparar(
 
     etapa("Entendendo o pedido (vetor da consulta)...")
     centroide_consulta = cliente_llm.embeddar([_texto_da_consulta(contexto)])[0]
-
-    if rodar_coleta:
-        etapa("Coletando notícias (feeds e consultas ao Google News)...")
-        leitor_rss.coletar(
-            conexao,
-            cliente_http,
-            caminho_fontes if caminho_fontes.exists() else None,
-            limiares.coleta,
-            caminho_sentinela,
-            feeds_extras=google_news.gerar_consultas_da_consulta(contexto, []),
-        )
-
-    etapa("Extraindo texto das notícias novas...")
-    extrator_perfil.processar_fila(cliente_llm, conexao)
-    etapa("Agrupando as notícias em assuntos...")
-    agrupador.agrupar(cliente_llm, conexao, limiares, caminho_sentinela, agora)
-    etapa("Qualificando os assuntos novos...")
-    qualificador.qualificar_pendentes(
-        cliente_llm, conexao, limiares.qualificacao.teto_por_dia, vetores_extras=[centroide_consulta]
-    )
 
     etapa("Lendo as redes sociais do contato no seu Chrome...")
     resumo_leitor = leitor_capturas.ler_redes_sociais_do_contato(
@@ -155,6 +136,29 @@ def preparar(
         blocos_capturados=resumo_leitor.blocos_capturados,
         fatos_gravados=resumo_leitor.fatos_gravados,
         motivos_sem_sessao=list(resumo_leitor.motivos_sem_sessao),
+    )
+
+    if rodar_coleta:
+        etapa("Escolhendo os termos de busca pelo que o contato publica...")
+        termos_contato = termos_contato_mod.termos_do_contato(cliente_llm, conexao, perfil_id)
+        etapa(f"Termos de busca do contato: {', '.join(termos_contato) or '(nenhum)'}")
+        etapa("Coletando notícias (feeds e consultas ao Google News)...")
+        leitor_rss.coletar(
+            conexao,
+            cliente_http,
+            caminho_fontes if caminho_fontes.exists() else None,
+            limiares.coleta,
+            caminho_sentinela,
+            feeds_extras=google_news.gerar_consultas_da_consulta(contexto, termos_contato),
+        )
+
+    etapa("Extraindo texto das notícias novas...")
+    extrator_perfil.processar_fila(cliente_llm, conexao)
+    etapa("Agrupando as notícias em assuntos...")
+    agrupador.agrupar(cliente_llm, conexao, limiares, caminho_sentinela, agora)
+    etapa("Qualificando os assuntos novos...")
+    qualificador.qualificar_pendentes(
+        cliente_llm, conexao, limiares.qualificacao.teto_por_dia, vetores_extras=[centroide_consulta]
     )
 
     etapa("Escolhendo os assuntos para esta pessoa...")
