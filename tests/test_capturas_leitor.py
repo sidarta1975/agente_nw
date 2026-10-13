@@ -229,7 +229,8 @@ def test_maximo_de_blocos_limita_as_chamadas_ao_modelo_e_avisa_o_progresso(
     blocos = [f"Publicação número {i} sobre um tema qualquer da semana" for i in range(5)]
     texto = ("preenchimento " * 40) + "\n\n" + "\n\n".join(blocos)
     pagina = _PaginaFake(estados=[("https://linkedin.com/in/dora/recent-activity/all/", texto)])
-    cliente = _ClienteLLMFake({})
+    publicacao = RespostaCapturaRedeSocial(descartar=False, tipo="publicacao", conteudo="algo")
+    cliente = _ClienteLLMFake({"Publicação número": publicacao})
     linhas: list[str] = []
 
     resumo = leitor.ler_redes_sociais_do_contato(
@@ -245,10 +246,39 @@ def test_maximo_de_blocos_limita_as_chamadas_ao_modelo_e_avisa_o_progresso(
         avisar=linhas.append,
     )
 
-    assert len(cliente.chamadas) == 2
+    assert len(cliente.chamadas) == 3  # o bloco de preenchimento é descartado; parou ao gravar 2
+    assert resumo.fatos_gravados == 2
     assert resumo.blocos_capturados == 6
-    assert any("extraindo 2" in linha for linha in linhas)
-    assert [linha for linha in linhas if "bloco 2/2" in linha]
+    assert any("examino até" in linha for linha in linhas)
+    assert [linha for linha in linhas if "bloco 2/6" in linha]
+
+
+def test_blocos_de_interface_no_inicio_nao_consomem_o_limite_de_publicacoes(
+    conn: sqlite3.Connection, tmp_path: Path
+) -> None:
+    perfil_id = _criar_contato(conn, "Fausto", "+5511900000006")
+    redes_sociais.inserir(conn, perfil_id, "facebook", "https://facebook.com/fausto", AGORA)
+    conn.commit()
+    menu = [f"Menu de navegação item {i} da interface da página" for i in range(3)]
+    publicacoes = [f"Publicação real {i} sobre viagem de veleiro com amigos" for i in range(3)]
+    texto = ("preenchimento " * 40) + "\n\n" + "\n\n".join(menu + publicacoes)
+    pagina = _PaginaFake(estados=[("https://facebook.com/fausto", texto)])
+    publicacao = RespostaCapturaRedeSocial(descartar=False, tipo="publicacao", conteudo="algo")
+    cliente = _ClienteLLMFake({"Publicação real": publicacao})
+
+    resumo = leitor.ler_redes_sociais_do_contato(
+        cliente,
+        conn,
+        perfil_id,
+        lambda _p: pagina,
+        tmp_path / "navegador",
+        AGORA,
+        dorme=lambda _s: None,
+        max_rolagens=1,
+        maximo_blocos=2,
+    )
+
+    assert resumo.fatos_gravados == 2
 
 
 def test_o_fato_guarda_o_texto_integral_da_publicacao_e_nao_o_resumo_do_modelo(

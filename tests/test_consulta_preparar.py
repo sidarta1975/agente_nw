@@ -371,6 +371,14 @@ def test_preparar_avisa_cada_etapa_na_ordem(
         avisar=etapas.append,
     )
 
-    ordem = ["Coletando", "Extraindo", "Agrupando", "Qualificando", "Lendo as redes", "Escolhendo"]
+    ordem = [
+        "Lendo as redes",
+        "Escolhendo os termos",
+        "Coletando",
+        "Extraindo",
+        "Agrupando",
+        "Qualificando",
+        "Escolhendo os assuntos",
+    ]
     posicoes = [etapas.index(next(e for e in etapas if e.startswith(inicio))) for inicio in ordem]
     assert posicoes == sorted(posicoes)

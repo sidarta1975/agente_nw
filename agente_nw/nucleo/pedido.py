@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import getpass
 import sqlite3
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Protocol, TypeVar
 
 from pydantic import BaseModel
@@ -13,7 +13,7 @@ from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido, ResultadoPedido
 from agente_nw.nucleo.modelos.perfil import Perfil
 from agente_nw.nucleo.prompts import extrair_pedido
-from agente_nw.nucleo.texto import sem_acento_e_caixa
+from agente_nw.nucleo.texto import sem_acento_e_caixa, similaridade_nome
 
 _EsquemaT = TypeVar("_EsquemaT", bound=BaseModel)
 _MAXIMO_CONTATOS_NO_PROMPT = 50
@@ -139,6 +139,8 @@ def processar(
     navegacao: localizacao_mod.ContextoNavegacao | None = None,
     trocar_perfil: bool = False,
     perfis_informados: Sequence[str] = (),
+    confirmar_contato: Callable[[str, str], bool] | None = None,
+    similaridade_minima_contato: float = 0.5,
 ) -> ResultadoPedido:
     pedido_id = registrar(conexao, frase, agora)
 
@@ -151,12 +153,22 @@ def processar(
     pedidos.gravar_resolucao(conexao, pedido_id, perfil.id if perfil is not None else None, criado, ambiguo)
     conexao.commit()
 
+    divergente = (
+        contato_id_forcado is not None
+        and perfil is not None
+        and bool(pedido.pessoa_nome)
+        and similaridade_nome(pedido.pessoa_nome, perfil.nome) < similaridade_minima_contato
+    )
+    if divergente and perfil is not None and confirmar_contato is not None:
+        divergente = not confirmar_contato(pedido.pessoa_nome, perfil.nome)
+
     resultado = ResultadoPedido(
         pedido_id=pedido_id,
         pedido=pedido,
         perfil=perfil,
         contato_criado=criado,
         contato_ambiguo=ambiguo,
+        contato_divergente=divergente,
         candidatos=candidatos,
     )
     _localizar_na_rede(cliente_llm, conexao, resultado, agora, navegacao, trocar_perfil, perfis_informados)
@@ -179,6 +191,8 @@ def _localizar_na_rede(
     pedido = resultado.pedido
     if perfil is None or perfil.id is None or not pedido.pessoa_nome:
         return
+    if resultado.contato_divergente:
+        return  # o contato dado em --contato não é a pessoa do pedido: não grava rede social nele
     if resultado.contato_ambiguo:
         return  # há homônimos e o contato é um palpite: não grava rede social em quem pode ser outro
 

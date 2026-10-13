@@ -104,6 +104,7 @@ class ResultadoPedido:
     perfil: Perfil | None
     contato_criado: bool = False
     contato_ambiguo: bool = False
+    contato_divergente: bool = False  # --contato com nome diferente do pedido, e o usuário não confirmou
     candidatos: list[Perfil] = field(default_factory=list)
     # Curadoria por rede (brief 037): uma localização para cada rede em que o contato ainda não tem perfil.
     localizacoes: list[Localizacao] = field(default_factory=list)

@@ -11,6 +11,18 @@ saude:
   - cirurgia
   - tratamento psiquiátrico
   - tratamento psiquiatrico
+  - vacina
+  - vacinas
+  - vacinação
+  - vacinacao
+  - clínica
+  - clinica
+  - hospital
+  - internado
+  - internação
+  - internacao
+  - doença
+  - doenca
 religiao:
   - evangélico
   - evangelico
@@ -69,3 +81,15 @@ menores:
   - filho de
   - anos de idade
   - menor de idade
+  - criança
+  - crianca
+  - crianças
+  - criancas
+  - menino
+  - menina
+  - meninos
+  - meninas
+  - adolescente
+  - adolescentes
+  - recém-nascido
+  - recem-nascido

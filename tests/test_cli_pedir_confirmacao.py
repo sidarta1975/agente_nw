@@ -318,6 +318,22 @@ def test_repetir_o_pedido_nao_pergunta_e_trocar_perfil_reabre(
     assert _redes_do_contato(conn) == [("linkedin", "https://exemplo.test/linkedin/marcos-lima")]
 
 
+def test_cada_bloco_de_curadoria_diz_qual_rede_esta_sendo_tratada(
+    conn: sqlite3.Connection,
+    monkeypatch: pytest.MonkeyPatch,
+    agora_real: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _com_um_marcos(conn, agora_real)
+
+    _pedir(monkeypatch, _pedido(pistas=PISTA), _respostas("S"))
+
+    saida = capsys.readouterr().out
+    assert "=== Rede social: linkedin ===" in saida
+    assert "=== Rede social: facebook ===" in saida
+    assert saida.index("Rede social: linkedin") < saida.index("É esta pessoa?")
+
+
 def _contato_id(conn: sqlite3.Connection) -> int:
     contato_id = perfis.listar_todos(conn)[0].id
     assert contato_id is not None

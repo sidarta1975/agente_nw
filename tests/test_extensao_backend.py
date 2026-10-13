@@ -187,3 +187,21 @@ def test_imagens_com_a_ponte_indisponivel_devolve_lista_vazia() -> None:
     pagina.ir_para("https://www.instagram.com/ana/")
 
     assert pagina.imagens(8, 250) == []
+
+
+def test_extensao_antiga_que_nao_conhece_imagens_nao_derruba_a_pagina() -> None:
+    ponte = _PonteFalsa(
+        {
+            "abrir": {"aba_id": 3},
+            "imagens": ErroDaExtensao("ação desconhecida: imagens"),
+            "estado": {"url": "https://www.instagram.com/ana/", "texto": "x" * 600},
+        }
+    )
+    pagina = _pagina(ponte)
+    pagina.ir_para("https://www.instagram.com/ana/")
+
+    assert pagina.imagens(8, 250) == []
+
+    assert pagina.aviso_imagens == "ação desconhecida: imagens"
+    assert pagina.motivo_indisponivel is None
+    assert pagina.estado()[0] == "https://www.instagram.com/ana/"  # o resto da leitura segue valendo

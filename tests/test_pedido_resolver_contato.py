@@ -124,3 +124,33 @@ def test_processar_grava_o_pedido_com_o_perfil_resolvido(conn: sqlite3.Connectio
     assert gravado.perfil_id == (resultado.perfil.id if resultado.perfil else None)
     assert gravado.contato_criado is True
     assert perfis.obter_usuario(conn) is not None
+
+
+def test_contato_forcado_com_nome_diferente_do_pedido_pede_confirmacao(conn: sqlite3.Connection) -> None:
+    from types import SimpleNamespace
+
+    lisa = perfis.inserir_novo_contato(conn, "Lisa Queen", None, None, AGORA)
+    conn.commit()
+    pedido = _pedido(pessoa_nome="Djalma")
+    perguntas: list[tuple[str, str]] = []
+
+    def _recusa(pessoa: str, contato: str) -> bool:
+        perguntas.append((pessoa, contato))
+        return False
+
+    def _processar(confirmar: Any) -> Any:
+        return pedido_mod.processar(
+            SimpleNamespace(gerar_json=lambda *_a, **_k: pedido),
+            conn,
+            "frase",
+            AGORA,
+            contato_id_forcado=lisa.id,
+            confirmar_contato=confirmar,
+        )
+
+    recusado = _processar(_recusa)
+    aceito = _processar(lambda _p, _c: True)
+
+    assert perguntas == [("Djalma", "Lisa Queen")]
+    assert recusado.contato_divergente is True
+    assert aceito.contato_divergente is False

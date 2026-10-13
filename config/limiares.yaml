@@ -42,6 +42,7 @@ listas:
   validade_dias: 30
   similaridade_minima: 0.8
   maximo_parecidas: 5
+  similaridade_contato_forcado: 0.5  # --contato com nome muito diferente do pedido pede confirmação
   rodadas_sem_novidade: 6         # listas que carregam aos poucos (Instagram) pedem mais paciência
   redes_so_por_link: []           # redes que a extensão não deve ler sozinha (ex.: [x]); vazio = todas automáticas
 extensao:                         # brief 044: leitura de rede social pelo Chrome do usuário
@@ -53,3 +54,4 @@ extensao:                         # brief 044: leitura de rede social pelo Chrom
   espera_extensao_s: 20
   espera_render_s: 8              # redes que desenham a página depois de carregar (X, Instagram)
   navegador_app: Google Chrome    # macOS: aplicativo que abre a aba da ponte (o navegador padrão pode ser outro)
+  navegador_perfil: Default       # perfil do Chrome em que a extensão está instalada (pasta em ~/Library/Application Support/Google/Chrome)

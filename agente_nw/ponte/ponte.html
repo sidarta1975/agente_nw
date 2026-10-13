@@ -47,9 +47,14 @@ window.addEventListener("message", (evento) => {
   if (resolver) { pendentes.delete(dados.id); resolver(dados.resposta); }
 });
 
+// O `ola` é só um aviso para acordar a extensão: se a via direta não responde logo (a primeira mensagem
+// a um service worker adormecido pode se perder), segue pelo relé em vez de esperar sem fim.
+const TEMPO_DIRETO_OLA_MS = 4000;
+
 function direto(tarefa) {
   return new Promise((resolver) => {
     if (!(window.chrome && chrome.runtime && chrome.runtime.sendMessage)) { resolver(null); return; }
+    if (tarefa.acao === "ola") setTimeout(() => resolver(null), TEMPO_DIRETO_OLA_MS);
     try {
       chrome.runtime.sendMessage(ID_EXTENSAO, { tarefa }, (resposta) => {
         resolver(chrome.runtime.lastError || !resposta ? null : resposta);

@@ -9,7 +9,7 @@ from urllib.request import Request, urlopen
 
 import pytest
 
-from agente_nw.ponte import ID_EXTENSAO, ErroDaExtensao, Ponte, PonteIndisponivel
+from agente_nw.ponte import ID_EXTENSAO, ErroDaExtensao, Ponte, PonteIndisponivel, _comando_de_abertura
 
 
 @pytest.fixture
@@ -153,3 +153,80 @@ def test_navegador_so_e_aberto_uma_vez_na_primeira_tarefa(avisos: list[str]) -> 
         assert abertas == [aberta.url]
     finally:
         aberta.fechar()
+
+
+def _ponte_com_aquecimento(avisos: list[str]) -> Ponte:
+    aberta = Ponte(
+        porta=0,
+        abrir_navegador=lambda _url: None,
+        espera_conexao_s=0.6,
+        long_poll_s=0.4,
+        sem_contato_s=0.6,
+        avisar=avisos.append,
+        aquecer=True,
+        limite_do_aquecimento_s=0.5,
+    )
+    aberta.iniciar()
+    return aberta
+
+
+def test_aquecimento_repete_o_ola_ate_a_extensao_acordar_e_so_depois_envia_a_tarefa(
+    avisos: list[str],
+) -> None:
+    aberta = _ponte_com_aquecimento(avisos)
+    recebidas: list[str] = []
+
+    def responder(tarefa: dict[str, Any]) -> dict[str, Any] | None:
+        recebidas.append(tarefa["acao"])
+        if len(recebidas) == 1:
+            return None  # a primeira mensagem ao service worker adormecido se perde
+        return {"ok": True, "dados": {"acao": tarefa["acao"]}}
+
+    try:
+        _pagina_falsa(aberta, responder)
+        dados = aberta.enviar({"acao": "abrir"}, tempo_limite_s=5)
+    finally:
+        aberta.fechar()
+
+    assert recebidas == ["ola", "ola", "abrir"]
+    assert dados == {"acao": "abrir"}
+    assert avisos == []
+
+
+def test_aquecimento_sem_resposta_declara_a_ponte_indisponivel_com_um_so_aviso(avisos: list[str]) -> None:
+    aberta = _ponte_com_aquecimento(avisos)
+    recebidas: list[str] = []
+
+    def responder(tarefa: dict[str, Any]) -> None:
+        recebidas.append(tarefa["acao"])
+
+    try:
+        _pagina_falsa(aberta, responder)
+        with pytest.raises(PonteIndisponivel, match="a tempo"):
+            aberta.enviar({"acao": "abrir"}, tempo_limite_s=5)
+        with pytest.raises(PonteIndisponivel, match="a tempo"):
+            aberta.enviar({"acao": "abrir"}, tempo_limite_s=5)
+    finally:
+        aberta.fechar()
+
+    assert recebidas == ["ola", "ola", "ola"]
+    assert len(avisos) == 1
+
+
+def test_com_perfil_o_chrome_abre_a_ponte_no_perfil_da_extensao() -> None:
+    comando = _comando_de_abertura("Google Chrome", "Default", "http://127.0.0.1:8766/ponte?token=x")
+
+    assert comando == [
+        "open",
+        "-a",
+        "Google Chrome",
+        "--args",
+        "--profile-directory=Default",
+        "http://127.0.0.1:8766/ponte?token=x",
+    ]
+
+
+def test_sem_perfil_abre_no_ultimo_perfil_usado() -> None:
+    comando = _comando_de_abertura("Google Chrome", None, "http://x")
+
+    assert comando == ["open", "-a", "Google Chrome", "http://x"]

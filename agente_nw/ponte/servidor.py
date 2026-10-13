@@ -16,6 +16,8 @@ HOST = "127.0.0.1"
 PORTA_PADRAO = 8766
 ID_EXTENSAO = "noicodbmhccmanolhjlbfjhamdbokgan"  # derivado da `key` de extensao/manifest.json
 LONG_POLL_S = 25.0
+_TENTATIVAS_DE_AQUECIMENTO = 3
+_LIMITE_DO_AQUECIMENTO_S = 15.0
 SEM_CONTATO_S = 8.0  # sem poll ativo há tanto tempo, com tarefa na fila: a aba da ponte foi fechada
 
 
@@ -46,6 +48,8 @@ class Ponte:
         long_poll_s: float = LONG_POLL_S,
         sem_contato_s: float = SEM_CONTATO_S,
         avisar: Callable[[str], None] = _avisar_no_terminal,
+        aquecer: bool = False,
+        limite_do_aquecimento_s: float = _LIMITE_DO_AQUECIMENTO_S,
     ) -> None:
         self.token = secrets.token_urlsafe(24)
         self._porta_pedida = porta
@@ -66,6 +70,9 @@ class Ponte:
         self._ultima_atividade: float | None = None
         self._puxadas: set[int] = set()
         self._falha: str | None = None
+        self._aquecer = aquecer
+        self._limite_do_aquecimento_s = limite_do_aquecimento_s
+        self._aquecida = False
 
     # ---- ciclo de vida -------------------------------------------------------------------------
 
@@ -211,11 +218,31 @@ class Ponte:
             )
         return PonteIndisponivel(motivo)
 
+    def _aquecer_extensao(self) -> None:
+        """O service worker do Chrome (manifest v3) dorme quando fica parado e a primeira mensagem que
+        o acorda pode se perder. Um `ola` curto, repetido, acorda a extensão antes da primeira tarefa
+        de verdade; só depois de todas as tentativas sem resposta a ponte é declarada indisponível."""
+        for _ in range(_TENTATIVAS_DE_AQUECIMENTO):
+            try:
+                self._enviar({"acao": "ola"}, self._limite_do_aquecimento_s, definitivo=False)
+            except PonteIndisponivel:
+                if self._falha is not None:
+                    raise
+                continue
+            self._aquecida = True
+            return
+        raise self._falhar("a extensão não respondeu a tempo.")
+
     def enviar(self, tarefa: dict[str, Any], tempo_limite_s: float) -> dict[str, Any]:
         """Entrega a tarefa à extensão e devolve os `dados` da resposta. Depois da primeira falha,
         as chamadas seguintes falham na hora (sem esperar o tempo limite de novo)."""
         if self._falha is not None:
             raise PonteIndisponivel(self._falha)
+        if self._aquecer and not self._aquecida:
+            self._aquecer_extensao()
+        return self._enviar(tarefa, tempo_limite_s, definitivo=True)
+
+    def _enviar(self, tarefa: dict[str, Any], tempo_limite_s: float, definitivo: bool) -> dict[str, Any]:
         self.iniciar()
         self._abrir_pagina_da_ponte()
 
@@ -230,6 +257,8 @@ class Ponte:
             while not evento.wait(timeout=0.25):
                 decorrido = time.monotonic() - inicio
                 if decorrido >= tempo_limite_s:
+                    if not definitivo:
+                        raise PonteIndisponivel("a extensão não respondeu a tempo.")
                     raise self._falhar("a extensão não respondeu a tempo.")
                 if identificador in self._puxadas or self._polls_ativos > 0:
                     continue
