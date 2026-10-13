@@ -687,6 +687,14 @@ def _contexto_de_navegacao(
     )
 
 
+def _confirmar_contato(entrada: Callable[[str], str]) -> Callable[[str, str], bool]:
+    def perguntar(pessoa_do_pedido: str, nome_do_contato: str) -> bool:
+        print(f"ATENÇÃO: o pedido fala de '{pessoa_do_pedido}', mas o contato é '{nome_do_contato}'.")
+        return entrada("Continuar com este contato mesmo assim? [s/N] ").strip().lower() in ("s", "sim")
+
+    return perguntar
+
+
 def _avisar_etapa(texto: str) -> None:
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {texto}", flush=True)
 
@@ -723,6 +731,8 @@ def pedir_cmd(
             navegacao=navegacao,
             trocar_perfil=trocar_perfil,
             perfis_informados=perfis_informados or (),
+            confirmar_contato=None if saida_json or sem_perguntar else _confirmar_contato(entrada),
+            similaridade_minima_contato=configuracao().limiares.listas.similaridade_contato_forcado,
         )
     except FalhaJsonInvalido as erro:
         print(f"FALHA: não consegui entender o pedido ({erro})")
@@ -754,6 +764,10 @@ def pedir_cmd(
             )
     if not preparar_depois:
         return 0
+    if resultado.contato_divergente:
+        if not saida_json:
+            print("Contato não confirmado: confira o id em --contato e repita o pedido.")
+        return 1
     if resultado.contato_ambiguo and not saida_json:
         print("Há mais de um contato com esse nome: escolha um com --contato <id> e repita o pedido.")
         return 0

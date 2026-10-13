@@ -37,13 +37,21 @@ class PaginaExtensao:
         self._limiares = limiares
         self._aba_id: int | None = None
         self.motivo_indisponivel: str | None = None
+        self.aviso_imagens: str | None = None  # a extensão não leu as imagens (a página segue disponível)
 
-    def _enviar(self, tarefa: dict[str, Any]) -> dict[str, Any] | None:
+    def _enviar(self, tarefa: dict[str, Any], so_esta_falha: bool = False) -> dict[str, Any] | None:
+        """`so_esta_falha`: um erro da extensão nesta tarefa não derruba a página inteira (a ponte sim)."""
         if self.motivo_indisponivel is not None:
             return None
         try:
             return self._ponte.enviar(tarefa, self._limiares.tempo_limite_tarefa_s)
-        except (PonteIndisponivel, ErroDaExtensao) as erro:
+        except ErroDaExtensao as erro:
+            if so_esta_falha:
+                self.aviso_imagens = str(erro)
+            else:
+                self.motivo_indisponivel = str(erro)
+            return None
+        except PonteIndisponivel as erro:
             self.motivo_indisponivel = str(erro)
             return None
 
@@ -120,7 +128,8 @@ class PaginaExtensao:
                 "maximo": maximo,
                 "largura_minima": largura_minima,
                 "ignorar": list(ignorar or []),
-            }
+            },
+            so_esta_falha=True,
         )
         if dados is None:
             return []

@@ -25,6 +25,11 @@ class ResumoLeitura:
     motivos_sem_sessao: list[str] = field(default_factory=list)
 
 
+# Os primeiros blocos de uma página costumam ser menu e cabeçalho: o limite de `maximo_blocos` vale
+# para publicações gravadas, e examino até este múltiplo de blocos para encontrá-las.
+_BLOCOS_EXAMINADOS_POR_PUBLICACAO = 4
+
+
 def url_de_leitura(rede: str, link: str) -> str:
     """No LinkedIn as publicações ficam na página de atividade, não no perfil (que traz experiência,
     formação e menu). Outras redes e links que já apontam para a atividade ficam como estão."""
@@ -93,7 +98,7 @@ def ler_redes_sociais_do_contato(
     `dorme`, `max_esperas_login`, `espera_login_s` e `max_rolagens` são passados
     para `navegador.ler`; produção usa os padrões (sem espera de login — a sessão é a
     do Chrome do usuário —, 5 rolagens); testes injetam valores curtos. `maximo_blocos`
-    limita os blocos que vão para o modelo por rede (os primeiros, que são os mais recentes);
+    limita as publicações gravadas por rede (examina os primeiros blocos, que são os mais recentes);
     `avisar` recebe uma linha de progresso por rede e por bloco."""
     resumo = ResumoLeitura(perfil_id=perfil_id)
     lista = redes_sociais.listar_por_perfil(conexao, perfil_id)
@@ -114,6 +119,9 @@ def ler_redes_sociais_do_contato(
             )
         finally:
             pagina.fechar()
+        aviso_imagens = getattr(pagina, "aviso_imagens", None)
+        if aviso_imagens and avisar is not None:
+            avisar(f"AVISO: {rede.rede}: a extensão não leu as imagens ({aviso_imagens}). Recarregue-a.")
 
         if not captura.autenticado:
             resumo.redes_sem_sessao += 1
@@ -123,16 +131,27 @@ def ler_redes_sociais_do_contato(
         resumo.redes_lidas += 1
         resumo.blocos_capturados += len(captura.blocos)
 
-        blocos = captura.blocos if maximo_blocos is None else captura.blocos[:maximo_blocos]
+        blocos = (
+            captura.blocos
+            if maximo_blocos is None
+            else captura.blocos[: maximo_blocos * _BLOCOS_EXAMINADOS_POR_PUBLICACAO]
+        )
         if avisar is not None:
-            avisar(f"{rede.rede}: {len(captura.blocos)} blocos na página; extraindo {len(blocos)}...")
+            avisar(f"{rede.rede}: {len(captura.blocos)} blocos na página; examino até {len(blocos)}...")
+        gravados_na_rede = 0
+        sensiveis = 0
+        descartados = 0
         for numero, bloco in enumerate(blocos, start=1):
+            if maximo_blocos is not None and gravados_na_rede >= maximo_blocos:
+                break
             if avisar is not None:
                 avisar(f"  {rede.rede}: bloco {numero}/{len(blocos)}")
             if sensivel.verificar(bloco) is not None:
+                sensiveis += 1
                 continue  # categoria sensível: o texto integral nunca chega ao banco
             extraido = extrator.extrair(cliente_llm, bloco, rede.rede)
             if extraido is None:
+                descartados += 1
                 continue
             fato = Fato(
                 perfil_id=perfil_id,
@@ -144,7 +163,13 @@ def ler_redes_sociais_do_contato(
             )
             fatos.inserir(conexao, fato)
             resumo.fatos_gravados += 1
+            gravados_na_rede += 1
 
+        if avisar is not None and (sensiveis or descartados):
+            avisar(
+                f"{rede.rede}: {sensiveis} bloco(s) barrados pelo filtro sensível e {descartados} "
+                f"descartados pelo modelo (interface ou sem publicação)"
+            )
         _descrever_imagens(
             cliente_llm, conexao, perfil_id, rede.rede, rede.link, captura.imagens, agora, resumo, avisar
         )
