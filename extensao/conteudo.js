@@ -44,10 +44,21 @@
   // que saem da tela, então cada passo da rolagem guarda os links antes de seguir.
   const vistos = new Map(); // href absoluto -> texto do cartão mais longo
   function coletar() {
+    // X: cada pessoa da lista é um UserCell; o primeiro link dele é o do perfil (os demais são
+    // @menções da biografia e não são pessoas da lista). A coluna da direita ("Quem seguir") fica fora.
+    if (/(^|\.)x\.com$/.test(location.hostname)) {
+      const coluna = document.querySelector('[data-testid="primaryColumn"]') || document;
+      for (const celula of coluna.querySelectorAll('[data-testid="UserCell"]')) {
+        const a = celula.querySelector("a[href]");
+        if (a && !vistos.has(a.href)) vistos.set(a.href, celula.innerText.trim());
+      }
+      return;
+    }
     for (const a of document.querySelectorAll("a[href]")) {
+      const antes = vistos.get(a.href);
+      if (antes !== undefined && antes.length > 0) continue; // já lido: innerText é caro
       const cartao = a.closest("li, article, div");
       const texto = cartao ? cartao.innerText.trim() : a.innerText || "";
-      const antes = vistos.get(a.href);
       if (antes === undefined || texto.length > antes.length) vistos.set(a.href, texto);
     }
   }
@@ -114,28 +125,36 @@
     }
   }
 
-  const MAX_PASSOS = 40;
-  async function rolarPainel(el) {
-    for (let passo = 0; passo < MAX_PASSOS; passo += 1) {
-      const fim = el.scrollHeight - el.clientHeight;
-      if (el.scrollTop >= fim - 2) break;
-      el.scrollTop = Math.min(fim, el.scrollTop + el.clientHeight * 0.8);
-      await esperar(250);
+  // X: a linha do tempo só mantém na página as pessoas perto da tela. Pular direto para o fim
+  // perde as do meio, então a janela desce em passos e cada passo guarda o que apareceu.
+  const ORCAMENTO_ROLAGEM_MS = 12000;
+  async function rolarJanelaEmPassos() {
+    const limite = Date.now() + ORCAMENTO_ROLAGEM_MS;
+    while (Date.now() < limite) {
       coletar();
+      const fim = document.documentElement.scrollHeight - window.innerHeight;
+      if (window.scrollY >= fim - 2) break;
+      window.scrollTo(0, Math.min(fim, window.scrollY + window.innerHeight * 0.8));
+      await esperar(350);
     }
-    el.scrollTop = el.scrollHeight;
+    window.scrollTo(0, document.documentElement.scrollHeight);
+    await esperar(350);
+    coletar();
   }
 
   async function rolar({ rotulos, pausa_s, maximo_entradas, pausa_pagina_s }) {
-    coletar();
     if (await paginarSeguidosInstagram({ maximo_entradas, pausa_pagina_s })) {
       return { rolados: 0, cliques: 0 };
     }
-    window.scrollTo(0, document.body.scrollHeight);
+    if (/(^|\.)x\.com$/.test(location.hostname)) {
+      await rolarJanelaEmPassos();
+    } else {
+      window.scrollTo(0, document.body.scrollHeight);
+    }
     let rolados = 0;
     for (const el of Array.from(document.querySelectorAll("*"))) {
       if (ehRolavel(getComputedStyle(el).overflowY, el.scrollHeight, el.clientHeight)) {
-        await rolarPainel(el);
+        el.scrollTop = el.scrollHeight;
         rolados += 1;
       }
     }
