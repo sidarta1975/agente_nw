@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import threading
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
@@ -10,6 +11,8 @@ from urllib.request import Request, urlopen
 import pytest
 
 from agente_nw.ponte import ID_EXTENSAO, ErroDaExtensao, Ponte, PonteIndisponivel, _comando_de_abertura
+
+_CHROME = Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
 
 
 @pytest.fixture
@@ -213,20 +216,21 @@ def test_aquecimento_sem_resposta_declara_a_ponte_indisponivel_com_um_so_aviso(a
     assert len(avisos) == 1
 
 
+@pytest.mark.skipif(not _CHROME.exists(), reason="Google Chrome não está instalado")
 def test_com_perfil_o_chrome_abre_a_ponte_no_perfil_da_extensao() -> None:
     comando = _comando_de_abertura("Google Chrome", "Default", "http://127.0.0.1:8766/ponte?token=x")
 
-    assert comando == [
-        "open",
-        "-a",
-        "Google Chrome",
-        "--args",
-        "--profile-directory=Default",
-        "http://127.0.0.1:8766/ponte?token=x",
-    ]
+    assert comando[0].endswith("/Google Chrome.app/Contents/MacOS/Google Chrome")
+    assert comando[1:] == ["--profile-directory=Default", "http://127.0.0.1:8766/ponte?token=x"]
 
 
 def test_sem_perfil_abre_no_ultimo_perfil_usado() -> None:
     comando = _comando_de_abertura("Google Chrome", None, "http://x")
 
     assert comando == ["open", "-a", "Google Chrome", "http://x"]
+
+
+def test_aplicativo_sem_executavel_conhecido_cai_no_open() -> None:
+    comando = _comando_de_abertura("Navegador Que Nao Existe", "Default", "http://x")
+
+    assert comando == ["open", "-a", "Navegador Que Nao Existe", "http://x"]

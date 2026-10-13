@@ -4,6 +4,7 @@ import atexit
 import subprocess
 import sys
 from collections.abc import Callable
+from pathlib import Path
 
 from agente_nw.ponte.servidor import (
     ID_EXTENSAO,
@@ -27,10 +28,12 @@ _PONTE: Ponte | None = None
 
 
 def _comando_de_abertura(aplicativo: str, perfil: str | None, url: str) -> list[str]:
-    """`open -a APP URL`; com `perfil`, o Chrome recebe `--profile-directory`, senão a aba abre no último
-    perfil usado, que pode ser um sem a extensão."""
-    if perfil:
-        return ["open", "-a", aplicativo, "--args", f"--profile-directory={perfil}", url]
+    """Comando que abre `url` no macOS. Com `perfil`, chama o executável do navegador, que entrega a
+    aba ao Chrome já aberto naquele perfil (`open --args` só vale ao abrir uma instância nova, e sem o
+    perfil a aba cai no último perfil usado, que pode ser um sem a extensão)."""
+    executavel = Path("/Applications") / f"{aplicativo}.app" / "Contents" / "MacOS" / aplicativo
+    if perfil and executavel.exists():
+        return [str(executavel), f"--profile-directory={perfil}", url]
     return ["open", "-a", aplicativo, url]
 
 
@@ -41,7 +44,14 @@ def _abridor(aplicativo: str | None, perfil: str | None = None) -> Callable[[str
         return None
 
     def abrir(url: str) -> object:
-        return subprocess.run(_comando_de_abertura(aplicativo, perfil, url), check=False, capture_output=True)
+        # Popen sem esperar: numa instância nova o executável só termina quando o Chrome fecha.
+        return subprocess.Popen(
+            _comando_de_abertura(aplicativo, perfil, url),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
 
     return abrir
 
