@@ -68,6 +68,9 @@ respondeu que...", "de novo"); senão false.
 Se a pessoa do pedido for um dos contatos já conhecidos, escreva o nome como está
 na lista.
 
+Se o pedido tiver linhas que começam com "Correção:", elas foram escritas depois pelo
+usuário para ajustar o que você entendeu: valem mais do que o resto da frase.
+
 Exemplo resolvido:
 Contatos já conhecidos:
 {lista_exemplo}

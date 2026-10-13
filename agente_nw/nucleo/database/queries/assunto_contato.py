@@ -99,6 +99,24 @@ def marcar_nao_serve(conexao: sqlite3.Connection, ac_id: int, motivo: str) -> bo
     return cursor.rowcount > 0
 
 
+def marcar_do_assunto(
+    conexao: sqlite3.Connection,
+    perfil_id: int,
+    assunto_id: int,
+    status: str,
+    motivo: str | None = None,
+) -> bool:
+    """Decisão do usuário sobre o assunto de um contato (`usado` ou `nao_serve`), a partir da tela de
+    ganchos, que conhece o assunto e não o registro do dia."""
+    assert status in ("usado", "nao_serve")
+    cursor = conexao.execute(
+        "UPDATE assunto_contato SET status = ?, motivo = COALESCE(?, motivo) "
+        "WHERE perfil_id = ? AND assunto_id = ? AND status = 'novo'",
+        (status, motivo, perfil_id, assunto_id),
+    )
+    return cursor.rowcount > 0
+
+
 def contar_por_status(conexao: sqlite3.Connection, data: str) -> dict[str, int]:
     linhas = conexao.execute(
         "SELECT status, COUNT(*) AS quantidade FROM assunto_contato WHERE gerado_em = ? GROUP BY status",

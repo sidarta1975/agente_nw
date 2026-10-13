@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block titulo %}{{ perfil.nome }}{% endblock %}
+{% block conteudo %}
+<p><a class="item-link" href="{{ url_for('inicio') }}">← início</a></p>
+<h1>{{ perfil.nome }}</h1>
+{% if erro %}<p class="erro-caixa">{{ erro }}</p>{% endif %}
+<h2>O que sei sobre esta pessoa</h2>
+<ul class="simples">
+  {% if perfil.cargo %}<li>Cargo: {{ perfil.cargo }}</li>{% endif %}
+  {% if perfil.empresa %}<li>Empresa: {{ perfil.empresa }}</li>{% endif %}
+  {% if perfil.cidade %}<li>Cidade: {{ perfil.cidade }}</li>{% endif %}
+  {% if perfil.notas %}<li>Notas: {{ perfil.notas }}</li>{% endif %}
+  {% for r in redes %}<li>{{ r.rede }}: <a class="item-link" href="{{ r.link }}" target="_blank" rel="noopener">{{ r.link }}</a></li>{% endfor %}
+  {% for rede in sem_perfil %}<li class="cinza">{{ rede }}: você disse que não tem perfil</li>{% endfor %}
+</ul>
+{% if fatos %}
+  <h3>O que ela publicou ou contou</h3>
+  <ul class="simples">
+    {% for f in fatos %}
+      <li><span class="cinza">{{ (f.data_do_fato or f.registrado_em)[:10] }} · {{ f.tipo }}</span><br>{{ f.conteudo[:300] }}{{ '…' if f.conteudo|length > 300 else '' }}</li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+<form class="bloco" method="post" action="{{ url_for('pessoa_contar', perfil_id=perfil.id) }}">
+  <label for="texto">Contar algo sobre esta pessoa</label>
+  <textarea id="texto" name="texto" placeholder="Ex.: mudou para Curitiba em março e abriu um escritório."></textarea>
+  <button>Guardar</button>
+</form>
+<form class="bloco" method="post" action="{{ url_for('pessoa_trocar_perfil', perfil_id=perfil.id) }}">
+  <label for="link">Trocar o perfil numa rede social (cole o link certo)</label>
+  <input type="text" id="link" name="link" placeholder="https://www.linkedin.com/in/...">
+  <button>Trocar</button>
+</form>
+
+<h2>Pedidos anteriores</h2>
+{% for pedido, ganchos in historico %}
+  <div class="cartao">
+    <a class="item-link" href="{{ url_for('ver_pedido', pedido_id=pedido.id) }}">{{ pedido.criado_em[:10] }}</a>
+    — “{{ pedido.texto[:140] }}{{ '…' if pedido.texto|length > 140 else '' }}” <span class="cinza">({{ pedido.status }})</span>
+    {% for gancho, status in ganchos %}
+      <br>{{ '✔' if status == 'usado' else '•' }} {{ gancho.titulo }}
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="vazio">Nenhum pedido ainda.</p>
+{% endfor %}
+{% endblock %}

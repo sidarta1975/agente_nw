@@ -46,7 +46,7 @@ agente_nw/
 │   │   └── capturas/         # leitura de rede social sob demanda (backend: extensao_backend.py)
 │   ├── ponte/                 # servidor local 127.0.0.1:8766 + página-ponte (brief 044)
 │   ├── perfil/                # importação da agenda, extração de texto, lacunas, centróide de perfil
-│   ├── console/                # Flask + templates + estáticos
+│   ├── console/                # Flask + templates + estáticos; a tela única (`/`) é a interface principal
 │   └── integracoes/          # (Etapa 3)
 ├── extensao/                  # extensão do Chrome (manifest v3): lê rede social no navegador do usuário
 ├── scripts/
@@ -109,7 +109,7 @@ A leitura das listas do usuário nas redes (conexões, seguidos, amigos) é sob 
 
 ## 7. Comportamento do software
 
-O usuário escreve um pedido em texto livre sobre uma pessoa ou um grupo e um objetivo. O sistema extrai quem, o quê, como e em que registro; reconhece ou cria o contato; decide sozinho o que buscar na notícia; localiza a pessoa nas redes do usuário com confirmação quando há dúvida; lê o que estiver disponível; seleciona assuntos e **redige o conteúdo** (ganchos e mensagens prontas no registro da relação). Nenhum cadastro é pré-requisito: contato, perfil do usuário, temas, tags e fatos são criados e mantidos pelo sistema; o usuário corrige em texto. Não existe envio de mensagem. Nunca rodam sozinhos: git, leitura de rede social, alteração de ficha de contato.
+O usuário escreve um pedido em texto livre sobre uma pessoa ou um grupo e um objetivo. O sistema extrai quem, o quê, como e em que registro; reconhece ou cria o contato; decide sozinho o que buscar na notícia; localiza a pessoa nas redes do usuário com confirmação quando há dúvida; lê o que estiver disponível; seleciona assuntos e **redige o conteúdo** (ganchos e mensagens prontas no registro da relação). Nenhum cadastro é pré-requisito: contato, perfil do usuário, temas, tags e fatos são criados e mantidos pelo sistema; o usuário corrige em texto. Não existe envio de mensagem. A interface principal é a tela única do console (brief 039): o usuário escreve a frase, confirma a pessoa quando perguntado, recebe os ganchos, marca "usei" ou "não serve" e corrige em texto livre; as telas antigas (contatos, menu, temas, eu) ficam em "bastidores". O pedido roda em segundo plano, uma tarefa por vez, com `pedido.status` e `pedido.etapa`. Nunca rodam sozinhos: git, leitura de rede social, alteração de ficha de contato.
 
 ## 8. Relatório final obrigatório
 

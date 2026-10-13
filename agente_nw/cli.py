@@ -26,6 +26,7 @@ from agente_nw.nucleo.database import backup, conexao
 from agente_nw.nucleo.database.queries import assunto_contato, assuntos, perfil_tema, perfis, sistema
 from agente_nw.nucleo.database.queries import listas as queries_listas
 from agente_nw.nucleo.database.queries import temas as queries_temas
+from agente_nw.nucleo.fluxo import FRACAO_DO_CONTEXTO_NO_PROMPT
 from agente_nw.nucleo.localizacao import ContextoNavegacao, atualizar_lista
 from agente_nw.nucleo.modelos.configuracao import PerfilRoteamento, Roteamento, TemasArquivo
 from agente_nw.nucleo.modelos.pedido import ResultadoPedido
@@ -703,9 +704,6 @@ def _avisar_etapa(texto: str) -> None:
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {texto}", flush=True)
 
 
-_FRACAO_DO_CONTEXTO_NO_PROMPT = 0.73  # 8192 de contexto → ~6000 tokens estimados de prompt
-
-
 def pedir_cmd(
     frase: str,
     preparar_depois: bool,
@@ -829,7 +827,7 @@ def pedir_cmd(
             pedido_mod.garantir_usuario(conn, agora_redacao),
             agora_redacao,
             frase=frase,
-            limite_tokens=int(num_ctx * _FRACAO_DO_CONTEXTO_NO_PROMPT),
+            limite_tokens=int(num_ctx * FRACAO_DO_CONTEXTO_NO_PROMPT),
         )
     except FalhaJsonInvalido as erro:
         print(f"FALHA: não consegui redigir os ganchos ({erro})")
@@ -1165,7 +1163,13 @@ def console_cmd(caminho_banco_str: str, porta: int) -> int:
     cfg = configuracao()
     caminho_log_llm = RAIZ / "dados" / "logs" / "console_chamadas_llm.jsonl"
     app = criar_app(
-        caminho_banco_console, caminho_log_llm, cfg.roteamento, cfg.limiares, cfg.local.ollama_url
+        caminho_banco_console,
+        caminho_log_llm,
+        cfg.roteamento,
+        cfg.limiares,
+        cfg.local.ollama_url,
+        usuarios_rede={r: v.usuario for r, v in cfg.local.redes.items() if v.usuario},
+        gravar_usuario=gravar_usuario_rede,
     )
     app.run(host="127.0.0.1", port=porta)
     return 0

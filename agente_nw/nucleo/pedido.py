@@ -141,8 +141,11 @@ def processar(
     perfis_informados: Sequence[str] = (),
     confirmar_contato: Callable[[str, str], bool] | None = None,
     similaridade_minima_contato: float = 0.5,
+    pedido_id: int | None = None,
 ) -> ResultadoPedido:
-    pedido_id = registrar(conexao, frase, agora)
+    """`pedido_id`: o console já gravou o pedido (e responde ao usuário antes de processar)."""
+    if pedido_id is None:
+        pedido_id = registrar(conexao, frase, agora)
 
     pedido = extrair(cliente_llm, conexao, frase)
     pedidos.gravar_extracao(conexao, pedido_id, pedido.model_dump_json(), pedido.confianca)

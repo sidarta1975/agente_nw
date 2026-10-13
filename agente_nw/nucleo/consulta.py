@@ -91,6 +91,7 @@ def preparar(
     espera_login_s_rede_social: float = 5.0,
     max_rolagens_rede_social: int = 5,
     avisar: Callable[[str], None] | None = None,
+    ler_redes_sociais: bool = True,
 ) -> ResultadoConsulta:
     """Orquestra a consulta sob demanda sobre um contato.
 
@@ -114,22 +115,25 @@ def preparar(
     etapa("Entendendo o pedido (vetor da consulta)...")
     centroide_consulta = cliente_llm.embeddar([_texto_da_consulta(contexto)])[0]
 
-    etapa("Lendo as redes sociais do contato no seu Chrome...")
-    resumo_leitor = leitor_capturas.ler_redes_sociais_do_contato(
-        cliente_llm,
-        conexao,
-        perfil_id,
-        abrir_pagina,
-        pasta_navegador,
-        agora,
-        max_esperas_login=max_esperas_login_rede_social,
-        espera_login_s=espera_login_s_rede_social,
-        max_rolagens=max_rolagens_rede_social,
-        maximo_blocos=limiares.coleta.maximo_blocos_por_rede,
-        maximo_imagens=limiares.coleta.maximo_imagens_por_rede,
-        largura_minima_imagem=limiares.coleta.largura_minima_imagem,
-        avisar=avisar,
-    )
+    if ler_redes_sociais:
+        etapa("Lendo as redes sociais do contato no seu Chrome...")
+        resumo_leitor = leitor_capturas.ler_redes_sociais_do_contato(
+            cliente_llm,
+            conexao,
+            perfil_id,
+            abrir_pagina,
+            pasta_navegador,
+            agora,
+            max_esperas_login=max_esperas_login_rede_social,
+            espera_login_s=espera_login_s_rede_social,
+            max_rolagens=max_rolagens_rede_social,
+            maximo_blocos=limiares.coleta.maximo_blocos_por_rede,
+            maximo_imagens=limiares.coleta.maximo_imagens_por_rede,
+            largura_minima_imagem=limiares.coleta.largura_minima_imagem,
+            avisar=avisar,
+        )
+    else:
+        resumo_leitor = leitor_capturas.ResumoLeitura(perfil_id=perfil_id)  # correção: usa o que já foi lido
     resumo_rede = ResumoRedeSocial(
         redes_lidas=resumo_leitor.redes_lidas,
         redes_sem_sessao=resumo_leitor.redes_sem_sessao,

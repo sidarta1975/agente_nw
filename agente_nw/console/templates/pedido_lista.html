@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block titulo %}lista de {{ rede }}{% endblock %}
+{% block conteudo %}
+<p><a class="item-link" href="{{ url_for('ver_pedido', pedido_id=pedido.id) }}">← voltar ao pedido</a></p>
+<h1>Sua lista no {{ rede }}</h1>
+<form method="get" class="bloco">
+  <input type="hidden" name="rede" value="{{ rede }}">
+  <input type="text" name="filtro" value="{{ filtro }}" placeholder="Filtrar por nome, cargo ou empresa">
+  <button>Filtrar</button>
+</form>
+<p class="cinza">{{ total }} resultado(s).</p>
+{% for o in entradas %}
+  <div class="opcao">
+    <div><strong>{{ o.nome }}</strong>{% if o.cabecalho %} — {{ o.cabecalho }}{% endif %}<br>
+      <a class="item-link" href="{{ o.link }}" target="_blank" rel="noopener">{{ o.link }}</a></div>
+    <form class="acao" method="post" action="{{ url_for('responder_pessoa', pedido_id=pedido.id) }}">
+      <input type="hidden" name="rede" value="{{ rede }}"><input type="hidden" name="acao" value="link">
+      <input type="hidden" name="link" value="{{ o.link }}">
+      <button class="primario">É esta</button>
+    </form>
+  </div>
+{% else %}
+  <p class="vazio">Nada encontrado. Leia a lista antes: agente_nw listas atualizar.</p>
+{% endfor %}
+<p>
+  {% if pagina > 1 %}<a class="item-link" href="{{ url_for('lista_do_pedido', pedido_id=pedido.id, rede=rede, filtro=filtro, pagina=pagina - 1) }}">← anteriores</a>{% endif %}
+  {% if tem_mais %}<a class="item-link" href="{{ url_for('lista_do_pedido', pedido_id=pedido.id, rede=rede, filtro=filtro, pagina=pagina + 1) }}">mais →</a>{% endif %}
+</p>
+{% endblock %}

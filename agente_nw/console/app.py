@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import sqlite3
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import httpx
 from flask import Flask, abort, g, redirect, render_template, request, url_for
@@ -11,13 +13,20 @@ from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
 from agente_nw.coleta.capturas import busca
+from agente_nw.nucleo import fluxo as fluxo_mod
+from agente_nw.nucleo import localizacao as localizacao_mod
+from agente_nw.nucleo import redacao as redacao_mod
 from agente_nw.nucleo.database import conexao, migracoes
 from agente_nw.nucleo.database.queries import (
     assunto_contato,
     assuntos,
+    fatos,
     fila_extracao,
+    gancho_uso,
+    pedidos,
     perfil_tema,
     perfis,
+    rede_sem_perfil,
     redes_sociais,
 )
 from agente_nw.nucleo.database.queries import temas as queries_temas
@@ -26,6 +35,7 @@ from agente_nw.nucleo.modelos.assunto import Assunto
 from agente_nw.nucleo.modelos.assunto_contato import AssuntoContato
 from agente_nw.nucleo.modelos.configuracao import Limiares, NivelTema, Roteamento, TemaUsuario
 from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
+from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.perfil import Perfil
 from agente_nw.nucleo.modelos.perfil_tema import PerfilTema
 from agente_nw.nucleo.modelos.tema import Tema
@@ -49,7 +59,13 @@ def criar_app(
     roteamento: Roteamento,
     limiares: Limiares,
     ollama_url: str,
+    dependencias: fluxo_mod.Dependencias | None = None,
+    executar: Callable[[Callable[[], None]], None] | None = None,
+    usuarios_rede: dict[str, str] | None = None,
+    gravar_usuario: Callable[[str, str], None] | None = None,
 ) -> Flask:
+    """`dependencias` e `executar` existem para os testes: com `executar` síncrono o pedido termina
+    dentro da requisição; em produção o trabalho roda na `FilaDeTrabalho`, numa thread do processo."""
     app = Flask(__name__)
 
     # Migrações rodam uma vez, aqui, com uma conexão descartada em seguida — cada
@@ -58,6 +74,7 @@ def criar_app(
     # da que criou o app, e sqlite3.Connection não pode atravessar threads.
     conexao_inicial = conexao.abrir(caminho_banco)
     migracoes.aplicar(conexao_inicial)
+    fluxo_mod.marcar_interrompidos(conexao_inicial)
     conexao_inicial.commit()
     conexao_inicial.close()
 
@@ -95,9 +112,207 @@ def criar_app(
         conn = _conn()
         return [(registro, assuntos.obter_por_id(conn, registro.assunto_id)) for registro in itens]
 
+    fila = fluxo_mod.FilaDeTrabalho()
+    despachar = executar or fila.enfileirar
+
+    def _dependencias() -> fluxo_mod.Dependencias:
+        if dependencias is not None:
+            return dependencias
+        from agente_nw.coleta.capturas.extensao_backend import abrir_pagina_extensao
+
+        def fabrica_llm(conn: sqlite3.Connection) -> ClienteOllama:
+            return ClienteOllama(httpx.Client(timeout=120.0), conn, roteamento, ollama_url, caminho_log_llm)
+
+        perfil_llm = roteamento.perfis[roteamento.perfil_ativo]
+        return fluxo_mod.Dependencias(
+            caminho_banco=caminho_banco,
+            fabrica_llm=fabrica_llm,
+            fabrica_http=lambda: httpx.Client(timeout=120.0),
+            limiares=limiares,
+            num_ctx_redacao=perfil_llm.tarefas["redigir_ganchos"].num_ctx,
+            caminho_fontes=caminho_banco.parent.parent / "fontes.yaml",
+            caminho_sentinela=caminho_banco.parent / "PARE",
+            pasta_navegador=caminho_banco.parent / "navegador",
+            abrir_pagina=abrir_pagina_extensao,
+            usuarios_rede=usuarios_rede or {},
+            gravar_usuario=gravar_usuario,
+        )
+
+    def _despachar_execucao(pedido_id: int, continuar: bool = False) -> None:
+        deps = _dependencias()
+        trabalho = fluxo_mod.continuar_pedido if continuar else fluxo_mod.executar_pedido
+        despachar(lambda: trabalho(deps, pedido_id))
+
+    def _pedido_ou_404(pedido_id: int) -> pedidos.PedidoGravado:
+        pedido = pedidos.obter_por_id(_conn(), pedido_id)
+        if pedido is None:
+            abort(404)
+        return pedido
+
+    def _visao_do_pedido(pedido: pedidos.PedidoGravado) -> dict[str, Any]:
+        """Tudo que a página do pedido mostra, já lido do banco."""
+        conn = _conn()
+        extraido = PedidoExtraido.model_validate_json(pedido.extraido_json) if pedido.extraido_json else None
+        perfil = perfis.obter_por_id(conn, pedido.perfil_id) if pedido.perfil_id is not None else None
+        ganchos = redacao_mod.ganchos_da_consulta(conn, pedido.consulta_id) if pedido.consulta_id else []
+        avisos: list[str] = json.loads(pedido.avisos_json) if pedido.avisos_json else []
+        return {
+            "pedido": pedido,
+            "extraido": extraido,
+            "perfil": perfil,
+            "ganchos": ganchos,
+            "avisos": avisos,
+            "perguntas": fluxo_mod.perguntas_pendentes(pedido),
+            "em_andamento": pedido.status in ("na_fila", "processando"),
+        }
+
     @app.route("/")
-    def indice() -> Response:
-        return redirect(url_for("contatos"))
+    def inicio() -> str:
+        conn = _conn()
+        ultimo = pedidos.obter_ultimo(conn)
+        recentes = pedidos.pessoas_recentes(conn, 20)
+        visao = _visao_do_pedido(ultimo) if ultimo is not None else None
+        return render_template("inicio.html", visao=visao, recentes=recentes, primeira_vez=ultimo is None)
+
+    @app.route("/pedir", methods=["POST"])
+    def pedir() -> Response:
+        conn = _conn()
+        texto = request.form.get("texto", "").strip()
+        if not texto:
+            return redirect(url_for("inicio"))
+        pedido_id = fluxo_mod.criar_pedido(conn, texto, datetime.now(UTC).isoformat())
+        _despachar_execucao(pedido_id)
+        return redirect(url_for("ver_pedido", pedido_id=pedido_id))
+
+    @app.route("/pedido/<int:pedido_id>")
+    def ver_pedido(pedido_id: int) -> str:
+        pedido = _pedido_ou_404(pedido_id)
+        visao = _visao_do_pedido(pedido)
+        return render_template("pedido.html", visao=visao, erro_resposta=request.args.get("erro"))
+
+    @app.route("/pedido/<int:pedido_id>/pessoa", methods=["POST"])
+    def responder_pessoa(pedido_id: int) -> Response:
+        conn = _conn()
+        pedido = _pedido_ou_404(pedido_id)
+        agora = datetime.now(UTC).isoformat()
+        if request.form.get("tipo") == "contato":
+            erro = fluxo_mod.decidir_contato(conn, pedido_id, int(request.form.get("perfil_id", "0") or 0))
+            if erro is None:
+                _despachar_execucao(pedido_id)
+            return redirect(url_for("ver_pedido", pedido_id=pedido.id, erro=erro))
+        indice_bruto = request.form.get("indice", "")
+        erro = fluxo_mod.decidir_rede(
+            conn,
+            pedido_id,
+            request.form.get("rede", ""),
+            request.form.get("acao", ""),
+            agora,
+            indice=int(indice_bruto) if indice_bruto.isdigit() else None,
+            link=request.form.get("link", "").strip(),
+        )
+        if erro is None and fluxo_mod.sem_perguntas(conn, pedido_id):
+            pedidos.atualizar_status(conn, pedido_id, "na_fila")
+            conn.commit()
+            _despachar_execucao(pedido_id, continuar=True)
+        return redirect(url_for("ver_pedido", pedido_id=pedido.id, erro=erro))
+
+    @app.route("/pedido/<int:pedido_id>/lista")
+    def lista_do_pedido(pedido_id: int) -> str:
+        conn = _conn()
+        pedido = _pedido_ou_404(pedido_id)
+        rede = request.args.get("rede", "")
+        filtro = request.args.get("filtro", "").strip()
+        pagina = max(int(request.args.get("pagina", "1") or 1), 1)
+        entradas = fluxo_mod.entradas_da_lista(conn, rede, filtro) if rede else []
+        por_pagina = 20
+        inicio_pagina = (pagina - 1) * por_pagina
+        return render_template(
+            "pedido_lista.html",
+            pedido=pedido,
+            rede=rede,
+            filtro=filtro,
+            pagina=pagina,
+            entradas=entradas[inicio_pagina : inicio_pagina + por_pagina],
+            total=len(entradas),
+            tem_mais=len(entradas) > inicio_pagina + por_pagina,
+        )
+
+    @app.route("/pedido/<int:pedido_id>/corrigir", methods=["POST"])
+    def corrigir_pedido(pedido_id: int) -> Response:
+        conn = _conn()
+        _pedido_ou_404(pedido_id)
+        novo_id = fluxo_mod.criar_correcao(
+            conn, pedido_id, request.form.get("correcao", ""), datetime.now(UTC).isoformat()
+        )
+        if novo_id is None:
+            return redirect(url_for("ver_pedido", pedido_id=pedido_id))
+        _despachar_execucao(novo_id)
+        return redirect(url_for("ver_pedido", pedido_id=novo_id))
+
+    @app.route("/pedido/<int:pedido_id>/tentar-de-novo", methods=["POST"])
+    def tentar_de_novo(pedido_id: int) -> Response:
+        conn = _conn()
+        pedido = _pedido_ou_404(pedido_id)
+        if pedido.status == "erro":
+            pedidos.atualizar_status(conn, pedido_id, "na_fila")
+            conn.commit()
+            _despachar_execucao(pedido_id)
+        return redirect(url_for("ver_pedido", pedido_id=pedido_id))
+
+    @app.route("/pedido/<int:pedido_id>/gancho/<int:assunto_id>/<acao>", methods=["POST"])
+    def marcar_gancho(pedido_id: int, assunto_id: int, acao: str) -> Response:
+        conn = _conn()
+        pedido = _pedido_ou_404(pedido_id)
+        if acao not in ("usado", "nao_serve") or pedido.consulta_id is None or pedido.perfil_id is None:
+            abort(400)
+        agora = datetime.now(UTC).isoformat()
+        status = cast(gancho_uso.StatusGancho, acao)
+        gancho_uso.marcar(conn, pedido.consulta_id, assunto_id, status, agora)
+        assunto_contato.marcar_do_assunto(conn, pedido.perfil_id, assunto_id, status)
+        conn.commit()
+        return redirect(url_for("ver_pedido", pedido_id=pedido_id))
+
+    @app.route("/pessoa/<int:perfil_id>")
+    def pessoa(perfil_id: int) -> str:
+        conn = _conn()
+        perfil = _perfil_ou_404(perfil_id)
+        historico = []
+        for pedido in pedidos.listar_por_perfil(conn, perfil_id):
+            ganchos = redacao_mod.ganchos_da_consulta(conn, pedido.consulta_id) if pedido.consulta_id else []
+            historico.append((pedido, ganchos))
+        return render_template(
+            "pessoa.html",
+            perfil=perfil,
+            fatos=fatos.listar_recentes(conn, perfil_id, 15),
+            redes=redes_sociais.listar_por_perfil(conn, perfil_id),
+            sem_perfil=sorted(rede_sem_perfil.listar_redes(conn, perfil_id)),
+            historico=historico,
+            erro=request.args.get("erro"),
+        )
+
+    @app.route("/pessoa/<int:perfil_id>/contar", methods=["POST"])
+    def pessoa_contar(perfil_id: int) -> Response:
+        conn = _conn()
+        _perfil_ou_404(perfil_id)
+        texto = request.form.get("texto", "").strip()
+        if texto:
+            agora = datetime.now(UTC).isoformat()
+            fila_extracao.inserir(conn, perfil_id, texto, "manual", agora)
+            conn.commit()
+            extrator.processar_fila(_cliente_llm(), conn)
+        return redirect(url_for("pessoa", perfil_id=perfil_id))
+
+    @app.route("/pessoa/<int:perfil_id>/trocar-perfil", methods=["POST"])
+    def pessoa_trocar_perfil(perfil_id: int) -> Response:
+        conn = _conn()
+        _perfil_ou_404(perfil_id)
+        link = request.form.get("link", "").strip()
+        opcao = localizacao_mod.gravar_link_do_pedido(
+            conn, perfil_id, link, datetime.now(UTC).isoformat(), substituir=True
+        )
+        conn.commit()
+        erro = None if opcao is not None else "Link não reconhecido."
+        return redirect(url_for("pessoa", perfil_id=perfil_id, erro=erro))
 
     @app.route("/contatos")
     def contatos() -> str:
