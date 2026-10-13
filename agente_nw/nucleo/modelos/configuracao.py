@@ -162,6 +162,12 @@ class ColetaLimiares(BaseModel):
     retencao_texto_dias: int
     intervalo_google_news_segundos: float
     dias_alerta_feed_vazio: int
+    maximo_blocos_por_rede: int = Field(default=10, ge=1)
+    """Blocos de texto de cada rede social do contato que vão para o modelo (cada um é uma chamada)."""
+    maximo_imagens_por_rede: int = Field(default=0, ge=0)
+    """Imagens publicadas de cada rede do contato que o modelo de visão descreve (0 = não lê imagens)."""
+    largura_minima_imagem: int = Field(default=250, ge=1)
+    """Largura (px) abaixo da qual a imagem é ícone ou foto de perfil e não publicação."""
 
 
 class CartaoLimiares(BaseModel):

@@ -1,5 +1,5 @@
 // Service worker da extensão agente_nw. Recebe tarefas da página-ponte e as executa com
-// chrome.tabs / chrome.scripting. Conjunto FIXO de ações: ola, abrir, estado, rolar, links, fechar.
+// chrome.tabs / chrome.scripting. Conjunto FIXO de ações: ola, abrir, estado, rolar, links, imagens, fechar.
 // Nunca executa código vindo do programa e só age em linkedin, instagram, facebook e x.
 const ORIGEM_PONTE = "http://127.0.0.1:8766/";
 const REDES = {
@@ -93,6 +93,51 @@ async function comNovaTentativa(abaId, func, args) {
   }
 }
 
+const HOSTS_DE_IMAGEM = ["cdninstagram.com", "fbcdn.net", "licdn.com", "twimg.com", "instagram.com",
+  "facebook.com", "linkedin.com", "x.com"];
+const LIMITE_BYTES_IMAGEM = 6 * 1024 * 1024;
+
+function imagemPermitida(url) {
+  try {
+    const host = new URL(url).hostname;
+    return HOSTS_DE_IMAGEM.some((d) => host === d || host.endsWith("." + d));
+  } catch (e) {
+    return false;
+  }
+}
+
+function paraBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let texto = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    texto += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(texto);
+}
+
+// Só LÊ: baixa os bytes das imagens publicadas (para serem descritas) e devolve em base64.
+async function imagens(tarefa) {
+  const lista = await comNovaTentativa(
+    tarefa.aba_id,
+    (opcoes) => globalThis.agenteNw.listarImagens(opcoes),
+    [{ maximo: tarefa.maximo, largura_minima: tarefa.largura_minima, ignorar: tarefa.ignorar }],
+  );
+  const saida = [];
+  for (const img of lista) {
+    if (!imagemPermitida(img.src)) continue;
+    try {
+      const resposta = await fetch(img.src, { credentials: "include" });
+      if (!resposta.ok) continue;
+      const buffer = await resposta.arrayBuffer();
+      if (buffer.byteLength > LIMITE_BYTES_IMAGEM) continue;
+      saida.push({ ...img, mime: resposta.headers.get("content-type") || "", dados: paraBase64(buffer) });
+    } catch (e) {
+      // imagem que não baixa é pulada
+    }
+  }
+  return { imagens: saida };
+}
+
 async function tratar(tarefa) {
   switch (tarefa.acao) {
     case "ola":
@@ -118,6 +163,8 @@ async function tratar(tarefa) {
       );
     case "links":
       return { links: await comNovaTentativa(tarefa.aba_id, () => globalThis.agenteNw.links(), []) };
+    case "imagens":
+      return await imagens(tarefa);
     case "fechar":
       await chrome.tabs.remove(tarefa.aba_id).catch(() => {});
       for (const [rede, id] of Object.entries(abas)) {

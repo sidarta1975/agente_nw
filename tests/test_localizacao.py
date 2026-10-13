@@ -16,7 +16,7 @@ from agente_nw.nucleo.database.queries import fatos, listas, perfis, redes_socia
 from agente_nw.nucleo.localizacao import ContextoNavegacao
 from agente_nw.nucleo.modelos.configuracao import ListasLimiares
 from agente_nw.nucleo.modelos.lista_rede_social import EntradaLista
-from agente_nw.nucleo.modelos.localizacao import RespostaDesempate
+from agente_nw.nucleo.modelos.localizacao import Localizacao, RespostaDesempate
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 
 AGORA = "2026-10-11T10:00:00+00:00"
@@ -226,36 +226,41 @@ def test_link_no_pedido_grava_direto_sem_localizar(
     def _nao_deveria(*_a: Any, **_k: Any) -> None:
         raise AssertionError("localizar não deveria ser chamado")
 
-    monkeypatch.setattr(localizacao_mod, "localizar", _nao_deveria)
+    monkeypatch.setattr(localizacao_mod, "localizar_rede", _nao_deveria)
     pedido = _pedido(nome="Renato", pistas={"link_rede_social": f"{URL_LINKEDIN}renato-alves/?trk=abc"})
 
     resultado = pedido_mod.processar(_LLM(pedido=pedido), conn, "frase", AGORA, navegacao=_navegacao())
 
-    assert resultado.localizacao is None
+    assert resultado.localizacoes == []
     assert resultado.link_gravado is not None
     assert resultado.perfil is not None and resultado.perfil.id is not None
     redes = redes_sociais.listar_por_perfil(conn, resultado.perfil.id)
     assert [(r.rede, r.link) for r in redes] == [("linkedin", f"{URL_LINKEDIN}renato-alves")]
 
 
-def test_contato_com_rede_gravada_nao_e_procurado_de_novo(
+def test_contato_com_rede_gravada_so_e_procurado_nas_redes_que_faltam(
     conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     contato = perfis.inserir_novo_contato(conn, "Renato Alves", None, None, AGORA)
     assert contato.id is not None
     redes_sociais.inserir(conn, contato.id, "linkedin", f"{URL_LINKEDIN}renato-alves", AGORA)
     conn.commit()
+    procuradas: list[str] = []
 
-    def _nao_deveria(*_a: Any, **_k: Any) -> None:
-        raise AssertionError("localizar não deveria ser chamado")
+    def _falso(
+        _conn: Any, _llm: Any, _pedido: Any, _nav: Any, _agora: Any, rede: str, nomes_extras: Any = ()
+    ) -> Localizacao:
+        procuradas.append(rede)
+        return Localizacao(status="nenhum", rede=rede)
 
-    monkeypatch.setattr(localizacao_mod, "localizar", _nao_deveria)
+    monkeypatch.setattr(localizacao_mod, "localizar_rede", _falso)
 
     resultado = pedido_mod.processar(
         _LLM(pedido=_pedido(nome="Renato")), conn, "frase", AGORA, navegacao=_navegacao()
     )
 
-    assert resultado.localizacao is None
+    assert sorted(procuradas) == ["facebook", "instagram", "x"]
+    assert [loc.rede for loc in resultado.localizacoes] == procuradas
 
 
 def test_trocar_perfil_reabre_a_localizacao(conn: sqlite3.Connection) -> None:
@@ -274,11 +279,42 @@ def test_trocar_perfil_reabre_a_localizacao(conn: sqlite3.Connection) -> None:
         trocar_perfil=True,
     )
 
-    assert resultado.localizacao is not None
-    assert resultado.localizacao.status == "claro"
+    do_linkedin = [loc for loc in resultado.localizacoes if loc.rede == "linkedin"]
+    assert [loc.status for loc in do_linkedin] == ["claro"]
 
 
 def test_rede_so_por_link_fica_fora_da_ordem_automatica() -> None:
     assert "x" not in localizacao_mod.ordem_das_redes("proximo", {}, so_por_link=("x",))
     assert busca.redes_automaticas(("x", "instagram")) == ("facebook", "linkedin")
     assert busca.redes_automaticas() == ("facebook", "instagram", "linkedin", "x")
+
+
+def test_casamento_com_pistas_conta_palavras_da_profissao_empresa_e_cidade() -> None:
+    pistas = {"profissao": "professor de inglês", "cidade": "São Paulo"}
+
+    assert localizacao_mod._casamento_com_pistas("Professor de Inglês · São Paulo", pistas) == 3
+    assert localizacao_mod._casamento_com_pistas("Gerente de vendas · Recife", pistas) == 0
+    assert localizacao_mod._casamento_com_pistas("qualquer", {}) == 0
+
+
+def test_variantes_do_nome_cobrem_nome_do_meio_e_sobrenome() -> None:
+    from agente_nw.nucleo.texto import variantes_do_nome
+
+    assert variantes_do_nome(["Djalma Martins", "Djalma Borges Martins"]) == [
+        "Djalma Martins",
+        "Djalma Borges Martins",
+        "Djalma Borges",
+    ]
+    assert variantes_do_nome(["  ", "Ana"]) == ["Ana"]
+
+
+def test_o_nome_completo_do_contato_tambem_procura_nas_listas(conn: sqlite3.Connection) -> None:
+    _popular_linkedin(conn, [("Djalma Borges", "Professor de inglês")])
+    pedido = _pedido(nome="Djalma Martins")
+
+    resultado = localizacao_mod.localizar(
+        conn, _LLM(), pedido, _navegacao(), AGORA, nomes_extras=["Djalma Borges Martins"]
+    )
+
+    assert resultado.escolhido is not None
+    assert resultado.escolhido.nome == "Djalma Borges"

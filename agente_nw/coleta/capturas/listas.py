@@ -203,6 +203,11 @@ def _caminho_de_perfil(rede: str, href: str) -> bool:
     return achado is not None and achado.group(1).lower() not in reservados
 
 
+def eh_perfil(rede: str, href: str) -> bool:
+    """O endereço é de uma pessoa (e não de uma página da rede como explorar, reels, popular)?"""
+    return _caminho_de_perfil(rede, href)
+
+
 def _chave_do_link(href: str) -> str:
     base = href if "profile.php" in href else href.split("?")[0]
     return base.rstrip("/")

@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from agente_nw.coleta.capturas import busca, listas
 from agente_nw.coleta.capturas.busca import redes_automaticas
 from agente_nw.coleta.capturas.listas import PaginaLista, ResultadoAtualizacao
-from agente_nw.nucleo.database.queries import fatos, perfis, redes_sociais
+from agente_nw.nucleo.database.queries import fatos, perfis, rede_sem_perfil, redes_sociais
 from agente_nw.nucleo.database.queries import listas as queries_listas
 from agente_nw.nucleo.llm import FalhaJsonInvalido
 from agente_nw.nucleo.modelos.configuracao import ListasLimiares
@@ -22,7 +22,7 @@ from agente_nw.nucleo.modelos.lista_rede_social import EntradaGravada
 from agente_nw.nucleo.modelos.localizacao import Localizacao, Opcao, RespostaDesempate
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.prompts import desempatar_perfil
-from agente_nw.nucleo.texto import sem_acento_e_caixa
+from agente_nw.nucleo.texto import sem_acento_e_caixa, variantes_do_nome
 
 _EsquemaT = TypeVar("_EsquemaT", bound=BaseModel)
 _CONFIANCA_MINIMA = 0.7
@@ -194,16 +194,38 @@ def _o_que_a_pagina_mostra(pagina: PaginaLista) -> str:
     return f' — a aba estava em {url}: "{resumo}"'
 
 
+_PISTAS_DA_DESCRICAO = ("profissao", "empresa", "cidade")
+
+
+def _casamento_com_pistas(descricao: str, pistas: dict[str, str]) -> int:
+    """Quantas palavras (de 4 letras ou mais) da profissão, empresa e cidade informadas pelo usuário
+    aparecem na descrição do candidato. Só ordena: a informação do usuário vem primeiro."""
+    texto = sem_acento_e_caixa(descricao)
+    achadas = 0
+    for chave in _PISTAS_DA_DESCRICAO:
+        for palavra in sem_acento_e_caixa(pistas.get(chave, "")).split():
+            if len(palavra) >= 4 and palavra in texto:
+                achadas += 1
+    return achadas
+
+
 def _busca_geral(
-    rede: str, pedido: PedidoExtraido, contexto: ContextoNavegacao
+    rede: str, pedido: PedidoExtraido, contexto: ContextoNavegacao, nome: str
 ) -> tuple[list[Opcao], str | None]:
     pagina = contexto.abrir_pagina(contexto.pasta_navegador / rede)
     try:
-        resultado = busca.buscar(pagina, rede, pedido.pessoa_nome, pedido.pessoa_pistas.get("empresa"))
+        resultado = busca.buscar(
+            pagina,
+            rede,
+            nome,
+            pedido.pessoa_pistas.get("empresa"),
+            refino=pedido.pessoa_pistas.get("profissao"),
+        )
     finally:
         pagina.fechar()
     if not resultado.autenticado:
         return [], resultado.motivo
+    resultado.candidatos.sort(key=lambda c: -_casamento_com_pistas(c.descricao, pedido.pessoa_pistas))
     opcoes = [
         Opcao(
             rede=rede,
@@ -217,18 +239,41 @@ def _busca_geral(
     return opcoes, None
 
 
+def _candidatas_da_lista(
+    conexao: sqlite3.Connection, rede: str, nomes: list[str], limiares: ListasLimiares
+) -> list[Opcao]:
+    """Entradas da lista da rede que casam com algum dos nomes (exato primeiro; só se nenhum casar,
+    por semelhança). Cada pessoa usa o nome que quer na conta, então vale qualquer variante."""
+    exatas: dict[str, Opcao] = {}
+    for nome in nomes:
+        for entrada in queries_listas.buscar_por_nome(conexao, rede, nome):
+            exatas.setdefault(entrada.link, opcao_da_entrada(entrada))
+    if exatas:
+        return list(exatas.values())
+    parecidas: dict[str, Opcao] = {}
+    for nome in nomes:
+        achadas = queries_listas.buscar_parecidos(
+            conexao, rede, nome, limiares.similaridade_minima, limiares.maximo_parecidas
+        )
+        for entrada in achadas:
+            parecidas.setdefault(entrada.link, opcao_da_entrada(entrada))
+    return list(parecidas.values())
+
+
 def localizar(
     conexao: sqlite3.Connection,
     cliente_llm: ClienteDesempate,
     pedido: PedidoExtraido,
     contexto: ContextoNavegacao,
     agora: str,
+    nomes_extras: Iterable[str] = (),
 ) -> Localizacao:
     """Procura a pessoa do pedido nas listas do próprio usuário (cache local) e, não achando,
     na busca geral de cada rede com sessão. Nunca decide sozinho nem grava: devolve `Localizacao`."""
     avisos: list[str] = []
     sem_sessao: set[str] = set()
     acumuladas: list[Opcao] = []
+    nomes = variantes_do_nome([pedido.pessoa_nome, *nomes_extras])
 
     for rede in ordem_das_redes(pedido.registro, pedido.pessoa_pistas, contexto.limiares.redes_so_por_link):
         atualizacao = atualizar_lista(conexao, rede, contexto, agora)
@@ -236,20 +281,7 @@ def localizar(
             avisos.append(f"{rede}: {atualizacao.motivo}")
             sem_sessao.add(rede)
             continue
-        candidatas = [
-            opcao_da_entrada(e) for e in queries_listas.buscar_por_nome(conexao, rede, pedido.pessoa_nome)
-        ]
-        if not candidatas:
-            candidatas = [
-                opcao_da_entrada(e)
-                for e in queries_listas.buscar_parecidos(
-                    conexao,
-                    rede,
-                    pedido.pessoa_nome,
-                    contexto.limiares.similaridade_minima,
-                    contexto.limiares.maximo_parecidas,
-                )
-            ]
+        candidatas = _candidatas_da_lista(conexao, rede, nomes, contexto.limiares)
         if not candidatas:
             continue
         escolhido, ordenadas = _avaliar(cliente_llm, pedido, candidatas)
@@ -262,15 +294,56 @@ def localizar(
     if acumuladas:
         return Localizacao(status="ambiguo", opcoes=acumuladas, fonte="lista", avisos=avisos)
 
-    opcoes_busca: list[Opcao] = []
+    nomes_da_busca = list(dict.fromkeys([pedido.pessoa_nome, *nomes_extras]))
+    opcoes_busca: dict[str, Opcao] = {}
     for rede in ordem_das_redes(pedido.registro, pedido.pessoa_pistas, contexto.limiares.redes_so_por_link):
         if rede in sem_sessao:
             continue
-        achadas, motivo = _busca_geral(rede, pedido, contexto)
+        for nome in nomes_da_busca:
+            achadas, motivo = _busca_geral(rede, pedido, contexto, nome)
+            if motivo:
+                avisos.append(f"{rede}: {motivo}")
+                break
+            for opcao in achadas:
+                opcoes_busca.setdefault(opcao.link, opcao)
+    return Localizacao(
+        status="nenhum", opcoes=list(opcoes_busca.values()), fonte="busca_geral", avisos=avisos
+    )
+
+
+def localizar_rede(
+    conexao: sqlite3.Connection,
+    cliente_llm: ClienteDesempate,
+    pedido: PedidoExtraido,
+    contexto: ContextoNavegacao,
+    agora: str,
+    rede: str,
+    nomes_extras: Iterable[str] = (),
+) -> Localizacao:
+    """Curadoria de uma rede: procura a pessoa na lista do usuário nessa rede (todas as variantes do
+    nome) e, não achando, na busca geral dela. Nunca decide nem grava: devolve `Localizacao`."""
+    atualizacao = atualizar_lista(conexao, rede, contexto, agora)
+    if atualizacao.motivo:
+        return Localizacao(status="nenhum", rede=rede, avisos=[f"{rede}: {atualizacao.motivo}"])
+    nomes = variantes_do_nome([pedido.pessoa_nome, *nomes_extras])
+    candidatas = _candidatas_da_lista(conexao, rede, nomes, contexto.limiares)
+    if candidatas:
+        escolhido, ordenadas = _avaliar(cliente_llm, pedido, candidatas)
+        return Localizacao(
+            status="claro" if escolhido is not None else "ambiguo",
+            escolhido=escolhido,
+            opcoes=ordenadas,
+            fonte="lista",
+            rede=rede,
+        )
+    opcoes: dict[str, Opcao] = {}
+    for nome in dict.fromkeys([pedido.pessoa_nome, *nomes_extras]):
+        achadas, motivo = _busca_geral(rede, pedido, contexto, nome)
         if motivo:
-            avisos.append(f"{rede}: {motivo}")
-        opcoes_busca.extend(achadas)
-    return Localizacao(status="nenhum", opcoes=opcoes_busca, fonte="busca_geral", avisos=avisos)
+            return Localizacao(status="nenhum", fonte="busca_geral", rede=rede, avisos=[f"{rede}: {motivo}"])
+        for opcao in achadas:
+            opcoes.setdefault(opcao.link, opcao)
+    return Localizacao(status="nenhum", opcoes=list(opcoes.values()), fonte="busca_geral", rede=rede)
 
 
 def confirmar(
@@ -290,6 +363,7 @@ def confirmar(
         atuais = redes_sociais.listar_por_perfil(conexao, perfil_id)
     if not any(r.link == opcao.link for r in atuais):
         redes_sociais.inserir(conexao, perfil_id, opcao.rede, opcao.link, agora)
+    rede_sem_perfil.remover(conexao, perfil_id, opcao.rede)
 
     if opcao.cabecalho:
         perfis.preencher_lacunas(conexao, perfil_id, {"notas": opcao.cabecalho}, agora)

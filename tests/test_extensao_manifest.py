@@ -17,6 +17,12 @@ REDES = {
     "https://*.facebook.com/*",
     "https://*.x.com/*",
 }
+IMAGENS = {  # servidores de imagem das mesmas redes: só para baixar a imagem que será descrita
+    "https://*.cdninstagram.com/*",
+    "https://*.fbcdn.net/*",
+    "https://*.licdn.com/*",
+    "https://*.twimg.com/*",
+}
 ORIGEM_PONTE = "http://127.0.0.1:8766/*"
 
 
@@ -39,8 +45,10 @@ def test_id_da_extensao_bate_com_a_chave_do_manifest(manifest: dict[str, Any]) -
     assert identificador == ID_EXTENSAO
 
 
-def test_host_permissions_so_nas_quatro_redes(manifest: dict[str, Any]) -> None:
-    assert set(manifest["host_permissions"]) == REDES
+def test_host_permissions_so_nas_quatro_redes_e_nos_servidores_de_imagem_delas(
+    manifest: dict[str, Any],
+) -> None:
+    assert set(manifest["host_permissions"]) == REDES | IMAGENS
 
 
 def test_permissoes_minimas(manifest: dict[str, Any]) -> None:
@@ -65,7 +73,7 @@ def test_arquivos_citados_no_manifest_existem(manifest: dict[str, Any]) -> None:
 def test_background_so_conhece_o_conjunto_fixo_de_acoes() -> None:
     codigo = (PASTA / "background.js").read_text(encoding="utf-8")
 
-    for acao in ("ola", "abrir", "estado", "rolar", "links", "fechar"):
+    for acao in ("ola", "abrir", "estado", "rolar", "links", "imagens", "fechar"):
         assert f'case "{acao}"' in codigo
     assert "eval(" not in codigo
     assert "new Function" not in codigo

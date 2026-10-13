@@ -35,3 +35,11 @@ def listar_recentes(conexao: sqlite3.Connection, perfil_id: int, limite: int) ->
         )
         for linha in linhas
     ]
+
+
+def existe(conexao: sqlite3.Connection, perfil_id: int, tipo: str, fonte: str) -> bool:
+    """Já há fato deste tipo e desta fonte (por exemplo, a mesma publicação já descrita)?"""
+    linha = conexao.execute(
+        "SELECT 1 FROM fato WHERE perfil_id = ? AND tipo = ? AND fonte = ? LIMIT 1", (perfil_id, tipo, fonte)
+    ).fetchone()
+    return linha is not None

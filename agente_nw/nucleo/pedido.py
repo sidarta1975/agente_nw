@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import getpass
 import sqlite3
+from collections.abc import Sequence
 from typing import Protocol, TypeVar
 
 from pydantic import BaseModel
 
 from agente_nw.nucleo import localizacao as localizacao_mod
-from agente_nw.nucleo.database.queries import pedidos, perfis, redes_sociais
+from agente_nw.nucleo.database.queries import pedidos, perfis, rede_sem_perfil, redes_sociais
 from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido, ResultadoPedido
 from agente_nw.nucleo.modelos.perfil import Perfil
@@ -137,6 +138,7 @@ def processar(
     contato_id_forcado: int | None = None,
     navegacao: localizacao_mod.ContextoNavegacao | None = None,
     trocar_perfil: bool = False,
+    perfis_informados: Sequence[str] = (),
 ) -> ResultadoPedido:
     pedido_id = registrar(conexao, frase, agora)
 
@@ -157,7 +159,7 @@ def processar(
         contato_ambiguo=ambiguo,
         candidatos=candidatos,
     )
-    _localizar_na_rede(cliente_llm, conexao, resultado, agora, navegacao, trocar_perfil)
+    _localizar_na_rede(cliente_llm, conexao, resultado, agora, navegacao, trocar_perfil, perfis_informados)
     return resultado
 
 
@@ -168,9 +170,11 @@ def _localizar_na_rede(
     agora: str,
     navegacao: localizacao_mod.ContextoNavegacao | None,
     trocar_perfil: bool,
+    perfis_informados: Sequence[str] = (),
 ) -> None:
-    """Brief 037: acha a pessoa nas redes do usuário. Link no pedido grava direto; contato que já tem
-    rede gravada não é procurado de novo (a menos que o usuário peça para trocar)."""
+    """Curadoria dos perfis (briefs 037 e 038). Link no pedido ou em `perfis_informados` grava direto.
+    Uma rede só é procurada enquanto estiver pendente: com perfil gravado ou declarada "sem perfil"
+    pelo usuário ela está curada e o programa não volta a procurar (a menos que `trocar_perfil`)."""
     perfil = resultado.perfil
     pedido = resultado.pedido
     if perfil is None or perfil.id is None or not pedido.pessoa_nome:
@@ -185,8 +189,20 @@ def _localizar_na_rede(
         )
         if resultado.link_gravado is not None:
             return
+    for informado in perfis_informados:
+        gravado = localizacao_mod.gravar_link_do_pedido(conexao, perfil.id, informado, agora, substituir=True)
+        if gravado is None:
+            resultado.links_nao_reconhecidos.append(informado)
     if navegacao is None:
         return
-    if redes_sociais.listar_por_perfil(conexao, perfil.id) and not trocar_perfil:
-        return
-    resultado.localizacao = localizacao_mod.localizar(conexao, cliente_llm, pedido, navegacao, agora)
+    curadas = {r.rede for r in redes_sociais.listar_por_perfil(conexao, perfil.id)}
+    curadas |= rede_sem_perfil.listar_redes(conexao, perfil.id)
+    so_por_link = navegacao.limiares.redes_so_por_link
+    for rede in localizacao_mod.ordem_das_redes(pedido.registro, pedido.pessoa_pistas, so_por_link):
+        if rede in curadas and not trocar_perfil:
+            continue
+        resultado.localizacoes.append(
+            localizacao_mod.localizar_rede(
+                conexao, cliente_llm, pedido, navegacao, agora, rede, nomes_extras=[perfil.nome]
+            )
+        )

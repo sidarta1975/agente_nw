@@ -143,3 +143,47 @@ def test_arquivar_ignora_pasta_vazia_ou_com_outro_nome(tmp_path: Path) -> None:
     assert arquivar_navegador_antigo(tmp_path / "navegador") is None
     assert arquivar_navegador_antigo(tmp_path / "outro") is None
     assert (tmp_path / "outro" / "x").exists()
+
+
+def test_imagens_viram_tarefa_e_voltam_como_imagens_capturadas() -> None:
+    ponte = _PonteFalsa(
+        {
+            "abrir": {"aba_id": 3},
+            "imagens": {
+                "imagens": [
+                    {
+                        "src": "https://cdn.test/a.jpg",
+                        "alt": "praia",
+                        "link": "https://x.test/p/1/",
+                        "mime": "image/jpeg",
+                        "dados": "QUJD",
+                    },
+                    {"src": "https://cdn.test/b.jpg", "alt": "", "link": "", "mime": "", "dados": ""},
+                ]
+            },
+        }
+    )
+    pagina = _pagina(ponte)
+    pagina.ir_para("https://www.instagram.com/ana/")
+
+    imagens = pagina.imagens(8, 250, ["https://cdn.test/z.jpg"])
+
+    assert [(i.src, i.alt, i.link, i.dados_base64) for i in imagens] == [
+        ("https://cdn.test/a.jpg", "praia", "https://x.test/p/1/", "QUJD")
+    ]  # sem bytes não serve
+    tarefa = ponte.tarefas[-1]
+    assert tarefa == {
+        "acao": "imagens",
+        "aba_id": 3,
+        "maximo": 8,
+        "largura_minima": 250,
+        "ignorar": ["https://cdn.test/z.jpg"],
+    }
+
+
+def test_imagens_com_a_ponte_indisponivel_devolve_lista_vazia() -> None:
+    ponte = _PonteFalsa({"abrir": {"aba_id": 3}, "imagens": PonteIndisponivel("sem ponte")})
+    pagina = _pagina(ponte)
+    pagina.ir_para("https://www.instagram.com/ana/")
+
+    assert pagina.imagens(8, 250) == []

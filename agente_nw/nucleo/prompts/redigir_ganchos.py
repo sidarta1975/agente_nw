@@ -7,6 +7,7 @@ from agente_nw.nucleo.modelos.redacao import (
     LIMITE_PALAVRAS_MENSAGEM,
     MAXIMO_GANCHOS,
     MAXIMO_PALAVRAS_TITULO,
+    LinkNoticia,
     RespostaRedacao,
 )
 
@@ -53,6 +54,7 @@ class AssuntoParaRedacao:
     por_que: str | None
     resumo: str | None
     manchetes: list[str] = field(default_factory=list)  # "veículo, data: título"
+    links: list[LinkNoticia] = field(default_factory=list)  # as mesmas notícias, com o endereço
 
 
 @dataclass(frozen=True)
@@ -69,6 +71,7 @@ class EntradaRedacao:
     frase: str
     historico: list[str]
     assuntos: list[AssuntoParaRedacao]
+    contexto_relacao: list[str] = field(default_factory=list)  # tags: família, amigos, trabalho...
 
 
 def estimar_tokens(texto: str) -> int:
@@ -91,6 +94,8 @@ def _bloco_para_quem(entrada: EntradaRedacao) -> str:
         f"PARA QUEM: {entrada.contato_nome} — {ficha}. Vínculo: {entrada.vinculo or 'não informado'}. "
         f"Tempo sem contato: {entrada.tempo_sem_contato or 'não informado'}."
     ]
+    if entrada.contexto_relacao:
+        linhas.append(f"Contexto da relação: {', '.join(entrada.contexto_relacao)}.")
     if entrada.cabecalho_rede:
         linhas.append(f"Na rede social: {entrada.cabecalho_rede}")
     if entrada.fatos:
@@ -150,8 +155,13 @@ encontre bem".
 - O objetivo molda a mensagem: "retomar" reconhece o tempo sem contato sem pedir desculpa; "agradecer" \
 põe o agradecimento antes do gancho; "pedir" põe o pedido depois do gancho e o torna explícito; \
 "responder" continua o fio da conversa; "apresentar" diz em uma linha quem é o usuário antes do gancho.
+- O contexto da relação (família, amigos, trabalho...) diz que assuntos cabem e que tom usar; respeite-o. \
+Assunto de trabalho não vai para mensagem a familiar, nem o contrário.
 - Nada do que o pedido manda evitar pode aparecer na mensagem.
 - Não repita um gancho que o histórico mostra como usado.
+- Decida sozinho se continua uma conversa anterior ou abre assunto novo: se o histórico traz um gancho \
+entregue ou usado com esta pessoa e o pedido indica seguimento, faça a mensagem retomar esse fio; \
+senão, trate como conversa nova. Nunca faça perguntas ao usuário.
 - Responda só com um objeto JSON, sem texto antes ou depois: \
 {{"ganchos": [{{"assunto_id": 0, "titulo": "", "noticia": "", "por_que_para_esta_pessoa": "", \
 "mensagem": "", "abordagem_presencial": null}}], "aviso": null}}"""

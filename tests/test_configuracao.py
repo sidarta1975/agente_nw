@@ -127,8 +127,8 @@ def test_perfil_llm_inexistente_falha_na_carga(monkeypatch: pytest.MonkeyPatch, 
 
 def test_modelos_obrigatorios_derivados_do_perfil() -> None:
     roteamento = Roteamento.model_validate(_carregar(RAIZ / "config" / "llm_routing.yaml"))
-    assert modelos_obrigatorios(roteamento.perfis["pro48"]) == ["qwen2.5:14b", "bge-m3"]
-    assert modelos_obrigatorios(roteamento.perfis["air16"]) == ["qwen3:4b", "qwen3:8b", "bge-m3"]
+    assert modelos_obrigatorios(roteamento.perfis["pro48"]) == ["gemma3:12b", "qwen2.5:14b", "bge-m3"]
+    assert modelos_obrigatorios(roteamento.perfis["air16"]) == ["gemma3:4b", "qwen3:4b", "qwen3:8b", "bge-m3"]
 
 
 def test_limiares_carrega_e_tem_todas_as_chaves() -> None:

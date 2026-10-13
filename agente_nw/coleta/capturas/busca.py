@@ -84,18 +84,22 @@ def _parece_pagina_de_login(url: str, texto: str) -> bool:
     return len(texto.strip()) < _MIN_CHARS_AUTENTICADO
 
 
-def _construir_query(nome: str, empresa: str | None) -> str:
-    if empresa and empresa.strip():
-        return f"{nome} {empresa}".strip()
+def _construir_query(nome: str, empresa: str | None, refino: str | None = None) -> str:
+    """Nome mais a empresa; sem empresa, mais o `refino` (profissão que o usuário informou)."""
+    for complemento in (empresa, refino):
+        if complemento and complemento.strip():
+            return f"{nome} {complemento}".strip()
     return nome.strip()
 
 
 def _filtrar_candidatos(rede: str, links: list[tuple[str, str]]) -> list[Candidato]:
+    from agente_nw.coleta.capturas import listas  # import tardio: listas importa este módulo
+
     padrao = _CONFIG_BUSCA[rede].padrao_link_perfil
     vistos: set[str] = set()
     candidatos: list[Candidato] = []
     for href, texto_container in links:
-        if not padrao.search(href):
+        if not padrao.search(href) or not listas.eh_perfil(rede, href):
             continue
         chave = href.split("?")[0].rstrip("/")
         if chave in vistos:
@@ -103,14 +107,19 @@ def _filtrar_candidatos(rede: str, links: list[tuple[str, str]]) -> list[Candida
         vistos.add(chave)
         linhas = [linha.strip() for linha in texto_container.split("\n") if linha.strip()]
         nome_exibido = linhas[0] if linhas else ""
+        if not nome_exibido:
+            continue  # link sem texto (ícone, menu): não é uma pessoa para o usuário escolher
         descricao = " · ".join(linhas[1:5]) if len(linhas) > 1 else ""
         candidatos.append(Candidato(nome_exibido=nome_exibido, descricao=descricao, link=href))
     return candidatos
 
 
-def buscar(pagina: PaginaBusca, rede: str, nome: str, empresa: str | None = None) -> ResultadoBusca:
+def buscar(
+    pagina: PaginaBusca, rede: str, nome: str, empresa: str | None = None, refino: str | None = None
+) -> ResultadoBusca:
     """Abre a busca nativa da rede social pelo nome do contato (opcionalmente
-    refinada por empresa) e devolve os candidatos que aparecem no resultado.
+    refinada por empresa ou, na falta dela, por `refino`) e devolve os candidatos que aparecem
+    no resultado. Se a busca refinada não achar ninguém, repete só com o nome.
 
     Não decide por nenhum — a confirmação humana continua obrigatória. Se a
     sessão não estiver logada, devolve `autenticado=False` com motivo, sem
@@ -119,15 +128,24 @@ def buscar(pagina: PaginaBusca, rede: str, nome: str, empresa: str | None = None
         return ResultadoBusca(autenticado=False, motivo=f"rede '{rede}' sem template de busca")
 
     config = _CONFIG_BUSCA[rede]
-    query = _construir_query(nome, empresa)
-    url = config.url_busca.format(query=urllib.parse.quote_plus(query))
-    pagina.ir_para(url)
-    url_atual, texto = pagina.estado()
-    if _parece_pagina_de_login(url_atual, texto):
-        return ResultadoBusca(
-            autenticado=False, motivo=f"sem sessão ativa em {rede} — faça login e tente de novo"
-        )
-
-    links = pagina.coletar_links()
-    candidatos = _filtrar_candidatos(rede, links)
+    consultas = [_construir_query(nome, empresa, refino)]
+    if consultas[0] != nome.strip():
+        consultas.append(nome.strip())
+    candidatos: list[Candidato] = []
+    for query in consultas:
+        url = config.url_busca.format(query=urllib.parse.quote_plus(query))
+        pagina.ir_para(url)
+        url_atual, texto = pagina.estado()
+        if _parece_pagina_de_login(url_atual, texto):
+            resumo = " ".join(texto.split())[:120]
+            return ResultadoBusca(
+                autenticado=False,
+                motivo=(
+                    f"sem sessão ativa em {rede} — entre na rede no seu Chrome e repita "
+                    f'(a aba estava em {url_atual}: "{resumo}")'
+                ),
+            )
+        candidatos = _filtrar_candidatos(rede, pagina.coletar_links())
+        if candidatos:
+            break
     return ResultadoBusca(autenticado=True, motivo=None, candidatos=candidatos)

@@ -25,7 +25,9 @@ _EsquemaT = TypeVar("_EsquemaT", bound=BaseModel)
 
 
 class ClienteExtracao(Protocol):
-    def gerar_json(self, tarefa: str, prompt: str, esquema: type[_EsquemaT]) -> _EsquemaT: ...
+    def gerar_json(
+        self, tarefa: str, prompt: str, esquema: type[_EsquemaT], imagens: list[str] | None = None
+    ) -> _EsquemaT: ...
 
 
 _CATEGORIAS_PROIBIDAS = """\

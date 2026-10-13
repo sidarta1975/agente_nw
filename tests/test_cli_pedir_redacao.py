@@ -13,8 +13,11 @@ from agente_nw.nucleo.consulta import ItemMenu, ResultadoConsulta, ResumoRedeSoc
 from agente_nw.nucleo.database import conexao, migracoes
 from agente_nw.nucleo.database.queries import assuntos as assuntos_q
 from agente_nw.nucleo.database.queries import consulta_contato as consulta_contato_q
+from agente_nw.nucleo.database.queries import fontes as fontes_q
 from agente_nw.nucleo.database.queries import gancho_uso, perfis
+from agente_nw.nucleo.database.queries import itens as itens_q
 from agente_nw.nucleo.modelos.assunto import Assunto
+from agente_nw.nucleo.modelos.item import Item
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.redacao import Gancho, RespostaRedacao
 
@@ -60,6 +63,19 @@ def _preparar_falso(**kwargs: Any) -> ResultadoConsulta:
         Assunto(titulo_gerado="Regra de reajuste", primeiro_visto=AGORA, ultimo_visto=AGORA, status="novo"),
     )
     ESTADO["assunto_id"] = assunto_id
+    fonte = fontes_q.obter_ou_criar(conn, "Gazeta", "https://gazeta.test/feed", "gazeta.test", "rss", 5)
+    assert fonte.id is not None
+    itens_q.inserir(
+        conn,
+        Item(
+            fonte_id=fonte.id,
+            url_canonica="https://gazeta.test/reajuste",
+            titulo="Seguradora muda regra de reajuste",
+            coletado_em=AGORA,
+            hash_titulo="h-reajuste",
+            assunto_id=assunto_id,
+        ),
+    )
     consulta = consulta_contato_q.inserir(conn, kwargs["perfil_id"], AGORA, "{}", None, "[]")
     conn.commit()
     assert consulta.id is not None
@@ -94,6 +110,9 @@ def test_pedir_entrega_a_redacao_por_padrao(
     assert "1. Seguradora muda regra de reajuste" in saida
     assert "Mensagem:" in saida
     assert "Abordagem presencial: Pergunte como o setor reagiu" in saida
+    assert "Links:" in saida
+    assert "- gazeta.test: Seguradora muda regra de reajuste" in saida
+    assert "https://gazeta.test/reajuste" in saida
     linhas = conn.execute("SELECT status FROM gancho_uso").fetchall()
     assert [linha["status"] for linha in linhas] == ["entregue"]
 

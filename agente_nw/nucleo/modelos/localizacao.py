@@ -28,6 +28,7 @@ class Localizacao:
     opcoes: list[Opcao] = field(default_factory=list)  # todas, da mais para a menos provável
     fonte: str = "lista"  # "lista" ou "busca_geral"
     avisos: list[str] = field(default_factory=list)
+    rede: str | None = None  # quando a localização é de uma rede só (curadoria por rede)
 
 
 class RespostaDesempate(BaseModel):

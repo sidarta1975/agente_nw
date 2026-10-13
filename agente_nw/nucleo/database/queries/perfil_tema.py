@@ -76,6 +76,16 @@ def listar_por_perfil(conexao: sqlite3.Connection, perfil_id: int) -> list[Perfi
     return [_para_perfil_tema(linha) for linha in linhas]
 
 
+def listar_nomes_do_contato(conexao: sqlite3.Connection, perfil_id: int) -> list[str]:
+    """Nomes das tags do contato (contextos como família, amigos, trabalho), das mais pesadas."""
+    linhas = conexao.execute(
+        "SELECT t.nome AS nome FROM perfil_tema pt JOIN tema t ON t.id = pt.tema_id "
+        "WHERE pt.perfil_id = ? ORDER BY pt.peso DESC, t.nome",
+        (perfil_id,),
+    ).fetchall()
+    return [linha["nome"] for linha in linhas]
+
+
 def _desserializar(blob: bytes) -> list[float]:
     quantidade = len(blob) // 4
     return list(struct.unpack(f"<{quantidade}f", blob))

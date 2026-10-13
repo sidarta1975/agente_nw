@@ -18,7 +18,6 @@ from agente_nw.nucleo.agrupamento import agrupador
 from agente_nw.nucleo.database.queries import assunto_contato as assunto_contato_q
 from agente_nw.nucleo.database.queries import assuntos as assuntos_q
 from agente_nw.nucleo.database.queries import consulta_contato as consulta_contato_q
-from agente_nw.nucleo.database.queries import perfil_tema as perfil_tema_q
 from agente_nw.nucleo.modelos.configuracao import Limiares
 from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
 from agente_nw.nucleo.relevancia import cruzamento, qualificador
@@ -90,6 +89,7 @@ def preparar(
     max_esperas_login_rede_social: int = 0,
     espera_login_s_rede_social: float = 5.0,
     max_rolagens_rede_social: int = 5,
+    avisar: Callable[[str], None] | None = None,
 ) -> ResultadoConsulta:
     """Orquestra a consulta sob demanda sobre um contato.
 
@@ -105,27 +105,35 @@ def preparar(
     existem e nunca bloqueiam. O `contexto` inteiro também é serializado em
     `contexto_json`.
     """
+
+    def etapa(texto: str) -> None:
+        if avisar is not None:
+            avisar(texto)
+
+    etapa("Entendendo o pedido (vetor da consulta)...")
     centroide_consulta = cliente_llm.embeddar([_texto_da_consulta(contexto)])[0]
 
     if rodar_coleta:
-        termos_contato = [
-            nome for nome, _, _ in perfil_tema_q.listar_do_contato_com_embedding(conexao, perfil_id)
-        ]
+        etapa("Coletando notícias (feeds e consultas ao Google News)...")
         leitor_rss.coletar(
             conexao,
             cliente_http,
             caminho_fontes if caminho_fontes.exists() else None,
             limiares.coleta,
             caminho_sentinela,
-            feeds_extras=google_news.gerar_consultas_da_consulta(contexto, termos_contato),
+            feeds_extras=google_news.gerar_consultas_da_consulta(contexto, []),
         )
 
+    etapa("Extraindo texto das notícias novas...")
     extrator_perfil.processar_fila(cliente_llm, conexao)
+    etapa("Agrupando as notícias em assuntos...")
     agrupador.agrupar(cliente_llm, conexao, limiares, caminho_sentinela, agora)
+    etapa("Qualificando os assuntos novos...")
     qualificador.qualificar_pendentes(
         cliente_llm, conexao, limiares.qualificacao.teto_por_dia, vetores_extras=[centroide_consulta]
     )
 
+    etapa("Lendo as redes sociais do contato no seu Chrome...")
     resumo_leitor = leitor_capturas.ler_redes_sociais_do_contato(
         cliente_llm,
         conexao,
@@ -136,6 +144,10 @@ def preparar(
         max_esperas_login=max_esperas_login_rede_social,
         espera_login_s=espera_login_s_rede_social,
         max_rolagens=max_rolagens_rede_social,
+        maximo_blocos=limiares.coleta.maximo_blocos_por_rede,
+        maximo_imagens=limiares.coleta.maximo_imagens_por_rede,
+        largura_minima_imagem=limiares.coleta.largura_minima_imagem,
+        avisar=avisar,
     )
     resumo_rede = ResumoRedeSocial(
         redes_lidas=resumo_leitor.redes_lidas,
@@ -145,6 +157,7 @@ def preparar(
         motivos_sem_sessao=list(resumo_leitor.motivos_sem_sessao),
     )
 
+    etapa("Escolhendo os assuntos para esta pessoa...")
     cruzamento.cruzar_contato_por_consulta(
         cliente_llm, conexao, perfil_id, contexto, centroide_consulta, limiares, agora
     )

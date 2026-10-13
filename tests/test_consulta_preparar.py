@@ -343,3 +343,34 @@ def test_preparar_com_rodar_coleta_falso_pula_coleta_mesmo_com_fontes_existente(
     )
 
     assert chamou_coletar["count"] == 0
+
+
+def test_preparar_avisa_cada_etapa_na_ordem(
+    monkeypatch: pytest.MonkeyPatch, conn: sqlite3.Connection, tmp_path: Path
+) -> None:
+    contato = perfis.inserir_ou_atualizar_contato(
+        conn, "Beto", "+5511900002222", None, None, None, None, AGORA
+    )
+    assert contato.id is not None
+    conn.commit()
+    _instalar_mocks_pipeline(monkeypatch, ResumoLeitura(perfil_id=contato.id))
+    etapas: list[str] = []
+
+    consulta_mod.preparar(
+        conexao=conn,
+        cliente_llm=_ClienteLLMFalso(),
+        cliente_http=object(),  # type: ignore[arg-type]
+        perfil_id=contato.id,
+        contexto=_contexto_padrao(),
+        limiares=_limiares(),
+        caminho_fontes=tmp_path / "fontes.yaml",
+        caminho_sentinela=tmp_path / "PARE",
+        abrir_pagina=_pagina_dummy,
+        pasta_navegador=tmp_path / "navegador",
+        agora=AGORA,
+        avisar=etapas.append,
+    )
+
+    ordem = ["Coletando", "Extraindo", "Agrupando", "Qualificando", "Lendo as redes", "Escolhendo"]
+    posicoes = [etapas.index(next(e for e in etapas if e.startswith(inicio))) for inicio in ordem]
+    assert posicoes == sorted(posicoes)

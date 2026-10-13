@@ -35,6 +35,13 @@ def test_construir_query_usa_so_o_nome_quando_empresa_ausente() -> None:
     assert busca._construir_query("Michel Viriato", "") == "Michel Viriato"
 
 
+def test_construir_query_usa_o_refino_quando_nao_ha_empresa() -> None:
+    assert busca._construir_query("Djalma Martins", None, "professor de inglês") == (
+        "Djalma Martins professor de inglês"
+    )
+    assert busca._construir_query("Djalma Martins", "Acme", "professor") == "Djalma Martins Acme"
+
+
 def test_filtrar_candidatos_linkedin_extrai_nome_descricao_link() -> None:
     links = [
         (
@@ -127,3 +134,75 @@ def test_buscar_rede_sem_template_devolve_motivo_sem_lancar() -> None:
     assert resultado.autenticado is False
     assert resultado.motivo is not None
     assert "outro" in resultado.motivo
+
+
+@dataclass
+class _PaginaPorBusca:
+    """Devolve candidatos só quando a busca traz a palavra `exige`; guarda as URLs abertas."""
+
+    exige: str
+    recusa: str = ""
+    urls: list[str] = field(default_factory=list)
+    _ultima: str = ""
+
+    def ir_para(self, url: str) -> None:
+        self.urls.append(url)
+        self._ultima = url
+
+    def estado(self) -> tuple[str, str]:
+        return ("https://www.linkedin.com/search/results/people/", "resultado da busca " * 40)
+
+    def coletar_links(self) -> list[tuple[str, str]]:
+        if self.exige in self._ultima and not (self.recusa and self.recusa in self._ultima):
+            return [("https://www.linkedin.com/in/dj-martins/", "Djalma Martins\nProfessor de inglês")]
+        return []
+
+    def fechar(self) -> None:
+        pass
+
+
+def test_buscar_com_refino_usa_o_refino_na_busca() -> None:
+    pagina = _PaginaPorBusca(exige="professor")
+
+    resultado = busca.buscar(pagina, "linkedin", "Djalma Martins", None, refino="professor de inglês")
+
+    assert len(pagina.urls) == 1
+    assert "Djalma+Martins+professor+de+ingl%C3%AAs" in pagina.urls[0]
+    assert [c.nome_exibido for c in resultado.candidatos] == ["Djalma Martins"]
+
+
+def test_buscar_sem_resultado_com_refino_repete_so_com_o_nome() -> None:
+    pagina = _PaginaPorBusca(exige="Djalma", recusa="engenheiro")
+
+    resultado = busca.buscar(pagina, "linkedin", "Djalma Martins", None, refino="engenheiro naval")
+
+    assert len(pagina.urls) == 2
+    assert pagina.urls[1].endswith("keywords=Djalma+Martins")
+    assert [c.nome_exibido for c in resultado.candidatos] == ["Djalma Martins"]
+
+
+def test_filtrar_candidatos_instagram_ignora_paginas_da_rede_e_links_sem_texto() -> None:
+    links = [
+        ("https://www.instagram.com/reels", ""),
+        ("https://www.instagram.com/explore", "Explorar"),
+        ("https://www.instagram.com/popular", "Popular"),
+        ("https://www.instagram.com/eu.mesmo", ""),
+        ("https://www.instagram.com/dj.borges/", "dj.borges\nDjalma Borges"),
+    ]
+
+    candidatos = busca._filtrar_candidatos("instagram", links)
+
+    assert [c.link for c in candidatos] == ["https://www.instagram.com/dj.borges/"]
+
+
+def test_sem_sessao_o_motivo_mostra_o_que_a_aba_exibia() -> None:
+    pagina = _PaginaFake(
+        resposta_estado=("https://www.linkedin.com/checkpoint/lg/login", "Verificação de segurança")
+    )
+
+    resultado = busca.buscar(pagina, "linkedin", "Ana", None)
+
+    assert resultado.autenticado is False
+    assert resultado.motivo is not None
+    assert "sem sessão ativa em linkedin" in resultado.motivo
+    assert "checkpoint/lg/login" in resultado.motivo and "Verificação de segurança" in resultado.motivo

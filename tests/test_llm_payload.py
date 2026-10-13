@@ -77,3 +77,29 @@ def test_payload_omite_think_quando_perfil_pede(tmp_path: Path) -> None:
     assert corpo["format"] == "json"
 
     conexao_bd.close()
+
+
+def test_imagens_vao_no_corpo_quando_a_tarefa_e_de_visao(tmp_path: Path) -> None:
+    dados_roteamento = yaml.safe_load((RAIZ / "config" / "llm_routing.yaml").read_text(encoding="utf-8"))
+    dados_roteamento["perfil_ativo"] = "pro48"
+    roteamento = Roteamento.model_validate(dados_roteamento)
+    corpos: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        corpos.append(json.loads(request.content))
+        return httpx.Response(200, json={"response": json.dumps({"ok": True})})
+
+    cliente_http = httpx.Client(transport=httpx.MockTransport(handler))
+    conexao_bd = conexao.abrir(tmp_path / "teste.db")
+    migracoes.aplicar(conexao_bd)
+    cliente = ClienteOllama(
+        cliente_http, conexao_bd, roteamento, "http://ollama.invalido", tmp_path / "chamadas_llm.jsonl"
+    )
+
+    cliente.gerar_json("descrever_imagem", "descreva", _EsquemaTeste, imagens=["QUJD"])
+    cliente.gerar_json("qualificar", "sem imagem", _EsquemaTeste)
+
+    assert corpos[0]["images"] == ["QUJD"]
+    assert "images" not in corpos[1]  # a segunda chamada não leva imagem
+    assert roteamento.perfis["pro48"].tarefas["descrever_imagem"].modelo == "gemma3:12b"
+    conexao_bd.close()

@@ -4,6 +4,7 @@ import random
 from dataclasses import dataclass
 
 from agente_nw.coleta.capturas import navegador
+from agente_nw.coleta.capturas.imagens import ImagemCapturada
 
 
 @dataclass
@@ -144,3 +145,61 @@ def test_rolagem_acumula_blocos_unicos_sem_duplicar() -> None:
     assert a_count == 1
     assert b_count == 1
     assert pagina.rolagens == 1
+
+
+class _PaginaComImagens(_PaginaFake):
+    """Cada chamada de `imagens` devolve o próximo lote; guarda o que foi pedido a ignorar."""
+
+    def __init__(self, estados: list[tuple[str, str]], lotes: list[list[str]]) -> None:
+        super().__init__(estados=estados)
+        self._lotes = lotes
+        self.pedidos: list[tuple[int, int, list[str]]] = []
+
+    def imagens(self, maximo: int, largura_minima: int, ignorar: list[str]) -> list[ImagemCapturada]:
+        self.pedidos.append((maximo, largura_minima, list(ignorar)))
+        lote = self._lotes.pop(0) if self._lotes else []
+        return [ImagemCapturada(src, "", "", "image/jpeg", "QUJD") for src in lote]
+
+
+def test_imagens_sao_acumuladas_sem_repetir_e_ate_o_maximo() -> None:
+    estados = [("https://exemplo.com/perfil", _texto_longo("perfil", ["Uma publicação da pessoa, longa."]))]
+    pagina = _PaginaComImagens(
+        estados,
+        lotes=[
+            ["https://cdn.test/a.jpg?x=1", "https://cdn.test/b.jpg"],
+            ["https://cdn.test/a.jpg?x=2", "https://cdn.test/c.jpg"],
+        ],
+    )
+
+    resultado = navegador.ler(
+        pagina,
+        "https://exemplo.com/perfil",
+        dorme=lambda _s: None,
+        aleatorio=random.Random(0),
+        max_rolagens=2,
+        maximo_imagens=3,
+        largura_minima_imagem=300,
+    )
+
+    assert [i.src.split("?")[0] for i in resultado.imagens] == [
+        "https://cdn.test/a.jpg",
+        "https://cdn.test/b.jpg",
+        "https://cdn.test/c.jpg",
+    ]
+    assert pagina.pedidos[0] == (3, 300, [])
+    assert pagina.pedidos[1] == (1, 300, ["https://cdn.test/a.jpg", "https://cdn.test/b.jpg"])
+
+
+def test_sem_maximo_de_imagens_a_pagina_nao_e_consultada() -> None:
+    estados = [("https://exemplo.com/perfil", _texto_longo("perfil", ["Uma publicação da pessoa, longa."]))]
+    pagina = _PaginaComImagens(estados, lotes=[["https://cdn.test/a.jpg"]])
+
+    resultado = navegador.ler(
+        pagina,
+        "https://exemplo.com/perfil",
+        dorme=lambda _s: None,
+        aleatorio=random.Random(0),
+        max_rolagens=1,
+    )
+
+    assert resultado.imagens == [] and pagina.pedidos == []

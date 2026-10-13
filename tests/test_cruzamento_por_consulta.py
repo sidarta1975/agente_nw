@@ -165,26 +165,39 @@ def test_contexto_sem_tag_e_sem_tema_gera_menu_com_conector(tmp_path: Path, limi
     assert registros[0].por_que
 
 
-def test_tag_confirmada_eleva_o_score_e_vira_ponto_de_apoio(tmp_path: Path, limiares: Limiares) -> None:
-    sem_tag = _abrir(tmp_path, "caso2a")
-    perfil_a = _contato(sem_tag)
-    _assunto(sem_tag, "Regata oceânica reúne veleiros")
+def test_tag_do_contato_e_ignorada_e_o_que_ele_publicou_eleva_o_score(
+    tmp_path: Path, limiares: Limiares
+) -> None:
+    sem_nada = _abrir(tmp_path, "caso2a")
+    perfil_a = _contato(sem_nada)
+    _assunto(sem_nada, "Regata oceânica reúne veleiros")
     cruzar_contato_por_consulta(
-        _ClienteFalso(), sem_tag, perfil_a, _contexto(), CENTROIDE_CONSULTA, limiares, AGORA
+        _ClienteFalso(), sem_nada, perfil_a, _contexto(), CENTROIDE_CONSULTA, limiares, AGORA
     )
-    score_sem_tag = assunto_contato.listar_do_dia(sem_tag, perfil_a, DATA)[0].score
+    base = assunto_contato.listar_do_dia(sem_nada, perfil_a, DATA)[0]
 
     com_tag = _abrir(tmp_path, "caso2b")
     perfil_b = _contato(com_tag)
     _tag(com_tag, perfil_b, "navegação", confirmado=True)
     _assunto(com_tag, "Regata oceânica reúne veleiros")
-    cliente = _ClienteFalso()
-    cruzar_contato_por_consulta(cliente, com_tag, perfil_b, _contexto(), CENTROIDE_CONSULTA, limiares, AGORA)
-    registro = assunto_contato.listar_do_dia(com_tag, perfil_b, DATA)[0]
+    cruzar_contato_por_consulta(
+        _ClienteFalso(), com_tag, perfil_b, _contexto(), CENTROIDE_CONSULTA, limiares, AGORA
+    )
+    tag = assunto_contato.listar_do_dia(com_tag, perfil_b, DATA)[0]
 
-    assert registro.score > score_sem_tag
-    assert registro.aderencia_contato > 0
-    assert "ponto de apoio do usuário: navegação" in cliente.prompts[0]
+    com_fato = _abrir(tmp_path, "caso2c")
+    perfil_c = _contato(com_fato)
+    fatos.inserir(
+        com_fato, Fato(perfil_id=perfil_c, tipo="post", conteudo="fato sobre navegação", registrado_em=AGORA)
+    )
+    com_fato.commit()
+    _assunto(com_fato, "Regata oceânica reúne veleiros")
+    cliente = _ClienteFalso()
+    cruzar_contato_por_consulta(cliente, com_fato, perfil_c, _contexto(), CENTROIDE_CONSULTA, limiares, AGORA)
+    fato = assunto_contato.listar_do_dia(com_fato, perfil_c, DATA)[0]
+
+    assert tag.score == base.score and tag.aderencia_contato == 0.0  # tag não vale nada
+    assert fato.score > base.score and fato.aderencia_contato > 0  # o que ele publicou vale
     assert "Contexto da consulta: assunto: mercado de vela" in cliente.prompts[0]
 
 
@@ -272,3 +285,15 @@ def test_avaliar_antigo_segue_identico() -> None:
     assert avaliacao.ponto_de_apoio == "tema"
     assert avaliacao.aderencia_consulta is None
     assert avaliacao.score == pytest.approx(50 + 30 + 18)
+
+
+def test_sem_fatos_o_centroide_vem_da_ficha_e_sem_nada_e_none(tmp_path: Path) -> None:
+    conn = _abrir(tmp_path, "caso_ficha")
+    perfil_id = _contato(conn)
+    cliente = _ClienteFalso()
+
+    assert perfis.calcular_centroide_do_contato(conn, perfil_id, cliente) is None
+
+    perfis.atualizar_ficha_manual(conn, perfil_id, {"cargo": "fato de ficha"}, AGORA)
+    conn.commit()
+    assert perfis.calcular_centroide_do_contato(conn, perfil_id, cliente) == _vetor(0.0, 1.0)

@@ -15,20 +15,26 @@ from agente_nw.nucleo.database.queries import gancho_uso as gancho_uso_q
 from agente_nw.nucleo.database.queries import itens as itens_q
 from agente_nw.nucleo.database.queries import listas as listas_q
 from agente_nw.nucleo.database.queries import perfil_tema as perfil_tema_q
+from agente_nw.nucleo.modelos.fato import Fato
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.perfil import Perfil
 from agente_nw.nucleo.modelos.redacao import (
     Gancho,
+    LinkNoticia,
     Redacao,
     RespostaRedacao,
     validar_ganchos,
 )
 from agente_nw.nucleo.prompts import redigir_ganchos as prompt_mod
 from agente_nw.nucleo.prompts.redigir_ganchos import AssuntoParaRedacao, EntradaRedacao
+from agente_nw.nucleo.vetores import cosseno
 
 _EsquemaT = TypeVar("_EsquemaT", bound=BaseModel)
 
 _FATOS_NO_PROMPT = 10
+_FATOS_CANDIDATOS = 40
+_TRECHO_DO_FATO_NO_PROMPT = 600  # o fato fica inteiro no banco; o prompt leva o começo
+_FATOS_RECENTES_GARANTIDOS = 4
 _CONSULTAS_NO_HISTORICO = 3
 _MANCHETES_POR_ASSUNTO = 3
 
@@ -40,16 +46,26 @@ class ClienteRedacao(Protocol):
 def _assunto_para_redacao(conexao: sqlite3.Connection, item: ItemMenu) -> AssuntoParaRedacao:
     assunto = assuntos_q.obter_por_id(conexao, item.assunto_id)
     manchetes: list[str] = []
+    links: list[LinkNoticia] = []
     for com_dominio in itens_q.listar_por_assunto(conexao, item.assunto_id)[:_MANCHETES_POR_ASSUNTO]:
         data = (com_dominio.item.publicado_em or "")[:10]
         origem = f"{com_dominio.dominio}, {data}" if data else com_dominio.dominio
         manchetes.append(f"{origem}: {com_dominio.item.titulo}")
+        links.append(
+            LinkNoticia(
+                veiculo=com_dominio.dominio,
+                titulo=com_dominio.item.titulo,
+                url=com_dominio.item.url_canonica,
+                texto=com_dominio.item.texto,
+            )
+        )
     return AssuntoParaRedacao(
         assunto_id=item.assunto_id,
         titulo=item.titulo,
         por_que=item.por_que,
         resumo=assunto.resumo_cartao if assunto is not None else None,
         manchetes=manchetes,
+        links=links,
     )
 
 
@@ -58,11 +74,34 @@ def _ficha(contato: Perfil) -> list[str]:
     return [f"{rotulo}: {valor}" for rotulo, valor in partes if valor]
 
 
-def _fatos(conexao: sqlite3.Connection, perfil_id: int) -> list[str]:
+def _escolher_fatos(cliente_llm: ClienteRedacao, candidatos: list[Fato], consulta: str) -> list[Fato]:
+    """Os 4 fatos mais recentes e, entre os demais, os que mais se parecem com a consulta e os assuntos.
+    Sem como medir a semelhança (cliente sem embeddings ou falha), ficam os mais recentes."""
+    if len(candidatos) <= _FATOS_NO_PROMPT:
+        return candidatos
+    garantidos = candidatos[:_FATOS_RECENTES_GARANTIDOS]
+    resto = candidatos[_FATOS_RECENTES_GARANTIDOS:]
+    vagas = _FATOS_NO_PROMPT - len(garantidos)
+    embeddar = getattr(cliente_llm, "embeddar", None)
+    if embeddar is None:
+        return candidatos[:_FATOS_NO_PROMPT]
+    try:
+        vetores = embeddar([consulta, *(f.conteudo[:_TRECHO_DO_FATO_NO_PROMPT] for f in resto)])
+    except Exception:
+        return candidatos[:_FATOS_NO_PROMPT]
+    alvo, vetores_resto = vetores[0], vetores[1:]
+    ordem = sorted(range(len(resto)), key=lambda i: -cosseno(alvo, vetores_resto[i]))
+    return [*garantidos, *(resto[i] for i in sorted(ordem[:vagas]))]
+
+
+def _fatos(
+    conexao: sqlite3.Connection, perfil_id: int, cliente_llm: ClienteRedacao, consulta: str
+) -> list[str]:
+    candidatos = fatos_q.listar_recentes(conexao, perfil_id, _FATOS_CANDIDATOS)
     linhas: list[str] = []
-    for fato in fatos_q.listar_recentes(conexao, perfil_id, _FATOS_NO_PROMPT):
+    for fato in _escolher_fatos(cliente_llm, candidatos, consulta):
         data = fato.data_do_fato or fato.registrado_em[:10]
-        linhas.append(f"{data[:10]} ({fato.tipo}): {fato.conteudo}")
+        linhas.append(f"{data[:10]} ({fato.tipo}): {fato.conteudo[:_TRECHO_DO_FATO_NO_PROMPT]}")
     return linhas
 
 
@@ -75,8 +114,13 @@ def _historico(conexao: sqlite3.Connection, perfil_id: int, consulta_id: int) ->
     return [historico_mod.formatar_uma(c, conexao) for c in anteriores]
 
 
+def _texto_da_consulta(pedido: PedidoExtraido, assuntos: list[ItemMenu]) -> str:
+    return ". ".join([pedido.assunto_principal, *pedido.interessa, *(item.titulo for item in assuntos)])
+
+
 def montar_entrada(
     conexao: sqlite3.Connection,
+    cliente_llm: ClienteRedacao,
     pedido: PedidoExtraido,
     frase: str,
     resultado_consulta: ResultadoConsulta,
@@ -97,12 +141,13 @@ def montar_entrada(
         contato_ficha=_ficha(contato),
         vinculo=pedido.pessoa_pistas.get("vinculo"),
         tempo_sem_contato=pedido.pessoa_pistas.get("tempo_sem_contato"),
-        fatos=_fatos(conexao, contato.id),
+        fatos=_fatos(conexao, contato.id, cliente_llm, _texto_da_consulta(pedido, assuntos)),
         cabecalho_rede=" · ".join(f"{rede}: {cabecalho}" for rede, cabecalho in cabecalhos) or None,
         pedido=pedido,
         frase=frase,
         historico=_historico(conexao, contato.id, resultado_consulta.consulta_id),
         assuntos=[_assunto_para_redacao(conexao, item) for item in assuntos],
+        contexto_relacao=perfil_tema_q.listar_nomes_do_contato(conexao, contato.id),
     )
 
 
@@ -145,7 +190,9 @@ def redigir(
         )
         return Redacao(ganchos=[], aviso=sem_assunto, registro_usado=registro)
 
-    entrada = montar_entrada(conexao, pedido, frase, resultado_consulta, perfil, usuario, disponiveis)
+    entrada = montar_entrada(
+        conexao, cliente_llm, pedido, frase, resultado_consulta, perfil, usuario, disponiveis
+    )
     prompt = prompt_mod.construir_prompt(entrada, limite_tokens)
     validos = {item.assunto_id for item in disponiveis}
     resposta = cliente_llm.gerar_json("redigir_ganchos", prompt, RespostaRedacao)
@@ -157,6 +204,8 @@ def redigir(
         retorno = f"{prompt}\n\nA resposta anterior foi recusada. Refaça respeitando as regras:\n{recusas}\n"
         resposta = cliente_llm.gerar_json("redigir_ganchos", retorno, RespostaRedacao)
         ganchos, motivos = _validar(resposta, pedido, validos, usados)
+    links_por_assunto = {a.assunto_id: a.links for a in entrada.assuntos}
+    ganchos = [g.model_copy(update={"links": links_por_assunto.get(g.assunto_id, [])}) for g in ganchos]
     aviso = _juntar_avisos([resposta.aviso or "", *motivos])
     if not ganchos and aviso is None:
         aviso = "O modelo não devolveu nenhum gancho para estes assuntos."

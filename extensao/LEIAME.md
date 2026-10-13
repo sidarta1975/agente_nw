@@ -20,7 +20,7 @@ Firefox e Safari não são suportados.
   "agente_nw — ponte". **Deixe essa aba aberta enquanto o programa estiver lendo.**
 - A página-ponte busca as tarefas no programa e as passa à extensão; a extensão abre uma aba da
   rede **em segundo plano**, rola, lê o texto e os links e devolve tudo.
-- Só estas ações existem: `ola`, `abrir`, `estado`, `rolar`, `links`, `fechar`. Nada de curtir,
+- Só estas ações existem: `ola`, `abrir`, `estado`, `rolar`, `links`, `imagens`, `fechar`. Nada de curtir,
   seguir ou enviar. A extensão só atua em linkedin.com, instagram.com, facebook.com e x.com.
 - Nunca mais de uma aba de rede social por vez, com pausa entre páginas da mesma rede.
 - Nada roda sem um comando seu (`pedir`, `listas atualizar`, console).

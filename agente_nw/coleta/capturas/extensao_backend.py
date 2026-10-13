@@ -6,6 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from agente_nw.coleta.capturas.imagens import ImagemCapturada
 from agente_nw.coleta.capturas.navegador import MIN_CHARS_AUTENTICADO, URL_LOGIN_SUBSTRINGS
 from agente_nw.nucleo.modelos.configuracao import ExtensaoLimiares
 from agente_nw.ponte import ErroDaExtensao, Ponte, PonteIndisponivel, obter_ponte
@@ -105,6 +106,38 @@ class PaginaExtensao:
             return []
         itens = dados.get("links", [])
         return [(str(item[0]), str(item[1])) for item in itens] if isinstance(itens, list) else []
+
+    def imagens(
+        self, maximo: int, largura_minima: int, ignorar: list[str] | None = None
+    ) -> list[ImagemCapturada]:
+        """Imagens publicadas na página (bytes em base64, só para serem descritas). Pula as `ignorar`."""
+        if self._aba_id is None:
+            return []
+        dados = self._enviar(
+            {
+                "acao": "imagens",
+                "aba_id": self._aba_id,
+                "maximo": maximo,
+                "largura_minima": largura_minima,
+                "ignorar": list(ignorar or []),
+            }
+        )
+        if dados is None:
+            return []
+        itens = dados.get("imagens", [])
+        if not isinstance(itens, list):
+            return []
+        return [
+            ImagemCapturada(
+                src=str(item.get("src", "")),
+                alt=str(item.get("alt", "")),
+                link=str(item.get("link", "")),
+                mime=str(item.get("mime", "")),
+                dados_base64=str(item.get("dados", "")),
+            )
+            for item in itens
+            if isinstance(item, dict) and item.get("dados")
+        ]
 
     def fechar(self) -> None:
         aba, self._aba_id = self._aba_id, None

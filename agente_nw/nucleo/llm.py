@@ -73,7 +73,13 @@ class ClienteOllama:
             )
         return perfil.tarefas[nome]
 
-    def _chamar_generate(self, tarefa: TarefaRoteamento, prompt: str, temperature: float) -> str:
+    def _chamar_generate(
+        self,
+        tarefa: TarefaRoteamento,
+        prompt: str,
+        temperature: float,
+        imagens: list[str] | None = None,
+    ) -> str:
         corpo: dict[str, object] = {
             "model": tarefa.modelo,
             "prompt": prompt,
@@ -81,6 +87,8 @@ class ClienteOllama:
             "stream": False,
             "options": {"num_ctx": tarefa.num_ctx, "temperature": temperature},
         }
+        if imagens:
+            corpo["images"] = imagens
         if self._roteamento.perfis[self._roteamento.perfil_ativo].enviar_think:
             corpo["think"] = tarefa.think
         resposta = self._http.post(f"{self._ollama_url}/api/generate", json=corpo)
@@ -97,7 +105,14 @@ class ClienteOllama:
         assert isinstance(texto, str)
         return texto
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[EsquemaT]) -> EsquemaT:
+    def gerar_json(
+        self,
+        tarefa_nome: str,
+        prompt: str,
+        esquema: type[EsquemaT],
+        imagens: list[str] | None = None,
+    ) -> EsquemaT:
+        """`imagens`: imagens em base64 para modelos com visão (tarefa `descrever_imagem`)."""
         tarefa = self._tarefa(tarefa_nome)
         nova_tentativa = self._roteamento.perfis[self._roteamento.perfil_ativo].nova_tentativa
 
@@ -105,7 +120,7 @@ class ClienteOllama:
         tentativas = (tarefa.temperature, nova_tentativa.temperature)
         for indice, temperatura in enumerate(tentativas, start=1):
             try:
-                texto = self._chamar_generate(tarefa, prompt, temperatura)
+                texto = self._chamar_generate(tarefa, prompt, temperatura, imagens)
                 bruto = json.loads(texto)
                 resultado = esquema.model_validate(bruto)
                 self._registrar_log_chamada(tarefa_nome, indice, True)

@@ -95,3 +95,15 @@ def test_o_exemplo_nao_usa_nomes_dos_testes() -> None:
 
 def test_estimativa_e_palavras_vezes_um_virgula_quatro() -> None:
     assert prompt.estimar_tokens(" ".join(["a"] * 100)) == 140
+
+
+def test_o_contexto_da_relacao_aparece_no_bloco_da_pessoa() -> None:
+    from dataclasses import replace
+
+    entrada = replace(_entrada(), contexto_relacao=["família", "amigos"])
+
+    texto = prompt.construir_prompt(entrada)
+
+    assert "Contexto da relação: família, amigos." in texto
+    assert texto.index("Contexto da relação") < texto.index("O PEDIDO:")
+    assert "Contexto da relação" not in prompt.construir_prompt(_entrada())

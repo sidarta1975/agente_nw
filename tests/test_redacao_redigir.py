@@ -11,8 +11,12 @@ from agente_nw.nucleo.consulta import ItemMenu, ResultadoConsulta, ResumoRedeSoc
 from agente_nw.nucleo.database import conexao, migracoes
 from agente_nw.nucleo.database.queries import assuntos as assuntos_q
 from agente_nw.nucleo.database.queries import consulta_contato as consulta_contato_q
+from agente_nw.nucleo.database.queries import fontes as fontes_q
 from agente_nw.nucleo.database.queries import gancho_uso, perfis
+from agente_nw.nucleo.database.queries import itens as itens_q
 from agente_nw.nucleo.modelos.assunto import Assunto
+from agente_nw.nucleo.modelos.fato import Fato
+from agente_nw.nucleo.modelos.item import Item
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.perfil import Perfil
 from agente_nw.nucleo.modelos.redacao import Gancho, RespostaRedacao
@@ -229,3 +233,94 @@ def test_registrar_grava_na_tabela_e_o_historico_mostra_o_status(conn: sqlite3.C
     gancho_uso.marcar(conn, resultado.consulta_id, assunto_id, "usado", AGORA)
     texto = historico.historico_recente_para_prompt(conn, contato.id or 0)
     assert f"Gancho {assunto_id} (usado)" in texto
+
+
+def test_links_das_noticias_vem_do_banco_e_nao_do_modelo(conn: sqlite3.Connection) -> None:
+    usuario, contato, resultado = _montar(conn, n_assuntos=1)
+    assunto_id = resultado.itens_menu[0].assunto_id
+    fonte = fontes_q.obter_ou_criar(conn, "Jornal", "https://jornal.test/feed", "jornal.test", "rss", 5)
+    assert fonte.id is not None
+    itens_q.inserir(
+        conn,
+        Item(
+            fonte_id=fonte.id,
+            url_canonica="https://jornal.test/materia-1",
+            titulo="Matéria sobre cooperativas",
+            texto="Texto integral da matéria sobre cooperativas, com todos os parágrafos.",
+            publicado_em="2026-10-12T08:00:00+00:00",
+            coletado_em=AGORA,
+            hash_titulo="h1",
+            assunto_id=assunto_id,
+        ),
+    )
+    conn.commit()
+    inventado = _gancho(assunto_id).model_copy(
+        update={"links": [{"veiculo": "x", "titulo": "y", "url": "https://inventado.test"}]}
+    )
+    llm = _LLMFalso(RespostaRedacao(ganchos=[inventado]))
+
+    redacao = redacao_mod.redigir(llm, conn, _pedido(), resultado, contato, usuario, AGORA)
+
+    assert [(link.veiculo, link.url) for link in redacao.ganchos[0].links] == [
+        ("jornal.test", "https://jornal.test/materia-1")
+    ]
+    redacao_mod.registrar(conn, resultado.consulta_id, redacao, AGORA)
+    gravado = redacao_mod.ganchos_da_consulta(conn, resultado.consulta_id)[0][0]
+    assert gravado.links[0].titulo == "Matéria sobre cooperativas"
+    assert gravado.links[0].texto == "Texto integral da matéria sobre cooperativas, com todos os parágrafos."
+
+
+class _LLMComEmbeddings(_LLMFalso):
+    """Embeddings controlados: texto com 'vela' fica perto da consulta (assunto 'vela')."""
+
+    def embeddar(self, textos: list[str]) -> list[list[float]]:
+        return [[1.0, 0.0] if "vela" in t else [0.0, 1.0] for t in textos]
+
+
+def _fatos(n: int, com_vela: set[int]) -> list[Fato]:
+    return [
+        Fato(
+            perfil_id=1,
+            tipo="post",
+            conteudo=f"fato {i} sobre {'vela' if i in com_vela else 'cozinha'}",
+            registrado_em=f"2026-10-{30 - i:02d}T10:00:00+00:00",
+        )
+        for i in range(n)
+    ]
+
+
+def test_fatos_escolhidos_sao_os_recentes_mais_os_parecidos_com_a_consulta() -> None:
+    candidatos = _fatos(30, com_vela={12, 20, 25})
+    llm = _LLMComEmbeddings()
+
+    escolhidos = redacao_mod._escolher_fatos(llm, candidatos, "vela")
+
+    conteudos = [f.conteudo for f in escolhidos]
+    assert len(escolhidos) == 10
+    assert all(f"fato {i} " in " ".join(conteudos) for i in range(4))  # os 4 mais recentes
+    assert all(f"fato {i} sobre vela" in conteudos for i in (12, 20, 25))  # e os que falam do assunto
+
+
+def test_poucos_fatos_entram_todos_e_sem_embeddings_ficam_os_recentes() -> None:
+    assert len(redacao_mod._escolher_fatos(_LLMFalso(), _fatos(8, set()), "vela")) == 8
+
+    sem_embeddings = redacao_mod._escolher_fatos(_LLMFalso(), _fatos(30, {25}), "vela")
+
+    assert [f.conteudo for f in sem_embeddings] == [f.conteudo for f in _fatos(30, {25})[:10]]
+
+
+def test_as_tags_do_contato_viram_o_contexto_da_relacao_no_prompt(conn: sqlite3.Connection) -> None:
+    from agente_nw.nucleo.database.queries import perfil_tema, temas
+
+    usuario, contato, resultado = _montar(conn, n_assuntos=1)
+    assert contato.id is not None
+    for nome, peso in (("trabalho", 3), ("família", 5)):
+        tema = temas.obter_ou_criar(conn, nome, "contexto fixo da relação com o contato", [], AGORA)
+        assert tema.id is not None
+        perfil_tema.vincular(conn, contato.id, tema.id, peso, "declarada", None, True, AGORA)
+    conn.commit()
+    llm = _LLMFalso(RespostaRedacao(ganchos=[_gancho(resultado.itens_menu[0].assunto_id)]))
+
+    redacao_mod.redigir(llm, conn, _pedido(), resultado, contato, usuario, AGORA)
+
+    assert "Contexto da relação: família, trabalho." in llm.prompts[0]

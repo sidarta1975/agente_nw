@@ -159,6 +159,7 @@ def apagar_contato_completo(conexao: sqlite3.Connection, perfil_id: int) -> None
     consulta_contato — o gatilho continua bloqueando DELETE em ambas."""
     conexao.execute("DELETE FROM assunto_contato WHERE perfil_id = ?", (perfil_id,))
     conexao.execute("DELETE FROM rede_social WHERE perfil_id = ?", (perfil_id,))
+    conexao.execute("DELETE FROM rede_sem_perfil WHERE perfil_id = ?", (perfil_id,))
     # Histórico de pedidos e cache das listas sobrevivem ao contato, só perdem o vínculo.
     conexao.execute("UPDATE pedido SET perfil_id = NULL WHERE perfil_id = ?", (perfil_id,))
     conexao.execute("UPDATE lista_rede_social SET perfil_id = NULL WHERE perfil_id = ?", (perfil_id,))
@@ -261,6 +262,10 @@ def unir_contatos(conexao: sqlite3.Connection, canonico_id: int, duplicado_id: i
 
     # Reatribuições simples nas demais tabelas.
     conexao.execute("UPDATE rede_social SET perfil_id = ? WHERE perfil_id = ?", (canonico_id, duplicado_id))
+    conexao.execute(
+        "UPDATE OR IGNORE rede_sem_perfil SET perfil_id = ? WHERE perfil_id = ?", (canonico_id, duplicado_id)
+    )
+    conexao.execute("DELETE FROM rede_sem_perfil WHERE perfil_id = ?", (duplicado_id,))
     conexao.execute("UPDATE pedido SET perfil_id = ? WHERE perfil_id = ?", (canonico_id, duplicado_id))
     conexao.execute(
         "UPDATE lista_rede_social SET perfil_id = ? WHERE perfil_id = ?", (canonico_id, duplicado_id)
@@ -467,47 +472,30 @@ def calcular_centroide(
     return calcular_media_ponderada(vetores, pesos)
 
 
-_PESO_TAG_NAO_CONFIRMADA = 0.5
 _MAXIMO_FATOS_NO_CENTROIDE = 20
+_TRECHO_DO_FATO_NO_CENTROIDE = 500  # o fato é guardado inteiro; para o vetor basta o começo
 
 
 class _ClienteEmbeddagem(Protocol):
     def embeddar(self, textos: list[str]) -> list[list[float]]: ...
 
 
-def calcular_centroide_flexivel(
-    conexao: sqlite3.Connection,
-    perfil_id: int,
-    peso_nivel: dict[str, float],
-    cliente_llm: _ClienteEmbeddagem,
+def calcular_centroide_do_contato(
+    conexao: sqlite3.Connection, perfil_id: int, cliente_llm: _ClienteEmbeddagem
 ) -> list[float] | None:
-    """Centroide do contato sem exigir tag confirmada (brief 034).
-
-    Fontes em ordem de preferência: (a) tags confirmadas; (b) tags sugeridas, com peso 0,5;
-    (c) embedding do texto dos fatos mais recentes. Sem nenhuma, devolve None."""
-    confirmado = calcular_centroide(conexao, perfil_id, peso_nivel)
-    if confirmado is not None:
-        return confirmado
-
-    linhas = conexao.execute(
-        "SELECT pt.peso, pt.nivel, vt.embedding AS embedding FROM perfil_tema pt "
-        "JOIN vetor_tema vt ON vt.tema_id = pt.tema_id "
-        "WHERE pt.perfil_id = ? AND pt.confirmado = 0",
-        (perfil_id,),
-    ).fetchall()
-    if linhas:
-        vetores = [_desserializar(linha["embedding"]) for linha in linhas]
-        pesos = [
-            linha["peso"] * (peso_nivel[linha["nivel"]] if linha["nivel"] is not None else 1.0)
-            for linha in linhas
-        ]
-        return calcular_media_ponderada(vetores, [peso * _PESO_TAG_NAO_CONFIRMADA for peso in pesos])
-
+    """Perfil do contato para a relevância, vindo só do que o sistema sabe dele: o que ele publicou
+    (os fatos mais recentes) e, na falta de fatos, a ficha (cargo, empresa, setor, cidade, notas).
+    Tags não entram: o usuário não trabalha para o agente. Sem nada, devolve None."""
     fatos_recentes = fatos.listar_recentes(conexao, perfil_id, _MAXIMO_FATOS_NO_CENTROIDE)
-    if not fatos_recentes:
+    if fatos_recentes:
+        trechos = [fato.conteudo[:_TRECHO_DO_FATO_NO_CENTROIDE] for fato in fatos_recentes]
+        return cliente_llm.embeddar(["\n".join(trechos)])[0]
+    perfil = obter_por_id(conexao, perfil_id)
+    if perfil is None:
         return None
-    texto = "\n".join(fato.conteudo for fato in fatos_recentes)
-    return cliente_llm.embeddar([texto])[0]
+    ficha = [perfil.cargo, perfil.empresa, perfil.setor, perfil.cidade, perfil.notas]
+    texto = ". ".join(parte for parte in ficha if parte)
+    return cliente_llm.embeddar([texto])[0] if texto else None
 
 
 def gravar_centroide(conexao: sqlite3.Connection, perfil_id: int, centroide: list[float]) -> None:

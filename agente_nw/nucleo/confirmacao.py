@@ -6,10 +6,18 @@ from collections.abc import Callable
 from agente_nw.coleta.capturas.busca import REDES_SUPORTADAS
 from agente_nw.nucleo import localizacao as localizacao_mod
 from agente_nw.nucleo.database.queries import listas as queries_listas
+from agente_nw.nucleo.database.queries import rede_sem_perfil
 from agente_nw.nucleo.modelos.localizacao import Localizacao, Opcao
 
 _OPCOES_MOSTRADAS = 5
 _POR_PAGINA = 20
+
+
+class _SemPerfil:
+    """O usuário declarou que o contato não tem conta nesta rede."""
+
+
+_SEM_PERFIL = _SemPerfil()
 
 
 def _descrever(opcao: Opcao) -> str:
@@ -62,30 +70,62 @@ def _menu(
     opcoes: list[Opcao],
     entrada: Callable[[str], str],
     saida: Callable[[str], None],
-) -> Opcao | None:
+    permitir_sem_perfil: bool = False,
+) -> Opcao | _SemPerfil | None:
     for numero, opcao in enumerate(opcoes, start=1):
         saida(f"  {numero}. {_descrever(opcao)}")
     redes = list(dict.fromkeys(o.rede for o in opcoes))
+    sem_perfil = " / n = não tem perfil nesta rede" if permitir_sem_perfil else ""
     while True:
-        resposta = entrada("número / l = mostrar a lista / c = colar um link / p = pular: ").strip()
+        pergunta = f"número / l = mostrar a lista / c = colar um link{sem_perfil} / p = pular: "
+        resposta = entrada(pergunta).strip()
         baixa = resposta.lower()
         if baixa.isdigit() and 1 <= int(baixa) <= len(opcoes):
             return opcoes[int(baixa) - 1]
         if baixa == "p":
             return None
+        if baixa == "n" and permitir_sem_perfil:
+            return _SEM_PERFIL
         if baixa == "l":
             escolhida = _escolher_na_lista(conexao, redes, entrada, saida)
             if escolhida is not None:
                 return escolhida
             continue
-        if baixa == "c" or baixa.startswith("c "):
-            link = resposta[1:].strip() or entrada("Cole o link do perfil: ").strip()
+        link_colado = baixa.startswith(("http://", "https://", "www."))
+        if link_colado or baixa == "c" or baixa.startswith("c "):
+            if link_colado:
+                link = resposta
+            else:
+                link = resposta[1:].strip() or entrada("Cole o link do perfil: ").strip()
             do_link = localizacao_mod.opcao_do_link(conexao, link)
             if do_link is None:
                 saida("Link não reconhecido (aceito: linkedin, instagram, facebook, x).")
                 continue
             return do_link
         saida("Opção inválida.")
+
+
+def _pedir_link(
+    conexao: sqlite3.Connection,
+    rede: str | None,
+    entrada: Callable[[str], str],
+    saida: Callable[[str], None],
+) -> Opcao | _SemPerfil | None:
+    """Rede em que não apareceu ninguém: o usuário cola o perfil certo (o nome na conta pode ser
+    outro), declara que não há perfil ali (n) ou decide depois (Enter)."""
+    onde = f" em {rede}" if rede else ""
+    saida(f"Não achei a pessoa{onde} nas suas listas nem na busca geral.")
+    sem_perfil = ", n = não tem perfil nesta rede" if rede else ""
+    while True:
+        resposta = entrada(f"Cole o link do perfil{sem_perfil}, ou Enter para decidir depois: ").strip()
+        if not resposta or resposta.lower() == "p":
+            return None
+        if resposta.lower() in ("n", "nao", "não") and rede:
+            return _SEM_PERFIL
+        do_link = localizacao_mod.opcao_do_link(conexao, resposta)
+        if do_link is not None:
+            return do_link
+        saida("Link não reconhecido (aceito: linkedin, instagram, facebook, x).")
 
 
 def conduzir(
@@ -102,7 +142,8 @@ def conduzir(
     for aviso in localizacao.avisos:
         saida(f"AVISO: {aviso}")
 
-    escolhida: Opcao | None = None
+    permitir = localizacao.rede is not None
+    escolhida: Opcao | _SemPerfil | None = None
     if localizacao.status == "claro" and localizacao.escolhido is not None:
         if sem_perguntar:
             escolhida = localizacao.escolhido
@@ -112,7 +153,7 @@ def conduzir(
                 escolhida = localizacao.escolhido
             else:
                 saida("Candidatos com esse nome:")
-                escolhida = _menu(conexao, localizacao.opcoes, entrada, saida)
+                escolhida = _menu(conexao, localizacao.opcoes, entrada, saida, permitir)
     elif not sem_perguntar and len(localizacao.opcoes) == 1:
         unica = localizacao.opcoes[0]
         if localizacao.status == "nenhum":
@@ -123,7 +164,9 @@ def conduzir(
         if resposta in ("", "s", "sim", "1"):
             escolhida = unica
         elif resposta != "p":
-            escolhida = _menu(conexao, [unica], entrada, saida)
+            escolhida = _menu(conexao, [unica], entrada, saida, permitir)
+    elif not sem_perguntar and localizacao.status == "nenhum" and not localizacao.opcoes:
+        escolhida = _pedir_link(conexao, localizacao.rede, entrada, saida)
     elif not sem_perguntar:
         if localizacao.status == "nenhum":
             saida("Não achei nas suas listas.")
@@ -132,8 +175,14 @@ def conduzir(
         else:
             saida("Mais de uma pessoa combina:")
         mostradas = localizacao.opcoes[:_OPCOES_MOSTRADAS]
-        escolhida = _menu(conexao, mostradas, entrada, saida)
+        escolhida = _menu(conexao, mostradas, entrada, saida, permitir)
 
+    if isinstance(escolhida, _SemPerfil):
+        assert localizacao.rede is not None
+        rede_sem_perfil.declarar(conexao, perfil_id, localizacao.rede, agora)
+        conexao.commit()
+        saida(f"Registrado: sem perfil em {localizacao.rede}. Não procuro mais nessa rede.")
+        return None
     if escolhida is None:
         saida("Sem rede social nesta consulta.")
         return None

@@ -7,6 +7,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from agente_nw.coleta.capturas.imagens import ImagemCapturada
+
 URL_LOGIN_SUBSTRINGS: tuple[str, ...] = (
     "/login",
     "/signin",
@@ -44,6 +46,32 @@ class CapturaBlocos:
     autenticado: bool
     motivo: str | None
     blocos: list[str] = field(default_factory=list)
+    imagens: list[ImagemCapturada] = field(default_factory=list)
+
+
+def _chave_da_imagem(src: str) -> str:
+    return src.split("?")[0]
+
+
+def _capturar_imagens(
+    pagina: Pagina, maximo: int, largura_minima: int, acumuladas: list[ImagemCapturada]
+) -> None:
+    """Pede à página (se ela lê imagens) as publicadas que ainda não vieram, até `maximo` no total."""
+    leitura = getattr(pagina, "imagens", None)
+    faltam = maximo - len(acumuladas)
+    if leitura is None or faltam <= 0:
+        return
+    ignorar = [_chave_da_imagem(imagem.src) for imagem in acumuladas]
+    try:
+        novas = leitura(faltam, largura_minima, ignorar)
+    except Exception:
+        return
+    vistas = set(ignorar)
+    for imagem in novas:
+        chave = _chave_da_imagem(imagem.src)
+        if chave not in vistas and len(acumuladas) < maximo:
+            vistas.add(chave)
+            acumuladas.append(imagem)
 
 
 def _parece_pagina_de_login(url: str, texto: str) -> bool:
@@ -72,6 +100,8 @@ def ler(
     max_rolagens: int = _MAX_ROLAGENS,
     intervalo_min_s: float = _INTERVALO_MIN_S,
     intervalo_max_s: float = _INTERVALO_MAX_S,
+    maximo_imagens: int = 0,
+    largura_minima_imagem: int = 250,
 ) -> CapturaBlocos:
     """Fluxo genérico de leitura: abre `url` no `pagina`, aguarda login se preciso,
     rola no máximo `max_rolagens` vezes com intervalo aleatório entre rolagens e
@@ -105,12 +135,15 @@ def ler(
                 vistos.add(bloco)
                 blocos.append(bloco)
 
+    imagens: list[ImagemCapturada] = []
     _acumular(texto)
+    _capturar_imagens(pagina, maximo_imagens, largura_minima_imagem, imagens)
 
     for _ in range(max(0, max_rolagens - 1)):
         dorme(rnd.uniform(intervalo_min_s, intervalo_max_s))
         pagina.rolar()
         _url, texto = pagina.estado()
         _acumular(texto)
+        _capturar_imagens(pagina, maximo_imagens, largura_minima_imagem, imagens)
 
-    return CapturaBlocos(autenticado=True, motivo=None, blocos=blocos)
+    return CapturaBlocos(autenticado=True, motivo=None, blocos=blocos, imagens=imagens)

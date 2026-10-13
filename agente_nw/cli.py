@@ -687,6 +687,10 @@ def _contexto_de_navegacao(
     )
 
 
+def _avisar_etapa(texto: str) -> None:
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {texto}", flush=True)
+
+
 _FRACAO_DO_CONTEXTO_NO_PROMPT = 0.73  # 8192 de contexto → ~6000 tokens estimados de prompt
 
 
@@ -700,6 +704,7 @@ def pedir_cmd(
     entrada: Callable[[str], str] = input,
     abrir_pagina: Callable[[Path], PaginaLista] | None = None,
     menu: bool = False,
+    perfis_informados: list[str] | None = None,
 ) -> int:
     from agente_nw.nucleo import confirmacao
     from agente_nw.nucleo import pedido as pedido_mod
@@ -710,7 +715,14 @@ def pedir_cmd(
     navegacao = None if saida_json else _contexto_de_navegacao(abrir_pagina, not sem_perguntar)
     try:
         resultado = pedido_mod.processar(
-            llm(), conn, frase, agora, contato_id, navegacao=navegacao, trocar_perfil=trocar_perfil
+            llm(),
+            conn,
+            frase,
+            agora,
+            contato_id,
+            navegacao=navegacao,
+            trocar_perfil=trocar_perfil,
+            perfis_informados=perfis_informados or (),
         )
     except FalhaJsonInvalido as erro:
         print(f"FALHA: não consegui entender o pedido ({erro})")
@@ -727,16 +739,19 @@ def pedir_cmd(
         _imprimir_pedido(resultado, frase)
         if resultado.link_gravado is not None:
             print(f"Rede social gravada a partir do link do pedido: {resultado.link_gravado.link}")
-    if resultado.localizacao is not None and resultado.perfil is not None and resultado.perfil.id is not None:
-        confirmacao.conduzir(
-            conn,
-            resultado.perfil.id,
-            resultado.localizacao,
-            agora,
-            entrada=entrada,
-            sem_perguntar=sem_perguntar,
-            substituir=trocar_perfil,
-        )
+        for nao_reconhecido in resultado.links_nao_reconhecidos:
+            print(f"AVISO: link não reconhecido em --perfil: {nao_reconhecido}")
+    if resultado.perfil is not None and resultado.perfil.id is not None:
+        for localizacao in resultado.localizacoes:
+            confirmacao.conduzir(
+                conn,
+                resultado.perfil.id,
+                localizacao,
+                agora,
+                entrada=entrada,
+                sem_perguntar=sem_perguntar,
+                substituir=trocar_perfil,
+            )
     if not preparar_depois:
         return 0
     if resultado.contato_ambiguo and not saida_json:
@@ -768,6 +783,7 @@ def pedir_cmd(
         abrir_pagina=abrir_pagina_extensao,
         pasta_navegador=RAIZ / "dados" / "navegador",
         agora=datetime.now(UTC).isoformat(),
+        avisar=None if saida_json else _avisar_etapa,
     )
     if menu:
         print()
@@ -780,6 +796,8 @@ def pedir_cmd(
                 print(f"  por quê: {item.por_que}")
         return 0
 
+    if not saida_json:
+        _avisar_etapa("Redigindo os ganchos e as mensagens...")
     config = configuracao()
     num_ctx = config.roteamento.perfis[config.roteamento.perfil_ativo].tarefas["redigir_ganchos"].num_ctx
     agora_redacao = datetime.now(UTC).isoformat()
@@ -821,6 +839,11 @@ def _imprimir_redacao(resultado: ResultadoPedido, redacao: Redacao) -> None:
         print(f'   "{gancho.mensagem}"')
         if gancho.abordagem_presencial:
             print(f"   Abordagem presencial: {gancho.abordagem_presencial}")
+        if gancho.links:
+            print("   Links:")
+            for link in gancho.links:
+                print(f"   - {link.veiculo}: {link.titulo}")
+                print(f"     {link.url}")
     if redacao.aviso:
         print()
         print(f"AVISO: {redacao.aviso}")
@@ -1219,6 +1242,12 @@ def _montar_parser() -> argparse.ArgumentParser:
     )
     pedir_parser.add_argument("--json", action="store_true", help="imprime a redação em JSON")
     pedir_parser.add_argument("--contato", type=int, default=None, help="id do contato (força a escolha)")
+    pedir_parser.add_argument(
+        "--perfil",
+        action="append",
+        default=None,
+        help="link do perfil do contato numa rede (grava e substitui o que houver); pode repetir",
+    )
 
     extensao_parser = subparsers.add_parser("extensao")
     extensao_sub = extensao_parser.add_subparsers(dest="acao", required=True)
@@ -1318,6 +1347,7 @@ def main(argv: list[str] | None = None) -> int:
             sem_perguntar=args.sem_perguntar,
             trocar_perfil=args.trocar_perfil,
             menu=args.menu,
+            perfis_informados=args.perfil,
         )
     if args.comando == "preparar":
         return preparar_cmd(

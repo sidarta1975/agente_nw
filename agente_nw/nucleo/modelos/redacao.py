@@ -11,6 +11,17 @@ MAXIMO_PALAVRAS_TITULO = 12
 MAXIMO_GANCHOS = 4
 
 
+class LinkNoticia(BaseModel):
+    """Notícia real que sustenta o gancho; vem do banco, nunca do modelo."""
+
+    model_config = ConfigDict(frozen=True)
+
+    veiculo: str
+    titulo: str
+    url: str
+    texto: str | None = None  # texto integral da notícia no momento da entrega (fica no histórico)
+
+
 class Gancho(BaseModel):
     """Um assunto pronto para a conversa: a notícia, o motivo e a mensagem redigida."""
 
@@ -22,6 +33,7 @@ class Gancho(BaseModel):
     por_que_para_esta_pessoa: str = Field(min_length=1)
     mensagem: str = Field(min_length=1)
     abordagem_presencial: str | None = None
+    links: list[LinkNoticia] = Field(default_factory=list)
 
     @field_validator("titulo", "noticia", "por_que_para_esta_pessoa", "mensagem")
     @classmethod

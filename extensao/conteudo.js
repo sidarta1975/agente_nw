@@ -176,10 +176,28 @@
     return Array.from(vistos.entries());
   }
 
+  // Imagens publicadas na página (não ícones nem foto de perfil): só endereço, texto alternativo e a
+  // publicação a que pertencem. Quem baixa os bytes é o background.js.
+  function listarImagens({ maximo, largura_minima, ignorar }) {
+    const pular = new Set(ignorar || []);
+    const achadas = [];
+    for (const img of document.images) {
+      if (achadas.length >= maximo) break;
+      const src = img.currentSrc || img.src || "";
+      const chave = src.split("?")[0];
+      if (!/^https?:/.test(src) || pular.has(chave) || !img.complete) continue;
+      if (img.naturalWidth < largura_minima) continue;
+      pular.add(chave);
+      const ancora = img.closest("a[href]");
+      achadas.push({ src, alt: img.alt || "", link: ancora ? ancora.href : "" });
+    }
+    return achadas;
+  }
+
   function estado(maximo) {
     const texto = document.body ? document.body.innerText : "";
     return { url: location.href, texto: texto.slice(0, maximo) };
   }
 
-  globalThis.agenteNw = { casaTexto, ehRolavel, ehCaminhoDeLista, rolar, links, estado };
+  globalThis.agenteNw = { casaTexto, ehRolavel, ehCaminhoDeLista, rolar, links, estado, listarImagens };
 })();

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "agente_nw — leitura de redes sociais",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Lê listas, buscas e perfis de rede social no seu Chrome, só quando o agente_nw pede.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvDymYokRZH3OURJ2deQCdujtDSljrEGa3+Pm46iqWuDU7Mqf+dMZGhBZwBRgLybKReL5DmviqwPeAIi9udW7FIAiPR/8r8HE0W+tVbcOQR4YitdvwfF3vozSQeT6kTgchRnY8MPA9JlBlp9VMla/ZkZ8jlYjpMHwZcMRTeQlwd2tCPa2WeVlVJufydRcbmEA4aCNDmJhkbmBs4kzEUNVzLVrgB8iB/6Ht26U8cTEZ1evg5B9w9bh4B8cRHurc4Smx8FlHnjzG9zx5NST7V1NykHsQSUiXNDn6EFOpRvxvvlI5LbwyrzDszv/hDIAwcNKlf/iyCu7MTtF5Co6jyoZuwIDAQAB",
   "permissions": [
@@ -13,7 +13,11 @@
     "https://*.linkedin.com/*",
     "https://*.instagram.com/*",
     "https://*.facebook.com/*",
-    "https://*.x.com/*"
+    "https://*.x.com/*",
+    "https://*.cdninstagram.com/*",
+    "https://*.fbcdn.net/*",
+    "https://*.licdn.com/*",
+    "https://*.twimg.com/*"
   ],
   "background": {
     "service_worker": "background.js"

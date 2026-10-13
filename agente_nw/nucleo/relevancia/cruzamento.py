@@ -208,9 +208,7 @@ def cruzar_contato_por_consulta(
     assunto_contato.apagar_nao_decididos_do_dia(conexao, perfil_id, data)
     conexao.commit()
 
-    centroide_contato = perfis.calcular_centroide_flexivel(
-        conexao, perfil_id, limiares.conector.peso_nivel, cliente_llm
-    )
+    centroide_contato = perfis.calcular_centroide_do_contato(conexao, perfil_id, cliente_llm)
     if centroide_contato is not None:
         perfis.gravar_centroide(conexao, perfil_id, centroide_contato)
         conexao.commit()
@@ -269,11 +267,6 @@ def cruzar_contato_por_consulta(
     termos_consulta = (
         list(zip(nomes_termos, cliente_llm.embeddar(nomes_termos), strict=True)) if nomes_termos else []
     )
-    tags_contato = [
-        (nome, embedding)
-        for nome, embedding, _ in perfil_tema.listar_do_contato_com_embedding(conexao, perfil_id)
-    ]
-
     avaliacoes: list[tuple[Assunto, Avaliacao]] = []
     for assunto in restantes:
         assert assunto.id is not None
@@ -291,7 +284,6 @@ def cruzar_contato_por_consulta(
                     assunto.conversavel,
                     limiares.conector,
                     termos_consulta,
-                    tags_contato,
                 ),
             )
         )
@@ -332,7 +324,9 @@ def cruzar_contato_por_consulta(
     contato = perfis.obter_por_id(conexao, perfil_id)
     assert contato is not None
     apelido_ou_nome = contato.apelido or contato.nome
-    temas_contato = [nome for nome, _ in tags_contato]
+    # As tags são contextos fixos da relação (família, amigos, trabalho): vão para o texto, não para o
+    # centroide, que vem do que o contato publicou.
+    temas_contato = perfil_tema.listar_nomes_do_contato(conexao, perfil_id)
     temas_usuario_com_nivel = [(nome, nivel) for nome, nivel, _ in temas_usuario]
     assuntos_para_prompt: list[tuple[str, str, str | None]] = [
         (assunto.titulo_gerado or "", avaliacao.tipo, avaliacao.ponto_de_apoio)

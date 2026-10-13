@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Iterable
 from difflib import SequenceMatcher
 
 
@@ -13,6 +14,22 @@ def sem_acento_e_caixa(texto: str) -> str:
 def _palavras(texto: str) -> list[str]:
     """Palavras sem acento, caixa e pontuação ("Silva, CFA" vira "silva", "cfa")."""
     return re.sub(r"[^\w]+", " ", sem_acento_e_caixa(texto)).split()
+
+
+def variantes_do_nome(nomes: Iterable[str]) -> list[str]:
+    """Os nomes dados e, para os de três palavras ou mais, as combinações que as pessoas usam nas
+    contas ("Djalma Borges Martins" → "Djalma Borges", "Djalma Martins"). Sem repetir, na ordem."""
+    resultado: dict[str, str] = {}
+    for nome in nomes:
+        palavras = nome.split()
+        if not palavras:
+            continue
+        candidatas = [" ".join(palavras)]
+        if len(palavras) >= 3:
+            candidatas += [f"{palavras[0]} {palavras[1]}", f"{palavras[0]} {palavras[-1]}"]
+        for candidata in candidatas:
+            resultado.setdefault(sem_acento_e_caixa(candidata), candidata)
+    return list(resultado.values())
 
 
 def casa_nome(busca: str, nome: str) -> bool:

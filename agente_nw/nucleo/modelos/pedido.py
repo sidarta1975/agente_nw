@@ -105,5 +105,7 @@ class ResultadoPedido:
     contato_criado: bool = False
     contato_ambiguo: bool = False
     candidatos: list[Perfil] = field(default_factory=list)
-    localizacao: Localizacao | None = None  # brief 037: só quando o contato ainda não tem rede gravada
+    # Curadoria por rede (brief 037): uma localização para cada rede em que o contato ainda não tem perfil.
+    localizacoes: list[Localizacao] = field(default_factory=list)
+    links_nao_reconhecidos: list[str] = field(default_factory=list)  # de --perfil
     link_gravado: Opcao | None = None  # o pedido trouxe o link da pessoa e ele foi gravado direto
