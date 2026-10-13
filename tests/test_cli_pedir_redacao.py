@@ -13,7 +13,7 @@ from agente_nw.nucleo.consulta import ItemMenu, ResultadoConsulta, ResumoRedeSoc
 from agente_nw.nucleo.database import conexao, migracoes
 from agente_nw.nucleo.database.queries import assuntos as assuntos_q
 from agente_nw.nucleo.database.queries import consulta_contato as consulta_contato_q
-from agente_nw.nucleo.database.queries import gancho_uso
+from agente_nw.nucleo.database.queries import gancho_uso, perfis
 from agente_nw.nucleo.modelos.assunto import Assunto
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.redacao import Gancho, RespostaRedacao
@@ -124,3 +124,22 @@ def test_json_imprime_a_redacao(capsys: pytest.CaptureFixture[str]) -> None:
     dados = json.loads(capsys.readouterr().out)
     assert dados["registro_usado"] == "cordial"
     assert dados["ganchos"][0]["titulo"] == "Seguradora muda regra de reajuste"
+
+
+def test_homonimos_nao_preparam_nem_gravam_rede_em_quem_pode_ser_outro(
+    conn: sqlite3.Connection, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    perfis.inserir_novo_contato(conn, "Otávio Alves", None, None, AGORA)
+    perfis.inserir_novo_contato(conn, "Otávio Souza", None, None, AGORA)
+    conn.commit()
+
+    def _nao_deveria_preparar(**_kwargs: Any) -> ResultadoConsulta:
+        raise AssertionError("não prepara com contato ambíguo")
+
+    monkeypatch.setattr(consulta_mod, "preparar", _nao_deveria_preparar)
+
+    assert cli.pedir_cmd("Almoço com o Otávio", True, False, None) == 0
+
+    saida = capsys.readouterr().out
+    assert "escolha um com --contato" in saida
+    assert "Ganchos para" not in saida

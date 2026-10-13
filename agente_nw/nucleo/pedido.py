@@ -175,6 +175,8 @@ def _localizar_na_rede(
     pedido = resultado.pedido
     if perfil is None or perfil.id is None or not pedido.pessoa_nome:
         return
+    if resultado.contato_ambiguo:
+        return  # há homônimos e o contato é um palpite: não grava rede social em quem pode ser outro
 
     link = pedido.pessoa_pistas.get("link_rede_social")
     if link:

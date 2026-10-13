@@ -739,6 +739,9 @@ def pedir_cmd(
         )
     if not preparar_depois:
         return 0
+    if resultado.contato_ambiguo and not saida_json:
+        print("Há mais de um contato com esse nome: escolha um com --contato <id> e repita o pedido.")
+        return 0
     if resultado.perfil is None or resultado.perfil.id is None:
         sem_pessoa = "pedido sem pessoa — não há contato para preparar."
         if saida_json:
