@@ -168,6 +168,8 @@ class ColetaLimiares(BaseModel):
     """Imagens publicadas de cada rede do contato que o modelo de visão descreve (0 = não lê imagens)."""
     largura_minima_imagem: int = Field(default=250, ge=1)
     """Largura (px) abaixo da qual a imagem é ícone ou foto de perfil e não publicação."""
+    maximo_itens_novos_por_feed: int = Field(default=15, ge=1)
+    """Notícias novas aceitas de cada feed por coleta (as mais recentes); evita rajadas de pedidos."""
 
 
 class CartaoLimiares(BaseModel):

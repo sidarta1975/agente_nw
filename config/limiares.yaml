@@ -31,6 +31,7 @@ coleta:
   retencao_texto_dias: 90
   intervalo_google_news_segundos: 2
   dias_alerta_feed_vazio: 2
+  maximo_itens_novos_por_feed: 15  # notícias novas por feed em cada coleta (as mais recentes)
   maximo_blocos_por_rede: 10      # blocos lidos por rede do contato; cada um custa uma chamada ao modelo
   maximo_imagens_por_rede: 8      # imagens publicadas descritas por rede (modelo de visão); 0 = não lê
   largura_minima_imagem: 250      # abaixo disso é ícone ou foto de perfil, não publicação

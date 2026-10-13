@@ -107,3 +107,51 @@ def test_erro_comum_de_um_feed_nao_bloqueia_os_demais(tmp_path: Path, limiares: 
     assert resumo.bloqueio is None
     assert resumo.feeds_com_erro == ["Fonte2"]
     assert resumo.fontes_processadas == 2
+
+
+def test_titulo_ja_conhecido_nao_gera_pedido_de_rede_e_o_limite_por_feed_vale(
+    tmp_path: Path, limiares: ColetaLimiares
+) -> None:
+    pedidos: list[str] = []
+
+    def feed_com(titulos: list[str]) -> bytes:
+        publicado = format_datetime(datetime.now(UTC) - timedelta(days=1))
+        itens = "".join(
+            f"<item><title>{t}</title><link>https://exemplo.com/{n}</link>"
+            f"<pubDate>{publicado}</pubDate></item>"
+            for n, t in enumerate(titulos)
+        )
+        return f'<?xml version="1.0"?><rss version="2.0"><channel>{itens}</channel></rss>'.encode()
+
+    titulos = [f"Notícia número {n} sobre um assunto" for n in range(6)]
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url.endswith("/feed1.xml"):
+            return httpx.Response(200, content=feed_com(titulos))
+        pedidos.append(url)
+        return httpx.Response(200, text=_PAGINA_HTML)
+
+    cliente = httpx.Client(transport=httpx.MockTransport(handler))
+    banco = conexao.abrir(tmp_path / "teste.db")
+    migracoes.aplicar(banco)
+    fontes = tmp_path / "fontes.yaml"
+    fontes.write_text(
+        "feeds:\n  - nome: Fonte1\n    url: https://exemplo.com/feed1.xml\n"
+        "    tipo: veiculo\n    confiabilidade: 7\n",
+        encoding="utf-8",
+    )
+    limitado = limiares.model_copy(update={"maximo_itens_novos_por_feed": 4})
+
+    primeira = leitor.coletar(banco, cliente, fontes, limitado, tmp_path / "PARE")
+
+    assert primeira.itens_novos == 4  # parou no limite do feed
+    assert len(pedidos) == 8  # 2 pedidos por notícia nova (redirecionamento + página)
+
+    pedidos.clear()
+    banco.execute("DELETE FROM progresso")  # simula outro dia: o feed é lido de novo
+    segunda = leitor.coletar(banco, cliente, fontes, limitado, tmp_path / "PARE")
+
+    assert segunda.duplicados == 4  # as 4 já conhecidas não geram nenhum pedido
+    assert segunda.itens_novos == 2
+    assert len(pedidos) == 4

@@ -25,6 +25,19 @@ from agente_nw.nucleo.modelos.item import Item
 
 ETAPA_PROGRESSO = "coleta"
 _CODIGOS_DE_BLOQUEIO = (429, 503)
+_HOST_GOOGLE_NEWS = "news.google.com"
+_ultimo_acesso_google = [0.0]
+
+
+def _respeitar_intervalo_do_google(url: str, intervalo_s: float) -> None:
+    """Pedidos ao news.google.com (feeds, redirecionamentos e páginas) guardam o intervalo configurado:
+    rajadas de centenas de pedidos fazem o Google bloquear o IP."""
+    if _HOST_GOOGLE_NEWS not in url:
+        return
+    espera = intervalo_s - (time.monotonic() - _ultimo_acesso_google[0])
+    if espera > 0:
+        time.sleep(espera)
+    _ultimo_acesso_google[0] = time.monotonic()
 
 
 @dataclass
@@ -158,14 +171,20 @@ def _processar_fonte(
         if not titulo or not link:
             continue
 
-        url_final = url_canonica(cliente_http, link)
         hash_do_titulo = hash_titulo(titulo)
+        # O mesmo título aparece em várias buscas: checa pelo título antes de qualquer pedido de rede.
+        if queries_itens.existe(conexao_bd, "", hash_do_titulo):
+            resumo.duplicados += 1
+            continue
 
+        _respeitar_intervalo_do_google(str(link), limiares.intervalo_google_news_segundos)
+        url_final = url_canonica(cliente_http, link)
         if queries_itens.existe(conexao_bd, url_final, hash_do_titulo):
             resumo.duplicados += 1
             continue
 
         corpo: str | None = None
+        _respeitar_intervalo_do_google(url_final, limiares.intervalo_google_news_segundos)
         try:
             pagina = cliente_http.get(url_final, timeout=15.0)
             pagina.raise_for_status()
@@ -193,5 +212,7 @@ def _processar_fonte(
         queries_itens.inserir(conexao_bd, item)
         resumo.itens_novos += 1
         n_itens_novos_da_fonte += 1
+        if n_itens_novos_da_fonte >= limiares.maximo_itens_novos_por_feed:
+            break
 
     return n_itens_novos_da_fonte
