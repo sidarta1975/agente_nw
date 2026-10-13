@@ -180,6 +180,8 @@ class ListasLimiares(BaseModel):
     validade_dias: int = Field(ge=1)
     similaridade_minima: float = Field(default=0.8, ge=0, le=1)
     maximo_parecidas: int = Field(default=5, ge=1)
+    rodadas_sem_novidade: int = Field(default=3, ge=1)
+    """Rodadas de rolagem seguidas sem entrada nova antes de dar a lista por lida."""
     redes_so_por_link: tuple[str, ...] = ()
     """Redes que não são lidas nem buscadas sozinhas (só por link colado). Vazio por padrão (brief 044)."""
 

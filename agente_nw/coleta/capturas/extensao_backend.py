@@ -28,7 +28,9 @@ class PaginaExtensao:
         ponte: Ponte,
         limiares: ExtensaoLimiares,
         dorme: Callable[[float], None] = time.sleep,
+        maximo_entradas: int = 2000,
     ) -> None:
+        self._maximo_entradas = maximo_entradas
         self._ponte = ponte
         self._dorme = dorme
         self._limiares = limiares
@@ -90,6 +92,8 @@ class PaginaExtensao:
                 "aba_id": self._aba_id,
                 "rotulos": list(self._limiares.textos_botao_mostrar_mais),
                 "pausa_s": 1.5,
+                "maximo_entradas": self._maximo_entradas,
+                "pausa_pagina_s": self._limiares.pausa_entre_paginas_s,
             }
         )
 
@@ -125,6 +129,11 @@ def abrir_pagina_extensao(pasta_ignorada: Path) -> PaginaExtensao:
     navegador separado) não é mais usado, a não ser para arquivar o perfil antigo na primeira vez."""
     from config.container import configuracao
 
-    limiares = configuracao().limiares.extensao
+    todos = configuracao().limiares
+    limiares = todos.extensao
     arquivar_navegador_antigo(pasta_ignorada.parent)
-    return PaginaExtensao(obter_ponte(limiares.espera_extensao_s, limiares.navegador_app), limiares)
+    return PaginaExtensao(
+        obter_ponte(limiares.espera_extensao_s, limiares.navegador_app),
+        limiares,
+        maximo_entradas=todos.listas.maximo_entradas,
+    )

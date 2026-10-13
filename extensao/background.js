@@ -107,7 +107,14 @@ async function tratar(tarefa) {
       return await comNovaTentativa(
         tarefa.aba_id,
         (opcoes) => globalThis.agenteNw.rolar(opcoes),
-        [{ rotulos: tarefa.rotulos, pausa_s: tarefa.pausa_s }],
+        [
+          {
+            rotulos: tarefa.rotulos,
+            pausa_s: tarefa.pausa_s,
+            maximo_entradas: tarefa.maximo_entradas,
+            pausa_pagina_s: tarefa.pausa_pagina_s,
+          },
+        ],
       );
     case "links":
       return { links: await comNovaTentativa(tarefa.aba_id, () => globalThis.agenteNw.links(), []) };

@@ -59,6 +59,8 @@ def test_cada_metodo_vira_a_tarefa_certa() -> None:
     }
     assert all(t["aba_id"] == 7 for t in ponte.tarefas[1:])
     assert "mostrar mais" in ponte.tarefas[2]["rotulos"]
+    assert ponte.tarefas[2]["maximo_entradas"] == 2000
+    assert ponte.tarefas[2]["pausa_pagina_s"] == 3.0
     assert set(ponte.limites) == {45.0}
 
 

@@ -14,7 +14,6 @@ from agente_nw.nucleo.modelos.lista_rede_social import EntradaLista
 REDES_COM_USUARIO: tuple[str, ...] = ("instagram", "x")
 _MAX_ESPERAS_LOGIN = 0  # sem espera: o usuário já está logado no próprio Chrome (brief 044)
 _ESPERA_LOGIN_S = 5.0
-_RODADAS_SEM_NOVIDADE = 3
 
 _URL_LISTA: dict[str, str] = {
     "linkedin": "https://www.linkedin.com/mynetwork/invite-connect/connections/",
@@ -339,7 +338,7 @@ def ler_lista(
 
     acumuladas: dict[str, EntradaLista] = {}
     sem_novidade = 0
-    while len(acumuladas) < limiares.maximo_entradas and sem_novidade < _RODADAS_SEM_NOVIDADE:
+    while len(acumuladas) < limiares.maximo_entradas and sem_novidade < limiares.rodadas_sem_novidade:
         antes = len(acumuladas)
         try:
             links = pagina.coletar_links()

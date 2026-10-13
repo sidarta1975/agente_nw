@@ -39,6 +39,7 @@ listas:
   validade_dias: 30
   similaridade_minima: 0.8
   maximo_parecidas: 5
+  rodadas_sem_novidade: 6         # listas que carregam aos poucos (Instagram) pedem mais paciência
   redes_so_por_link: []           # redes que a extensão não deve ler sozinha (ex.: [x]); vazio = todas automáticas
 extensao:                         # brief 044: leitura de rede social pelo Chrome do usuário
   tempo_limite_tarefa_s: 60

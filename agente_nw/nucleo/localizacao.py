@@ -165,6 +165,7 @@ def atualizar_lista(
             contexto.limiares,
             dorme=contexto.dorme,
         )
+        vista = _o_que_a_pagina_mostra(pagina) if resultado.autenticado and not resultado.entradas else ""
     finally:
         pagina.fechar()
 
@@ -176,11 +177,21 @@ def atualizar_lista(
             lida=False,
             usou_cache=False,
             total=0,
-            motivo=f"abri a lista de {rede} mas não achei ninguém nela (a página pode ter mudado)",
+            motivo=f"abri a lista de {rede} mas não achei ninguém nela (a página pode ter mudado){vista}",
         )
     queries_listas.substituir_lista(conexao, rede, resultado.entradas, agora)
     conexao.commit()
     return ResultadoAtualizacao(rede=rede, lida=True, usou_cache=False, total=len(resultado.entradas))
+
+
+def _o_que_a_pagina_mostra(pagina: PaginaLista) -> str:
+    """Endereço e começo do texto da página, para o usuário ver por que a lista veio vazia."""
+    try:
+        url, texto = pagina.estado()
+    except Exception:
+        return ""
+    resumo = " ".join(str(texto).split())[:160]
+    return f' — a aba estava em {url}: "{resumo}"'
 
 
 def _busca_geral(
