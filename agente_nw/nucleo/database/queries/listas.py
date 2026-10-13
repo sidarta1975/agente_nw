@@ -95,6 +95,16 @@ def vincular(conexao: sqlite3.Connection, link: str, perfil_id: int) -> bool:
     return cursor.rowcount > 0
 
 
+def cabecalhos_do_perfil(conexao: sqlite3.Connection, perfil_id: int) -> list[tuple[str, str]]:
+    """[(rede, cabeçalho)] das entradas das listas vinculadas ao contato que têm cabeçalho."""
+    linhas = conexao.execute(
+        "SELECT rede, cabecalho FROM lista_rede_social "
+        "WHERE perfil_id = ? AND cabecalho IS NOT NULL AND cabecalho <> '' ORDER BY rede",
+        (perfil_id,),
+    ).fetchall()
+    return [(linha["rede"], linha["cabecalho"]) for linha in linhas]
+
+
 def ultima_leitura(conexao: sqlite3.Connection, rede: str) -> str | None:
     (quando,) = conexao.execute(
         "SELECT MAX(lido_em) FROM lista_rede_social WHERE rede = ?", (rede,)

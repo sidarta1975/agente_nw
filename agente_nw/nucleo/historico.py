@@ -4,6 +4,7 @@ import json
 import sqlite3
 
 from agente_nw.nucleo.database.queries import consulta_contato as queries
+from agente_nw.nucleo.database.queries import gancho_uso as gancho_uso_queries
 from agente_nw.nucleo.modelos.consulta_contato import ConsultaContato
 
 LIMITE_PADRAO = 5
@@ -38,22 +39,40 @@ def _formatar_assuntos(assuntos_entregues_json: str) -> str:
     return " · ".join(titulos)
 
 
-def _formatar_uma(consulta: ConsultaContato) -> str:
+def _formatar_ganchos(conexao: sqlite3.Connection, consulta_id: int) -> str | None:
+    """Os ganchos redigidos na consulta, cada um com o que o usuário fez com ele (brief 038)."""
+    partes: list[str] = []
+    for _assunto_id, status, gancho_json in gancho_uso_queries.listar_por_consulta(conexao, consulta_id):
+        try:
+            dados = json.loads(gancho_json)
+        except json.JSONDecodeError:
+            continue
+        titulo = dados.get("titulo") if isinstance(dados, dict) else None
+        if isinstance(titulo, str) and titulo:
+            partes.append(f"{titulo} ({status})")
+    return " · ".join(partes) or None
+
+
+def formatar_uma(consulta: ConsultaContato, conexao: sqlite3.Connection | None = None) -> str:
     data = consulta.criado_em[:10]
     linhas = [f"[{data}] contexto: {_formatar_contexto(consulta.contexto_json)}"]
     if consulta.resumo_redes_sociais:
         linhas.append(f"  leitura de rede social: {consulta.resumo_redes_sociais}")
     linhas.append(f"  entregues: {_formatar_assuntos(consulta.assuntos_entregues_json)}")
+    if conexao is not None and consulta.id is not None:
+        ganchos = _formatar_ganchos(conexao, consulta.id)
+        if ganchos:
+            linhas.append(f"  ganchos redigidos: {ganchos}")
     return "\n".join(linhas)
 
 
-def formatar(consultas: list[ConsultaContato]) -> str:
+def formatar(consultas: list[ConsultaContato], conexao: sqlite3.Connection | None = None) -> str:
     if not consultas:
         return ""
-    return "\n".join(_formatar_uma(c) for c in consultas)
+    return "\n".join(formatar_uma(c, conexao) for c in consultas)
 
 
 def historico_recente_para_prompt(
     conexao: sqlite3.Connection, perfil_id: int, limite: int = LIMITE_PADRAO
 ) -> str:
-    return formatar(queries.listar_por_perfil(conexao, perfil_id, limite))
+    return formatar(queries.listar_por_perfil(conexao, perfil_id, limite), conexao)

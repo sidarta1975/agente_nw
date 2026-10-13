@@ -1,0 +1,126 @@
+from __future__ import annotations
+
+import json
+import sqlite3
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+import agente_nw.cli as cli
+import agente_nw.nucleo.consulta as consulta_mod
+from agente_nw.nucleo.consulta import ItemMenu, ResultadoConsulta, ResumoRedeSocial
+from agente_nw.nucleo.database import conexao, migracoes
+from agente_nw.nucleo.database.queries import assuntos as assuntos_q
+from agente_nw.nucleo.database.queries import consulta_contato as consulta_contato_q
+from agente_nw.nucleo.database.queries import gancho_uso
+from agente_nw.nucleo.modelos.assunto import Assunto
+from agente_nw.nucleo.modelos.pedido import PedidoExtraido
+from agente_nw.nucleo.modelos.redacao import Gancho, RespostaRedacao
+
+AGORA = "2026-10-12T10:00:00+00:00"
+ESTADO: dict[str, Any] = {}
+
+
+def _pedido(meio: str) -> PedidoExtraido:
+    return PedidoExtraido.model_validate(
+        {
+            "pessoa_nome": "Otávio",
+            "pessoa_pistas": {"vinculo": "ex-sócio"},
+            "objetivo": "retomar",
+            "objetivo_texto": "voltar a conversar",
+            "meio": meio,
+            "registro": "cordial",
+            "assunto_principal": "mercado de seguros",
+            "termos_busca": ["seguros"],
+            "confianca": 0.9,
+        }
+    )
+
+
+class _LLMFalso:
+    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+        if tarefa_nome == "extrair_pedido":
+            return _pedido(ESTADO["meio"])
+        gancho = Gancho(
+            assunto_id=ESTADO["assunto_id"],
+            titulo="Seguradora muda regra de reajuste",
+            noticia="A seguradora mudou a regra. A mudança vale em janeiro.",
+            por_que_para_esta_pessoa="Ele atua no setor de seguros.",
+            mensagem="Oi, Otávio! Li que o reajuste dos seguros vai mudar e lembrei de você.",
+            abordagem_presencial="Pergunte como o setor reagiu à mudança.",
+        )
+        return RespostaRedacao(ganchos=[gancho])
+
+
+def _preparar_falso(**kwargs: Any) -> ResultadoConsulta:
+    conn: sqlite3.Connection = kwargs["conexao"]
+    assunto_id = assuntos_q.inserir(
+        conn,
+        Assunto(titulo_gerado="Regra de reajuste", primeiro_visto=AGORA, ultimo_visto=AGORA, status="novo"),
+    )
+    ESTADO["assunto_id"] = assunto_id
+    consulta = consulta_contato_q.inserir(conn, kwargs["perfil_id"], AGORA, "{}", None, "[]")
+    conn.commit()
+    assert consulta.id is not None
+    item = ItemMenu(1, assunto_id, "conector", "Regra de reajuste", "ele atua no setor", 71.0)
+    return ResultadoConsulta(kwargs["perfil_id"], consulta.id, [item], ResumoRedeSocial(), "")
+
+
+@pytest.fixture
+def conn(tmp_path: Path) -> sqlite3.Connection:
+    conexao_aberta = conexao.abrir(tmp_path / "teste.db")
+    migracoes.aplicar(conexao_aberta)
+    return conexao_aberta
+
+
+@pytest.fixture(autouse=True)
+def _ambiente(conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch) -> None:
+    ESTADO.clear()
+    ESTADO["meio"] = "pessoalmente"
+    monkeypatch.setattr(cli, "banco", lambda: conn)
+    monkeypatch.setattr(cli, "llm", lambda: _LLMFalso())
+    monkeypatch.setattr(cli, "_contexto_de_navegacao", lambda *_a, **_k: None)
+    monkeypatch.setattr(consulta_mod, "preparar", _preparar_falso)
+
+
+def test_pedir_entrega_a_redacao_por_padrao(
+    conn: sqlite3.Connection, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert cli.pedir_cmd("Almoço com o Otávio", True, False, None) == 0
+
+    saida = capsys.readouterr().out
+    assert "Ganchos para Otávio" in saida
+    assert "1. Seguradora muda regra de reajuste" in saida
+    assert "Mensagem:" in saida
+    assert "Abordagem presencial: Pergunte como o setor reagiu" in saida
+    linhas = conn.execute("SELECT status FROM gancho_uso").fetchall()
+    assert [linha["status"] for linha in linhas] == ["entregue"]
+
+
+def test_pedido_por_whatsapp_traz_so_a_mensagem(capsys: pytest.CaptureFixture[str]) -> None:
+    ESTADO["meio"] = "whatsapp"
+
+    cli.pedir_cmd("Falar com o Otávio", True, False, None)
+
+    saida = capsys.readouterr().out
+    assert "Mensagem:" in saida
+    assert "Abordagem presencial" not in saida
+
+
+def test_menu_mantem_o_formato_anterior(conn: sqlite3.Connection, capsys: pytest.CaptureFixture[str]) -> None:
+    cli.pedir_cmd("Almoço com o Otávio", True, False, None, menu=True)
+
+    saida = capsys.readouterr().out
+    assert "[conector] Regra de reajuste (score=71.0)" in saida
+    assert "por quê: ele atua no setor" in saida
+    assert "Mensagem:" not in saida
+    assert gancho_uso.listar_por_consulta(conn, 1) == []
+
+
+def test_json_imprime_a_redacao(capsys: pytest.CaptureFixture[str]) -> None:
+    assert cli.pedir_cmd("Almoço com o Otávio", True, True, None) == 0
+
+    dados = json.loads(capsys.readouterr().out)
+    assert dados["registro_usado"] == "cordial"
+    assert dados["ganchos"][0]["titulo"] == "Seguradora muda regra de reajuste"

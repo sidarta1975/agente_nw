@@ -29,6 +29,7 @@ from agente_nw.nucleo.database.queries import temas as queries_temas
 from agente_nw.nucleo.localizacao import ContextoNavegacao, atualizar_lista
 from agente_nw.nucleo.modelos.configuracao import PerfilRoteamento, Roteamento, TemasArquivo
 from agente_nw.nucleo.modelos.pedido import ResultadoPedido
+from agente_nw.nucleo.modelos.redacao import Redacao
 from agente_nw.nucleo.relevancia import cartoes, cruzamento, qualificador
 from agente_nw.nucleo.saidas import markdown
 from agente_nw.perfil import agenda_google_csv, agenda_macos, extrator
@@ -686,6 +687,9 @@ def _contexto_de_navegacao(
     )
 
 
+_FRACAO_DO_CONTEXTO_NO_PROMPT = 0.73  # 8192 de contexto → ~6000 tokens estimados de prompt
+
+
 def pedir_cmd(
     frase: str,
     preparar_depois: bool,
@@ -695,6 +699,7 @@ def pedir_cmd(
     trocar_perfil: bool = False,
     entrada: Callable[[str], str] = input,
     abrir_pagina: Callable[[Path], PaginaLista] | None = None,
+    menu: bool = False,
 ) -> int:
     from agente_nw.nucleo import confirmacao
     from agente_nw.nucleo import pedido as pedido_mod
@@ -714,13 +719,14 @@ def pedir_cmd(
         print(f"FALHA: {erro}")
         return 1
 
-    if saida_json:
+    if saida_json and not preparar_depois:
         print(resultado.pedido.model_dump_json(indent=2))
         return 0
 
-    _imprimir_pedido(resultado, frase)
-    if resultado.link_gravado is not None:
-        print(f"Rede social gravada a partir do link do pedido: {resultado.link_gravado.link}")
+    if not saida_json:
+        _imprimir_pedido(resultado, frase)
+        if resultado.link_gravado is not None:
+            print(f"Rede social gravada a partir do link do pedido: {resultado.link_gravado.link}")
     if resultado.localizacao is not None and resultado.perfil is not None and resultado.perfil.id is not None:
         confirmacao.conduzir(
             conn,
@@ -734,10 +740,16 @@ def pedir_cmd(
     if not preparar_depois:
         return 0
     if resultado.perfil is None or resultado.perfil.id is None:
-        print("AVISO: pedido sem pessoa — não há contato para preparar.")
+        sem_pessoa = "pedido sem pessoa — não há contato para preparar."
+        if saida_json:
+            vazia = Redacao(aviso=sem_pessoa, registro_usado=resultado.pedido.registro)
+            print(vazia.model_dump_json(indent=2))
+        else:
+            print(f"AVISO: {sem_pessoa}")
         return 0
 
     from agente_nw.coleta.capturas.extensao_backend import abrir_pagina_extensao
+    from agente_nw.nucleo import redacao as redacao_mod
     from agente_nw.nucleo.consulta import preparar
 
     contexto = pedido_mod.para_contexto(resultado.pedido, frase)
@@ -754,15 +766,61 @@ def pedir_cmd(
         pasta_navegador=RAIZ / "dados" / "navegador",
         agora=datetime.now(UTC).isoformat(),
     )
-    print()
-    print(f"Consulta #{consulta.consulta_id} gravada para {resultado.perfil.nome}.")
-    if consulta.aviso:
-        print(f"AVISO: {consulta.aviso}")
-    for item in consulta.itens_menu:
-        print(f"[{item.tipo}] {item.titulo} (score={item.score:.1f})")
-        if item.por_que:
-            print(f"  por quê: {item.por_que}")
+    if menu:
+        print()
+        print(f"Consulta #{consulta.consulta_id} gravada para {resultado.perfil.nome}.")
+        if consulta.aviso:
+            print(f"AVISO: {consulta.aviso}")
+        for item in consulta.itens_menu:
+            print(f"[{item.tipo}] {item.titulo} (score={item.score:.1f})")
+            if item.por_que:
+                print(f"  por quê: {item.por_que}")
+        return 0
+
+    config = configuracao()
+    num_ctx = config.roteamento.perfis[config.roteamento.perfil_ativo].tarefas["redigir_ganchos"].num_ctx
+    agora_redacao = datetime.now(UTC).isoformat()
+    try:
+        redacao = redacao_mod.redigir(
+            llm(),
+            conn,
+            resultado.pedido,
+            consulta,
+            resultado.perfil,
+            pedido_mod.garantir_usuario(conn, agora_redacao),
+            agora_redacao,
+            frase=frase,
+            limite_tokens=int(num_ctx * _FRACAO_DO_CONTEXTO_NO_PROMPT),
+        )
+    except FalhaJsonInvalido as erro:
+        print(f"FALHA: não consegui redigir os ganchos ({erro})")
+        return 1
+    redacao_mod.registrar(conn, consulta.consulta_id, redacao, agora_redacao)
+    if saida_json:
+        print(redacao.model_dump_json(indent=2))
+    else:
+        print()
+        print(f"Consulta #{consulta.consulta_id} gravada para {resultado.perfil.nome}.")
+        _imprimir_redacao(resultado, redacao)
     return 0
+
+
+def _imprimir_redacao(resultado: ResultadoPedido, redacao: Redacao) -> None:
+    pedido = resultado.pedido
+    print(f"Ganchos para {_descrever_pessoa(resultado)}")
+    print(f'Objetivo: {pedido.objetivo} — "{pedido.objetivo_texto}" · {pedido.meio} · {pedido.registro}')
+    for numero, gancho in enumerate(redacao.ganchos, start=1):
+        print()
+        print(f"{numero}. {gancho.titulo}")
+        print(f"   Notícia: {gancho.noticia}")
+        print(f"   Por que serve: {gancho.por_que_para_esta_pessoa}")
+        print("   Mensagem:")
+        print(f'   "{gancho.mensagem}"')
+        if gancho.abordagem_presencial:
+            print(f"   Abordagem presencial: {gancho.abordagem_presencial}")
+    if redacao.aviso:
+        print()
+        print(f"AVISO: {redacao.aviso}")
 
 
 def extensao_instalar_cmd() -> int:
@@ -1150,8 +1208,13 @@ def _montar_parser() -> argparse.ArgumentParser:
     pedir_parser.add_argument(
         "--trocar-perfil", action="store_true", help="reabre a escolha da rede social do contato"
     )
-    pedir_parser.add_argument("--preparar", action="store_true", help="encadeia a consulta e imprime o menu")
-    pedir_parser.add_argument("--json", action="store_true", help="imprime só o pedido extraído, em JSON")
+    pedir_parser.add_argument(
+        "--preparar", action="store_true", help="(já é o padrão: o pedido sempre encadeia a consulta)"
+    )
+    pedir_parser.add_argument(
+        "--menu", action="store_true", help="imprime o menu de assuntos em vez da redação"
+    )
+    pedir_parser.add_argument("--json", action="store_true", help="imprime a redação em JSON")
     pedir_parser.add_argument("--contato", type=int, default=None, help="id do contato (força a escolha)")
 
     extensao_parser = subparsers.add_parser("extensao")
@@ -1242,13 +1305,16 @@ def main(argv: list[str] | None = None) -> int:
             return listas_atualizar_cmd(args.rede, args.forcar)
         return listas_ver_cmd(args.rede, args.filtro)
     if args.comando == "pedir":
+        if args.menu and args.json:
+            parser.error("--menu e --json não combinam: --json imprime a redação")
         return pedir_cmd(
             args.frase,
-            args.preparar,
+            True,
             args.json,
             args.contato,
             sem_perguntar=args.sem_perguntar,
             trocar_perfil=args.trocar_perfil,
+            menu=args.menu,
         )
     if args.comando == "preparar":
         return preparar_cmd(
