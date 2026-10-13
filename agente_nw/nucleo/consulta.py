@@ -201,7 +201,12 @@ def preparar(
             {"titulo": titulo, "tipo": registro.tipo, "score": registro.score, "por_que": registro.por_que}
         )
 
-    aviso = None if itens_menu else "Nenhum assunto qualificado para este contato agora."
+    aviso = (
+        None
+        if itens_menu
+        else "Não achei notícia com relação com o pedido ou com o que esta pessoa publica. "
+        "Tente outro assunto, ou espere notícias novas."
+    )
     historico_texto = historico_mod.historico_recente_para_prompt(conexao, perfil_id)
 
     consulta_gravada = consulta_contato_q.inserir(

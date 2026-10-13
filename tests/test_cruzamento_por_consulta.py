@@ -297,3 +297,20 @@ def test_sem_fatos_o_centroide_vem_da_ficha_e_sem_nada_e_none(tmp_path: Path) ->
     perfis.atualizar_ficha_manual(conn, perfil_id, {"cargo": "fato de ficha"}, AGORA)
     conn.commit()
     assert perfis.calcular_centroide_do_contato(conn, perfil_id, cliente) == _vetor(0.0, 1.0)
+
+
+def test_assunto_sem_relacao_com_o_pedido_nao_entra_mesmo_sendo_conversavel(
+    tmp_path: Path, limiares: Limiares
+) -> None:
+    conn = _abrir(tmp_path, "caso_sem_relacao")
+    perfil_id = _contato(conn)
+    sem_relacao = _assunto(conn, "Serviço móvel de satélite chega ao Brasil", _vetor(0.0, 1.0))
+
+    resumo = cruzar_contato_por_consulta(
+        _ClienteFalso(), conn, perfil_id, _contexto(), CENTROIDE_CONSULTA, limiares, AGORA
+    )
+
+    registro = {r.assunto_id: r for r in assunto_contato.listar_do_dia(conn, perfil_id, DATA)}[sem_relacao]
+    assert resumo.sem_assunto is True
+    assert registro.status == "descartado"
+    assert registro.motivo == "pouca relação com o pedido"

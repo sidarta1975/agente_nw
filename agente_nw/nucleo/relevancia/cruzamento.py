@@ -288,10 +288,13 @@ def cruzar_contato_por_consulta(
             )
         )
 
+    # Na consulta só entra o que tem relação com o pedido, o contato ou os temas do usuário ("conector"):
+    # o "viável com esforço" não tem relação nenhuma e entregá-lo seria inventar gancho.
     for assunto, avaliacao in avaliacoes:
-        if avaliacao.tipo != "fora_do_dominio":
+        if avaliacao.tipo == "conector":
             continue
         assert assunto.id is not None
+        motivo = "fora do domínio" if avaliacao.tipo == "fora_do_dominio" else "pouca relação com o pedido"
         assunto_contato.inserir(
             conexao,
             AssuntoContato(
@@ -304,14 +307,14 @@ def cruzar_contato_por_consulta(
                 conversavel=avaliacao.conversavel,
                 score=avaliacao.score,
                 status="descartado",
-                motivo="fora do domínio",
+                motivo=motivo,
                 aderencia_consulta=avaliacao.aderencia_consulta,
             ),
         )
         resumo.descartados += 1
     conexao.commit()
 
-    demais = [(a, av) for a, av in avaliacoes if av.tipo != "fora_do_dominio"]
+    demais = [(a, av) for a, av in avaliacoes if av.tipo == "conector"]
     if not demais:
         resumo.sem_assunto = True
         resumo.motivo = "nenhum candidato passou do piso"
