@@ -175,7 +175,7 @@ def abrir_pagina_extensao(pasta_ignorada: Path) -> PaginaExtensao:
     limiares = todos.extensao
     arquivar_navegador_antigo(pasta_ignorada.parent)
     return PaginaExtensao(
-        obter_ponte(limiares.espera_extensao_s, limiares.navegador_app),
+        obter_ponte(limiares.espera_extensao_s, limiares.navegador_app, limiares.navegador_perfil),
         limiares,
         maximo_entradas=todos.listas.maximo_entradas,
     )
