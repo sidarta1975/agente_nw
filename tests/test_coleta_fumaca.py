@@ -22,7 +22,13 @@ def _rede_disponivel() -> bool:
         return False
 
 
-pytestmark = pytest.mark.skipif(not _rede_disponivel(), reason="rede indisponível (feed real não respondeu)")
+pytestmark = pytest.mark.rede_real  # só roda sob pedido: pytest -m rede_real
+
+
+@pytest.fixture(autouse=True)
+def _exige_rede() -> None:
+    if not _rede_disponivel():
+        pytest.skip("rede indisponível (feed real não respondeu)")
 
 
 @pytest.fixture
@@ -57,6 +63,8 @@ def test_leitor_completo_sobre_fontes_exemplo_nao_duplica_em_segunda_rodada(
     resumo1 = leitor.coletar(
         conexao_bd, cliente_http, RAIZ / "fontes.exemplo.yaml", limiares, caminho_sentinela
     )
+    if resumo1.bloqueio is not None:
+        pytest.skip(f"rede real bloqueou a coleta ({resumo1.bloqueio}); tente mais tarde")
     assert resumo1.fontes_processadas >= 3  # 3 feeds do exemplo + ao menos 1 consulta do Google News
     assert resumo1.itens_novos >= 1
 

@@ -24,6 +24,7 @@ from agente_nw.nucleo.modelos.fonte import Fonte
 from agente_nw.nucleo.modelos.item import Item
 
 ETAPA_PROGRESSO = "coleta"
+_CODIGOS_DE_BLOQUEIO = (429, 503)
 
 
 @dataclass
@@ -33,6 +34,8 @@ class ResumoColeta:
     duplicados: int = 0
     descartados_ruido: int = 0
     alertas_feed_vazio: list[str] = field(default_factory=list)
+    feeds_com_erro: list[str] = field(default_factory=list)
+    bloqueio: str | None = None  # o site recusou por excesso de pedidos (429/503): a coleta para na hora
     tempo_segundos: float = 0.0
 
 
@@ -105,6 +108,12 @@ def coletar(
             ultima_consulta_google_news = time.monotonic()
 
         n_itens_novos_da_fonte = _processar_fonte(conexao_bd, cliente_http, fonte, limiares, resumo)
+        if n_itens_novos_da_fonte is None:
+            # Feed que falhou não conta como processado: a próxima coleta do dia tenta de novo. Com
+            # bloqueio do site, continuar só prolonga o bloqueio.
+            if resumo.bloqueio is not None:
+                break
+            continue
 
         queries_fontes.registrar_execucao(conexao_bd, fonte.id, hoje, n_itens_novos_da_fonte)
         if queries_fontes.dois_dias_vazios(conexao_bd, fonte.id, hoje):
@@ -124,7 +133,8 @@ def _processar_fonte(
     fonte: Fonte,
     limiares: ColetaLimiares,
     resumo: ResumoColeta,
-) -> int:
+) -> int | None:
+    """Itens novos do feed, ou `None` se o feed não pôde ser lido."""
     assert fonte.id is not None
     n_itens_novos_da_fonte = 0
 
@@ -132,8 +142,15 @@ def _processar_fonte(
         resposta_feed = cliente_http.get(fonte.url_feed, timeout=15.0)
         resposta_feed.raise_for_status()
         analisado = feedparser.parse(resposta_feed.content)
+    except httpx.HTTPStatusError as erro:
+        resumo.feeds_com_erro.append(fonte.nome)
+        codigo = erro.response.status_code
+        if codigo in _CODIGOS_DE_BLOQUEIO:
+            resumo.bloqueio = f"{_dominio(fonte.url_feed)} respondeu {codigo}"
+        return None
     except Exception:
-        return 0
+        resumo.feeds_com_erro.append(fonte.nome)
+        return None
 
     for entrada in analisado.entries:
         titulo = str(entrada.get("title", "")).strip()

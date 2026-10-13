@@ -331,6 +331,10 @@ def coletar() -> int:
     if resumo.alertas_feed_vazio:
         nomes = ", ".join(resumo.alertas_feed_vazio)
         print(f"ALERTA — sem novidade em duas execuções seguidas: {nomes}")
+    if resumo.bloqueio is not None:
+        print(f"AVISO — {resumo.bloqueio}: excesso de buscas, o site bloqueou por um tempo")
+    elif resumo.feeds_com_erro:
+        print(f"AVISO — feeds que falharam: {', '.join(resumo.feeds_com_erro)}")
     print(f"Tempo total: {resumo.tempo_segundos:.1f}s")
     return 0
 

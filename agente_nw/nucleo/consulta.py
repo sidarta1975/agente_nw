@@ -143,7 +143,7 @@ def preparar(
         termos_contato = termos_contato_mod.termos_do_contato(cliente_llm, conexao, perfil_id)
         etapa(f"Termos de busca do contato: {', '.join(termos_contato) or '(nenhum)'}")
         etapa("Coletando notícias (feeds e consultas ao Google News)...")
-        leitor_rss.coletar(
+        resumo_coleta = leitor_rss.coletar(
             conexao,
             cliente_http,
             caminho_fontes if caminho_fontes.exists() else None,
@@ -151,6 +151,13 @@ def preparar(
             caminho_sentinela,
             feeds_extras=google_news.gerar_consultas_da_consulta(contexto, termos_contato),
         )
+        if resumo_coleta is not None and resumo_coleta.bloqueio is not None:
+            etapa(
+                f"AVISO: {resumo_coleta.bloqueio}: excesso de buscas, o site bloqueou por um tempo. "
+                "As notícias desta consulta não foram buscadas; só valem as já guardadas."
+            )
+        elif resumo_coleta is not None and resumo_coleta.feeds_com_erro:
+            etapa(f"AVISO: {len(resumo_coleta.feeds_com_erro)} busca(s) de notícia falharam nesta consulta.")
 
     etapa("Extraindo texto das notícias novas...")
     extrator_perfil.processar_fila(cliente_llm, conexao)
