@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -308,6 +307,7 @@ def test_fila_roda_uma_tarefa_por_vez_na_ordem() -> None:
     fila = fluxo_mod.FilaDeTrabalho()
     ordem: list[int] = []
     terminou = threading.Event()
+
     def falha() -> None:
         raise RuntimeError("falha não derruba a fila")
 

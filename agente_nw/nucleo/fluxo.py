@@ -124,9 +124,7 @@ def opcao_da_pergunta(dados: dict[str, Any] | None) -> Opcao | None:
     return _opcao_de_dict(dados) if dados else None
 
 
-def _gravar_perguntas(
-    conexao: sqlite3.Connection, pedido_id: int, perguntas: list[dict[str, Any]]
-) -> None:
+def _gravar_perguntas(conexao: sqlite3.Connection, pedido_id: int, perguntas: list[dict[str, Any]]) -> None:
     texto = json.dumps(perguntas, ensure_ascii=False) if perguntas else None
     pedidos.gravar_localizacoes(conexao, pedido_id, texto)
     conexao.commit()
