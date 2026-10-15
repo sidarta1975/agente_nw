@@ -5,7 +5,6 @@ from typing import Protocol, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from agente_nw.nucleo import sensivel
 from agente_nw.nucleo.database.queries import fatos
 from agente_nw.nucleo.llm import FalhaJsonInvalido
 
@@ -40,8 +39,7 @@ Devolva de 1 a {MAXIMO_TERMOS} termos de busca de notícia, cada um com 2 a {_MA
 palavras, em português, sobre temas profissionais, esportes, hobbies, viagens e lugares,
 tecnologia ou mercado.
 
-Não use nomes de pessoas. Não use saúde, religião, posição política, sindicato, vida sexual,
-origem racial nem menores de idade. Se nada servir, devolva a lista vazia.
+Não use nomes de pessoas. Se nada servir, devolva a lista vazia.
 
 Responda só com um objeto JSON, sem texto antes ou depois:
 {{"termos": ["...", "..."]}}
@@ -72,7 +70,7 @@ def termos_do_contato(cliente_llm: ClienteTermos, conexao: sqlite3.Connection, p
         termo = " ".join(bruto.split())
         if not termo or len(termo.split()) > _MAXIMO_PALAVRAS_DO_TERMO:
             continue
-        if sensivel.verificar(termo) is not None or termo.lower() in (t.lower() for t in termos):
+        if termo.lower() in (t.lower() for t in termos):
             continue
         termos.append(termo)
     return termos[:MAXIMO_TERMOS]

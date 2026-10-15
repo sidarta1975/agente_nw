@@ -158,6 +158,9 @@ põe o agradecimento antes do gancho; "pedir" põe o pedido depois do gancho e o
 - O contexto da relação (família, amigos, trabalho...) diz que assuntos cabem e que tom usar; respeite-o. \
 Assunto de trabalho não vai para mensagem a familiar, nem o contrário.
 - Nada do que o pedido manda evitar pode aparecer na mensagem.
+- Sobre a pessoa, afirme só o que está nos fatos e na ficha acima. Fato marcado [antigo] ou [de imagem] \
+não vale como posição atual dela: se usar, com ressalva ("há um tempo", "numa imagem que publicou"). Nunca \
+infira opinião, posição ou adesão da pessoa a partir de manchete, foto ou assunto.
 - Não repita um gancho que o histórico mostra como usado.
 - Decida sozinho se continua uma conversa anterior ou abre assunto novo: se o histórico traz um gancho \
 entregue ou usado com esta pessoa e o pedido indica seguimento, faça a mensagem retomar esse fio; \

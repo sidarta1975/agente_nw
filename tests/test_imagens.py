@@ -50,10 +50,11 @@ def test_modelo_que_descarta_ou_devolve_vazio_nao_gera_descricao() -> None:
     assert imagens.descrever(vazia, _imagem(), "x") is None
 
 
-def test_descricao_com_termo_sensivel_e_descartada_depois_do_modelo() -> None:
-    visao = _Visao(RespostaDescricaoImagem(descricao="Pessoa em tratamento contra o câncer num hospital."))
+def test_descricao_de_qualquer_tema_e_mantida() -> None:
+    texto = "Pessoa com camiseta de campanha política em ato, ao lado de um hospital."
+    visao = _Visao(RespostaDescricaoImagem(descricao=texto))
 
-    assert imagens.descrever(visao, _imagem(), "instagram") is None
+    assert imagens.descrever(visao, _imagem(), "instagram") == texto
 
 
 def test_falha_do_modelo_nao_derruba_o_chamador() -> None:

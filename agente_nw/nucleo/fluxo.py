@@ -290,6 +290,7 @@ def _escrever(deps: Dependencias, conexao: sqlite3.Connection, pedido_id: int) -
             avisar=avisar,
         )
     pedidos.gravar_consulta(conexao, pedido_id, consulta.consulta_id)
+    pedidos.gravar_fonte_noticias(conexao, pedido_id, consulta.fonte_noticias, consulta.google_bloqueado_ate)
     conexao.commit()
 
     _etapa(conexao, pedido_id, "Escrevendo os ganchos e as mensagens")
@@ -304,6 +305,7 @@ def _escrever(deps: Dependencias, conexao: sqlite3.Connection, pedido_id: int) -
         agora_redacao,
         frase=pedido.texto,
         limite_tokens=int(deps.num_ctx_redacao * FRACAO_DO_CONTEXTO_NO_PROMPT),
+        meses_fato_antigo=deps.limiares.redacao.meses_fato_antigo,
     )
     redacao_mod.registrar(conexao, consulta.consulta_id, redacao, agora_redacao)
     if redacao.aviso:

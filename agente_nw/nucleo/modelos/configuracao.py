@@ -168,9 +168,20 @@ class ColetaLimiares(BaseModel):
     """Imagens publicadas de cada rede do contato que o modelo de visão descreve (0 = não lê imagens)."""
     largura_minima_imagem: int = Field(default=250, ge=1)
     """Largura (px) abaixo da qual a imagem é ícone ou foto de perfil e não publicação."""
+    cooldown_bloqueio_minutos: int = Field(default=180, ge=0)
+    """Depois de um 429/503 o host fica sem receber pedido por este tempo (vale entre pedidos e reinícios)."""
+    max_consultas_por_pedido: int = Field(default=4, ge=1)
+    """Buscas de notícia por pedido, depois de juntar os termos repetidos."""
+    horas_reuso_termo: int = Field(default=24, ge=0)
+    """Termo já buscado há menos que isto não vai de novo à rede (0 = sempre busca)."""
+    candidatos_suficientes: int = Field(default=10, ge=1)
+    """Com tantas notícias novas na coleta do pedido, as buscas seguintes não são abertas."""
+    usar_fonte_alternativa: bool = True
+    """Quando o Google está bloqueado, busca no Bing News (RSS público, sem chave)."""
     minutos_reaproveitamento: int = Field(default=120, ge=0)
     """Uma correção em texto reaproveita a coleta de notícias feita há menos que isto (0 = sempre coleta)."""
     maximo_itens_novos_por_feed: int = Field(default=15, ge=1)
+    tempo_maximo_segundos: int = Field(default=240, ge=10)
     """Notícias novas aceitas de cada feed por coleta (as mais recentes); evita rajadas de pedidos."""
 
 
@@ -221,6 +232,15 @@ class ExtensaoLimiares(BaseModel):
     """Espera máxima, em `estado()`, para a página (X, Instagram) terminar de desenhar o texto."""
 
 
+class RedacaoLimiares(BaseModel):
+    """Redação dos ganchos (brief 046)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    meses_fato_antigo: int = Field(default=12, ge=1)
+    """Fato com mais meses que isto entra no prompt marcado [antigo]: não vale como posição atual."""
+
+
 class Limiares(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -231,6 +251,7 @@ class Limiares(BaseModel):
     cartao: CartaoLimiares
     listas: ListasLimiares
     extensao: ExtensaoLimiares = Field(default_factory=ExtensaoLimiares)
+    redacao: RedacaoLimiares = Field(default_factory=RedacaoLimiares)
 
 
 class TemaUsuario(BaseModel):

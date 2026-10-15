@@ -5,7 +5,6 @@ from typing import Protocol, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
-from agente_nw.nucleo import sensivel
 from agente_nw.nucleo.llm import FalhaJsonInvalido
 
 _EsquemaT = TypeVar("_EsquemaT", bound=BaseModel)
@@ -23,7 +22,7 @@ class ImagemCapturada:
 
 
 class RespostaDescricaoImagem(BaseModel):
-    """Tarefa `descrever_imagem`. `descartar` = imagem sensível ou sem nada que descrever."""
+    """Tarefa `descrever_imagem`. `descartar` = imagem sem nada que descrever."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -45,8 +44,8 @@ de forma objetiva e detalhada, em 2 a 5 frases: o que aparece (lugar, objetos, a
 quantas pessoas há e o que fazem, e qualquer texto legível na imagem, transcrito. Não identifique
 ninguém pelo rosto e não invente o que não se vê.{dica}
 
-Se a imagem mostrar menores de idade, ou tocar em saúde, religião, posição política, sindicato, vida sexual
-ou origem racial, devolva descartar=true e descricao vazia, sem descrever.
+Se não houver nada que descrever (imagem em branco, ilegível ou só interface), devolva descartar=true e
+descricao vazia.
 
 Responda só com um objeto JSON, sem texto antes ou depois:
 {{"descartar": bool, "descricao": "..."}}
@@ -54,8 +53,8 @@ Responda só com um objeto JSON, sem texto antes ou depois:
 
 
 def descrever(cliente_llm: ClienteVisao, imagem: ImagemCapturada, rede: str) -> str | None:
-    """Descrição da imagem em texto, ou `None` se o modelo descartou, falhou ou a descrição cai em
-    categoria sensível (filtro determinístico depois do modelo). Nunca lança para o chamador."""
+    """Descrição da imagem em texto, ou `None` se o modelo descartou ou falhou. Nunca lança para o
+    chamador."""
     prompt = construir_prompt(rede, imagem.alt)
     try:
         resposta = cliente_llm.gerar_json(
@@ -64,6 +63,6 @@ def descrever(cliente_llm: ClienteVisao, imagem: ImagemCapturada, rede: str) -> 
     except FalhaJsonInvalido:
         return None
     descricao = resposta.descricao.strip()
-    if resposta.descartar or not descricao or sensivel.verificar(descricao) is not None:
+    if resposta.descartar or not descricao:
         return None
     return descricao

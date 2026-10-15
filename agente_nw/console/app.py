@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
 from agente_nw.coleta.capturas import busca
+from agente_nw.nucleo import consulta as consulta_mod
 from agente_nw.nucleo import fluxo as fluxo_mod
 from agente_nw.nucleo import localizacao as localizacao_mod
 from agente_nw.nucleo import redacao as redacao_mod
@@ -156,7 +157,13 @@ def criar_app(
         perfil = perfis.obter_por_id(conn, pedido.perfil_id) if pedido.perfil_id is not None else None
         ganchos = redacao_mod.ganchos_da_consulta(conn, pedido.consulta_id) if pedido.consulta_id else []
         avisos: list[str] = json.loads(pedido.avisos_json) if pedido.avisos_json else []
+        fonte = (
+            consulta_mod.rotulo_da_fonte(pedido.noticias_fonte, pedido.noticias_bloqueado_ate)
+            if pedido.noticias_fonte
+            else None
+        )
         return {
+            "fonte_noticias": fonte,
             "pedido": pedido,
             "extraido": extraido,
             "perfil": perfil,

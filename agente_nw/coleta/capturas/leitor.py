@@ -9,7 +9,6 @@ from pathlib import Path
 from agente_nw.coleta.capturas import extrator, imagens, navegador
 from agente_nw.coleta.capturas.extrator import ClienteExtracao
 from agente_nw.coleta.capturas.navegador import Pagina
-from agente_nw.nucleo import sensivel
 from agente_nw.nucleo.database.queries import fatos, redes_sociais
 from agente_nw.nucleo.modelos.fato import Fato
 
@@ -139,16 +138,12 @@ def ler_redes_sociais_do_contato(
         if avisar is not None:
             avisar(f"{rede.rede}: {len(captura.blocos)} blocos na página; examino até {len(blocos)}...")
         gravados_na_rede = 0
-        sensiveis = 0
         descartados = 0
         for numero, bloco in enumerate(blocos, start=1):
             if maximo_blocos is not None and gravados_na_rede >= maximo_blocos:
                 break
             if avisar is not None:
                 avisar(f"  {rede.rede}: bloco {numero}/{len(blocos)}")
-            if sensivel.verificar(bloco) is not None:
-                sensiveis += 1
-                continue  # categoria sensível: o texto integral nunca chega ao banco
             extraido = extrator.extrair(cliente_llm, bloco, rede.rede)
             if extraido is None:
                 descartados += 1
@@ -165,11 +160,8 @@ def ler_redes_sociais_do_contato(
             resumo.fatos_gravados += 1
             gravados_na_rede += 1
 
-        if avisar is not None and (sensiveis or descartados):
-            avisar(
-                f"{rede.rede}: {sensiveis} bloco(s) barrados pelo filtro sensível e {descartados} "
-                f"descartados pelo modelo (interface ou sem publicação)"
-            )
+        if avisar is not None and descartados:
+            avisar(f"{rede.rede}: {descartados} bloco(s) descartados pelo modelo (interface ou sem post)")
         _descrever_imagens(
             cliente_llm, conexao, perfil_id, rede.rede, rede.link, captura.imagens, agora, resumo, avisar
         )

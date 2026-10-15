@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
+from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol, TypeVar
 
 from pydantic import BaseModel
@@ -37,6 +39,11 @@ _TRECHO_DO_FATO_NO_PROMPT = 600  # o fato fica inteiro no banco; o prompt leva o
 _FATOS_RECENTES_GARANTIDOS = 4
 _CONSULTAS_NO_HISTORICO = 3
 _MANCHETES_POR_ASSUNTO = 3
+_DIAS_POR_MES = 30
+_MARCA_ANTIGO = "[antigo]"
+_MARCA_DE_IMAGEM = "[de imagem]"
+# Lembrança do Facebook ("Há 4 anos", "Veja suas lembranças"): a data do fato é a da leitura.
+_LEMBRANCA = re.compile(r"\bh[aá]\s+\d+\s+anos?\b|\blembran[cç]as\b", re.IGNORECASE)
 
 
 class ClienteRedacao(Protocol):
@@ -94,14 +101,37 @@ def _escolher_fatos(cliente_llm: ClienteRedacao, candidatos: list[Fato], consult
     return [*garantidos, *(resto[i] for i in sorted(ordem[:vagas]))]
 
 
+def _e_antigo(fato: Fato, data: str, meses_fato_antigo: int, hoje: datetime) -> bool:
+    if _LEMBRANCA.search(fato.conteudo):
+        return True
+    try:
+        publicado = datetime.fromisoformat(data[:10]).replace(tzinfo=UTC)
+    except ValueError:
+        return False
+    return hoje - publicado > timedelta(days=meses_fato_antigo * _DIAS_POR_MES)
+
+
 def _fatos(
-    conexao: sqlite3.Connection, perfil_id: int, cliente_llm: ClienteRedacao, consulta: str
+    conexao: sqlite3.Connection,
+    perfil_id: int,
+    cliente_llm: ClienteRedacao,
+    consulta: str,
+    meses_fato_antigo: int,
+    hoje: datetime,
 ) -> list[str]:
+    """Os fatos do prompt, um por linha. Fato antigo e fato lido de imagem levam marca: a redação não os
+    afirma como posição atual da pessoa."""
     candidatos = fatos_q.listar_recentes(conexao, perfil_id, _FATOS_CANDIDATOS)
     linhas: list[str] = []
     for fato in _escolher_fatos(cliente_llm, candidatos, consulta):
         data = fato.data_do_fato or fato.registrado_em[:10]
-        linhas.append(f"{data[:10]} ({fato.tipo}): {fato.conteudo[:_TRECHO_DO_FATO_NO_PROMPT]}")
+        marcas = []
+        if _e_antigo(fato, data, meses_fato_antigo, hoje):
+            marcas.append(_MARCA_ANTIGO)
+        if fato.tipo.startswith("imagem"):
+            marcas.append(_MARCA_DE_IMAGEM)
+        sufixo = f" {' '.join(marcas)}" if marcas else ""
+        linhas.append(f"{data[:10]} ({fato.tipo}){sufixo}: {fato.conteudo[:_TRECHO_DO_FATO_NO_PROMPT]}")
     return linhas
 
 
@@ -127,6 +157,7 @@ def montar_entrada(
     contato: Perfil,
     usuario: Perfil,
     assuntos: list[ItemMenu],
+    meses_fato_antigo: int = 12,
 ) -> EntradaRedacao:
     assert contato.id is not None and usuario.id is not None
     temas_usuario = [
@@ -141,7 +172,14 @@ def montar_entrada(
         contato_ficha=_ficha(contato),
         vinculo=pedido.pessoa_pistas.get("vinculo"),
         tempo_sem_contato=pedido.pessoa_pistas.get("tempo_sem_contato"),
-        fatos=_fatos(conexao, contato.id, cliente_llm, _texto_da_consulta(pedido, assuntos)),
+        fatos=_fatos(
+            conexao,
+            contato.id,
+            cliente_llm,
+            _texto_da_consulta(pedido, assuntos),
+            meses_fato_antigo,
+            datetime.now(UTC),
+        ),
         cabecalho_rede=" · ".join(f"{rede}: {cabecalho}" for rede, cabecalho in cabecalhos) or None,
         pedido=pedido,
         frase=frase,
@@ -172,6 +210,7 @@ def redigir(
     agora: str,
     frase: str = "",
     limite_tokens: int = prompt_mod.LIMITE_TOKENS_PADRAO,
+    meses_fato_antigo: int = 12,
 ) -> Redacao:
     """Uma chamada ao modelo com todos os assuntos selecionados pelo motor. Não grava nada: quem
     entrega chama `registrar`. Sem assunto disponível, devolve `ganchos=[]` com aviso e não chama o
@@ -191,7 +230,15 @@ def redigir(
         return Redacao(ganchos=[], aviso=sem_assunto, registro_usado=registro)
 
     entrada = montar_entrada(
-        conexao, cliente_llm, pedido, frase, resultado_consulta, perfil, usuario, disponiveis
+        conexao,
+        cliente_llm,
+        pedido,
+        frase,
+        resultado_consulta,
+        perfil,
+        usuario,
+        disponiveis,
+        meses_fato_antigo,
     )
     prompt = prompt_mod.construir_prompt(entrada, limite_tokens)
     validos = {item.assunto_id for item in disponiveis}

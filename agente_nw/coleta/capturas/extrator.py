@@ -30,17 +30,6 @@ class ClienteExtracao(Protocol):
     ) -> _EsquemaT: ...
 
 
-_CATEGORIAS_PROIBIDAS = """\
-- saúde (doenças, tratamentos, condições físicas ou mentais)
-- religião
-- posição política ou partidária
-- sindicalização ou participação em movimento sindical
-- orientação ou vida sexual
-- raça, etnia ou cor
-- dados de menores de idade\
-"""
-
-
 def construir_prompt(bloco: str, rede: str) -> str:
     return f"""\
 Você recebe um bloco de texto capturado da página de uma rede social ({rede}).
@@ -64,10 +53,6 @@ Se for uma publicação/curtida/comentário, devolva descartar=false e preencha:
 - conteudo: o texto essencial da publicação, limpo, sem sugestões laterais
   nem prompts de interface. Sem chamar atenção do modelo para nada que não
   esteja no bloco.
-
-Nunca extraia informação sobre estas categorias sensíveis; se o bloco tocar
-em uma delas, devolva descartar=true e não repita o trecho:
-{_CATEGORIAS_PROIBIDAS}
 
 Bloco a processar:
 "{bloco}"

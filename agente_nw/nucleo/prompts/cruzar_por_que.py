@@ -20,8 +20,8 @@ _EXEMPLO_ASSUNTOS = [
 ]
 _EXEMPLO_SAIDA = (
     '{"por_que": ['
-    '"ela navega, e você também curte esporte de resistência como a corrida — dá pra puxar esse gancho", '
-    '"é a área que você domina, e ela trabalha com imóveis — a transição do ICMS pode afetar o setor dela"'
+    '"vela é um dos temas dela, e você também curte esporte de resistência como a corrida — dá pra puxar", '
+    '"é a área que você domina, e imóveis é um tema dela — a transição do ICMS pode afetar o setor"'
     "]}"
 )
 
@@ -71,6 +71,11 @@ contato — cada um já com o tipo (conector ou viável com esforço) e o ponto 
 apoio do usuário que justifica a escolha. Você escreve, para cada assunto
 nessa ordem, uma frase curta de "por quê" esse assunto vale a pena puxar com
 esse contato — citando o ponto de apoio dado, nunca inventando outro.
+
+Regra de verdade: nunca atribua ao contato opinião, posição, adesão, crença ou característica
+("ele apoia X", "ele é contra Y", "ele é de tal grupo"). Você só sabe os temas dele, que vêm das
+publicações dele; cite no máximo um desses temas, nunca uma posição deduzida do título do assunto.
+O "por quê" liga o assunto ao objetivo do usuário.
 
 Responda só com um objeto JSON, sem texto antes ou depois, no formato exato,
 com exatamente um "por_que" por assunto recebido, na mesma ordem:

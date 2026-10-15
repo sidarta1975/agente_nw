@@ -4,6 +4,7 @@ import json
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -52,6 +53,22 @@ class ResultadoConsulta:
     resumo_rede_social: ResumoRedeSocial
     historico_texto: str
     aviso: str | None = None
+    fonte_noticias: str = "nenhuma"  # google | alternativa | reaproveitada | nenhuma (brief 045)
+    google_bloqueado_ate: str | None = None
+
+
+def rotulo_da_fonte(fonte: str, google_bloqueado_ate: str | None = None) -> str:
+    """A linha que diz de onde vieram (ou não) as notícias, na tela e no terminal."""
+    if fonte == "google":
+        return "Notícias: Google"
+    if fonte == "alternativa":
+        if google_bloqueado_ate:
+            hora = datetime.fromisoformat(google_bloqueado_ate).astimezone().strftime("%H:%M")
+            return f"Notícias: fonte alternativa (Google bloqueado até {hora})"
+        return "Notícias: fonte alternativa"
+    if fonte == "reaproveitada":
+        return "Notícias reaproveitadas da coleta de hoje"
+    return "Sem notícias agora — ganchos a partir das publicações e dos seus temas."
 
 
 def _resumo_rede_para_texto(resumo: ResumoRedeSocial) -> str | None:
@@ -142,26 +159,41 @@ def preparar(
         motivos_sem_sessao=list(resumo_leitor.motivos_sem_sessao),
     )
 
+    fonte_noticias = "reaproveitada"  # sem coleta nova, valem as notícias que já estavam guardadas
+    google_bloqueado_ate: str | None = None
     if rodar_coleta:
         etapa("Escolhendo os termos de busca pelo que o contato publica...")
         termos_contato = termos_contato_mod.termos_do_contato(cliente_llm, conexao, perfil_id)
         etapa(f"Termos de busca do contato: {', '.join(termos_contato) or '(nenhum)'}")
-        etapa("Coletando notícias (feeds e consultas ao Google News)...")
+        etapa("Coletando notícias (Google News, ou a fonte alternativa se ele estiver bloqueado)...")
+        termos = [
+            termo
+            for _rotulo, termo in google_news.selecionar_termos(
+                contexto, termos_contato, limiares.coleta.max_consultas_por_pedido
+            )
+        ]
         resumo_coleta = leitor_rss.coletar(
             conexao,
             cliente_http,
             caminho_fontes if caminho_fontes.exists() else None,
             limiares.coleta,
             caminho_sentinela,
-            feeds_extras=google_news.gerar_consultas_da_consulta(contexto, termos_contato),
+            termos=termos,
+            avancar=etapa,
         )
-        if resumo_coleta is not None and resumo_coleta.bloqueio is not None:
-            etapa(
-                f"AVISO: {resumo_coleta.bloqueio}: excesso de buscas, o site bloqueou por um tempo. "
-                "As notícias desta consulta não foram buscadas; só valem as já guardadas."
-            )
-        elif resumo_coleta is not None and resumo_coleta.feeds_com_erro:
-            etapa(f"AVISO: {len(resumo_coleta.feeds_com_erro)} busca(s) de notícia falharam nesta consulta.")
+        fonte_noticias = "nenhuma"
+        if resumo_coleta is not None:
+            fonte_noticias = resumo_coleta.fonte_usada
+            google_bloqueado_ate = resumo_coleta.google_bloqueado_ate
+            if resumo_coleta.bloqueio is not None or google_bloqueado_ate is not None:
+                etapa(
+                    "AVISO: o Google News está bloqueado por excesso de buscas e não recebe mais pedido "
+                    "por um tempo. " + rotulo_da_fonte(fonte_noticias, google_bloqueado_ate)
+                )
+            elif resumo_coleta.tempo_esgotado:
+                etapa("AVISO: a coleta de notícias passou do tempo máximo e parou com o que já tinha.")
+            elif resumo_coleta.feeds_com_erro:
+                etapa(f"AVISO: {len(resumo_coleta.feeds_com_erro)} busca(s) de notícia falharam.")
 
     etapa("Extraindo texto das notícias novas...")
     extrator_perfil.processar_fila(cliente_llm, conexao)
@@ -231,4 +263,6 @@ def preparar(
         resumo_rede_social=resumo_rede,
         historico_texto=historico_texto,
         aviso=aviso,
+        fonte_noticias=fonte_noticias,
+        google_bloqueado_ate=google_bloqueado_ate,
     )

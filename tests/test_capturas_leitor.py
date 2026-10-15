@@ -310,9 +310,7 @@ def test_o_fato_guarda_o_texto_integral_da_publicacao_e_nao_o_resumo_do_modelo(
     assert linha["data_do_fato"] == "2026-10-01"
 
 
-def test_bloco_com_termo_sensivel_nao_vira_fato_nem_chega_ao_modelo(
-    conn: sqlite3.Connection, tmp_path: Path
-) -> None:
+def test_bloco_de_qualquer_tema_vira_fato(conn: sqlite3.Connection, tmp_path: Path) -> None:
     perfil_id = _criar_contato(conn, "Fábio", "+5511900000006")
     redes_sociais.inserir(conn, perfil_id, "linkedin", "https://linkedin.com/in/fabio", AGORA)
     conn.commit()
@@ -331,7 +329,7 @@ def test_bloco_com_termo_sensivel_nao_vira_fato_nem_chega_ao_modelo(
         max_rolagens=1,
     )
 
-    assert conn.execute("SELECT COUNT(*) AS n FROM fato WHERE conteudo LIKE '%câncer%'").fetchone()["n"] == 0
+    assert conn.execute("SELECT COUNT(*) AS n FROM fato WHERE conteudo LIKE '%câncer%'").fetchone()["n"] == 1
 
 
 class _PaginaComImagens(_PaginaFake):

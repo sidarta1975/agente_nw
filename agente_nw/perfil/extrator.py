@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from agente_nw.nucleo import sensivel
-from agente_nw.nucleo.database.queries import descarte_sensivel, fatos, fila_extracao
+from agente_nw.nucleo.database.queries import fatos, fila_extracao
 from agente_nw.nucleo.database.queries import perfil_tema as queries_perfil_tema
 from agente_nw.nucleo.database.queries import perfis as queries_perfis
 from agente_nw.nucleo.database.queries import temas as queries_temas
@@ -22,37 +21,7 @@ class ResumoProcessamento:
     tags_gravadas: int = 0
     campos_gravados: int = 0
     fatos_gravados: int = 0
-    descartes_por_categoria: dict[str, int] = field(default_factory=dict)
     erros: int = 0
-
-
-def _registrar_descarte(
-    conexao: sqlite3.Connection,
-    resumo: ResumoProcessamento,
-    item: FilaExtracao,
-    categoria: str,
-    agora: str,
-) -> None:
-    descarte_sensivel.registrar(conexao, item.perfil_id, item.origem, categoria, agora)
-    resumo.descartes_por_categoria[categoria] = resumo.descartes_por_categoria.get(categoria, 0) + 1
-
-
-def _campos_limpos(
-    resposta: RespostaExtracaoTexto,
-    conexao: sqlite3.Connection,
-    resumo: ResumoProcessamento,
-    item: FilaExtracao,
-    agora: str,
-) -> dict[str, object]:
-    limpos: dict[str, object] = {}
-    for campo, valor in resposta.campos.model_dump(exclude_none=True).items():
-        texto_verificado = ", ".join(valor) if isinstance(valor, list) else str(valor)
-        categoria = sensivel.verificar(texto_verificado)
-        if categoria is not None:
-            _registrar_descarte(conexao, resumo, item, categoria, agora)
-            continue
-        limpos[campo] = valor
-    return limpos
 
 
 def _gravar_tag(
@@ -76,10 +45,8 @@ def processar_fila(
     cliente_llm: ClienteOllama, conexao: sqlite3.Connection, limite: int = 20
 ) -> ResumoProcessamento:
     """Lê itens pendentes de `fila_extracao`, extrai campos/tags/fatos via o
-    contrato `extrair_de_texto`, filtra cada peça pelo filtro determinístico
-    de categorias sensíveis, grava o que passar e descarta (registrando) o
-    que não passar. Marca cada item como processado ou com erro; um erro em
-    um item não interrompe o lote.
+    contrato `extrair_de_texto` e grava tudo. Marca cada item como processado
+    ou com erro; um erro em um item não interrompe o lote.
     """
     resumo = ResumoProcessamento()
 
@@ -97,24 +64,16 @@ def processar_fila(
             resumo.erros += 1
             continue
 
-        campos_limpos = _campos_limpos(resposta, conexao, resumo, item, agora)
-        if campos_limpos:
-            queries_perfis.atualizar_campos_guiados(conexao, item.perfil_id, campos_limpos, agora)
-            resumo.campos_gravados += len(campos_limpos)
+        campos = resposta.campos.model_dump(exclude_none=True)
+        if campos:
+            queries_perfis.atualizar_campos_guiados(conexao, item.perfil_id, campos, agora)
+            resumo.campos_gravados += len(campos)
 
         for tag in resposta.tags_sugeridas:
-            categoria = sensivel.verificar(tag.tag) or sensivel.verificar(tag.trecho)
-            if categoria is not None:
-                _registrar_descarte(conexao, resumo, item, categoria, agora)
-                continue
             _gravar_tag(conexao, tag, item, agora)
             resumo.tags_gravadas += 1
 
         for fato_extraido in resposta.fatos_datados:
-            categoria = sensivel.verificar(fato_extraido.conteudo)
-            if categoria is not None:
-                _registrar_descarte(conexao, resumo, item, categoria, agora)
-                continue
             fatos.inserir(
                 conexao,
                 Fato(

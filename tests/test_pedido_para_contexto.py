@@ -36,14 +36,17 @@ def test_campos_mapeados_e_livre_guarda_a_frase_original() -> None:
     assert contexto.termos_busca == ["estaleiros", "construção naval", "Petrobras"]
 
 
-def test_termos_de_busca_viram_feeds_antes_dos_do_contato() -> None:
+def test_termos_de_busca_vem_depois_do_contato_e_sem_repetir_o_interessa() -> None:
     contexto = pedido_mod.para_contexto(_pedido(), "frase")
 
-    feeds = gerar_consultas_da_consulta(contexto, ["tag do contato"])
+    feeds = gerar_consultas_da_consulta(contexto, ["tag do contato"], maximo=10)
 
     nomes = [feed.nome for feed in feeds]
-    assert len(feeds) == 1 + 1 + 3 + 1  # assunto + interessa + termos_busca + contato
-    posicoes_busca = [i for i, n in enumerate(nomes) if "busca:" in n]
+    # assunto + contato + 2 termos_busca: "construção naval" já é o assunto e "estaleiros" já está
+    # nos termos_busca, então o interessa não acrescenta nada
+    assert len(feeds) == 1 + 1 + 2
     posicao_contato = next(i for i, n in enumerate(nomes) if "contato:" in n)
-    assert len(posicoes_busca) == 3
-    assert max(posicoes_busca) < posicao_contato
+    posicoes_busca = [i for i, n in enumerate(nomes) if "busca:" in n]
+    assert len(posicoes_busca) == 2
+    assert posicao_contato < min(posicoes_busca)
+    assert not any("interessa:" in n for n in nomes)

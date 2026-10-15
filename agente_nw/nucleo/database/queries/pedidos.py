@@ -24,6 +24,8 @@ class PedidoGravado:
     pedido_pai_id: int | None = None
     consulta_id: int | None = None
     localizacao_json: str | None = None
+    noticias_fonte: str | None = None
+    noticias_bloqueado_ate: str | None = None
 
 
 @dataclass(frozen=True)
@@ -36,7 +38,8 @@ class PessoaRecente:
 
 _COLUNAS = (
     "id, perfil_id, texto, extraido_json, confianca, contato_criado, contato_ambiguo, criado_em, "
-    "status, etapa, erro, avisos_json, pedido_pai_id, consulta_id, localizacao_json"
+    "status, etapa, erro, avisos_json, pedido_pai_id, consulta_id, localizacao_json, "
+    "noticias_fonte, noticias_bloqueado_ate"
 )
 
 
@@ -57,6 +60,8 @@ def _para_pedido(linha: sqlite3.Row) -> PedidoGravado:
         pedido_pai_id=linha["pedido_pai_id"],
         consulta_id=linha["consulta_id"],
         localizacao_json=linha["localizacao_json"],
+        noticias_fonte=linha["noticias_fonte"],
+        noticias_bloqueado_ate=linha["noticias_bloqueado_ate"],
     )
 
 
@@ -114,6 +119,15 @@ def gravar_consulta(conexao: sqlite3.Connection, pedido_id: int, consulta_id: in
 
 def gravar_localizacoes(conexao: sqlite3.Connection, pedido_id: int, localizacao_json: str | None) -> None:
     conexao.execute("UPDATE pedido SET localizacao_json = ? WHERE id = ?", (localizacao_json, pedido_id))
+
+
+def gravar_fonte_noticias(
+    conexao: sqlite3.Connection, pedido_id: int, fonte: str, bloqueado_ate: str | None
+) -> None:
+    conexao.execute(
+        "UPDATE pedido SET noticias_fonte = ?, noticias_bloqueado_ate = ? WHERE id = ?",
+        (fonte, bloqueado_ate, pedido_id),
+    )
 
 
 def gravar_avisos(conexao: sqlite3.Connection, pedido_id: int, avisos_json: str | None) -> None:

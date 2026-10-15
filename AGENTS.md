@@ -37,7 +37,6 @@ agente_nw/
 │   │   │   └── queries/      # todo SQL isolado aqui
 │   │   ├── llm.py            # cliente único do Ollama
 │   │   ├── vetores.py        # embeddings, cosseno, centróide
-│   │   ├── sensivel.py       # filtro determinístico de categorias sensíveis
 │   │   ├── relevancia/       # qualificação, pontuação, piso, tipo (regra do conector)
 │   │   ├── agrupamento/      # centróide, janela, reabertura, divisão
 │   │   └── saidas/           # cartão, menu, exportação Markdown
@@ -87,7 +86,7 @@ Nome do pacote e da pasta é sempre `agente_nw`. Desvio de nomenclatura é corri
 - Restrições são estruturais, não procedurais: o que não deve ser visto a jusante é bloqueado na origem, não filtrado depois.
 - Antes de diagnosticar erro: "isso funcionava antes?" Responder essa pergunta antes de tocar em código.
 - Toda alteração de tabela é uma migração numerada em `scripts/migracoes/`. Nenhum brief cria ou altera tabela fora de migração.
-- Categorias sensíveis (saúde, religião, política, sindicato, vida sexual, origem racial, menores) nunca chegam ao banco: prompt proíbe e `nucleo/sensivel.py` descarta depois do modelo.
+- Quem decide que tema cabe numa mensagem é o usuário (brief 046): o programa não descarta conteúdo por tema (política, saúde, religião…). Em troca, a redação nunca afirma sobre a pessoa o que ela não disse (opinião, posição, adesão), trata fato `[antigo]` ou `[de imagem]` como não atual, e o motor só entrega assunto com relação com o objetivo do pedido (`conector.consulta.minima` é piso necessário).
 
 ## 5. Git
 
@@ -102,6 +101,8 @@ Nome do pacote e da pasta é sempre `agente_nw`. Desvio de nomenclatura é corri
 Não existem. Nenhuma etapa do sistema — coleta RSS, extração, agrupamento, qualificação, cruzamento, cartão, leitura de rede social, geração do menu — roda sem que Sidarta a dispare explicitamente pelo console ou pela CLI. Cada disparo é isolado, corresponde a uma consulta com contexto e escreve no banco quando termina.
 
 Requisitos que continuam valendo em toda execução, mesmo sob demanda: idempotência e retomada, log em arquivo, SQLite nunca compartilhado entre processos, desenvolvimento sempre em cópia (`agente_nw copiar-banco`) — o banco real só é tocado por operação autorizada por Sidarta.
+
+A coleta de notícias é resiliente a bloqueio (brief 045): host que responde 429/503 fica em cooldown no banco (`coleta.cooldown_bloqueio_minutos`) e não recebe pedido nem em outro pedido nem depois de reiniciar; cada pedido faz poucas buscas (`coleta.max_consultas_por_pedido`), reaproveita termo buscado há pouco (`coleta.horas_reuso_termo`) e, com o Google bloqueado, cai no Bing News RSS (`coleta/rss/fonte_alternativa.py`, sem chave). Sem notícia nenhuma o pedido conclui com ganchos das publicações e dos temas, e a tela diz de onde vieram as notícias.
 
 A leitura das listas do usuário nas redes (conexões, seguidos, amigos) é sob demanda e com cache local; nunca periódica. A extensão nunca abre mais de uma aba de rede social por vez, respeita `extensao.pausa_entre_paginas_s` entre páginas da mesma rede e só lê (abrir, rolar, ler texto e links): nenhuma ação na rede além disso.
 

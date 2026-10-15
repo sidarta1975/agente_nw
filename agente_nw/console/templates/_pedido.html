@@ -103,6 +103,7 @@
   </div>
 
 {% else %}
+  {% if visao.fonte_noticias %}<p class="cinza">{{ visao.fonte_noticias }}</p>{% endif %}
   {% for aviso in visao.avisos %}<p class="aviso">{{ aviso }}</p>{% endfor %}
   {% for gancho, status in visao.ganchos %}
     <div class="gancho {{ status }}">

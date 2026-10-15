@@ -397,11 +397,6 @@ def processar_fila_cmd() -> int:
     print(f"Tags gravadas: {resumo.tags_gravadas}")
     print(f"Campos gravados: {resumo.campos_gravados}")
     print(f"Fatos gravados: {resumo.fatos_gravados}")
-    if resumo.descartes_por_categoria:
-        for categoria, quantidade in sorted(resumo.descartes_por_categoria.items()):
-            print(f"Descartes ({categoria}): {quantidade}")
-    else:
-        print("Descartes: 0")
     print(f"Erros: {resumo.erros}")
     return 0
 
@@ -784,7 +779,7 @@ def pedir_cmd(
 
     from agente_nw.coleta.capturas.extensao_backend import abrir_pagina_extensao
     from agente_nw.nucleo import redacao as redacao_mod
-    from agente_nw.nucleo.consulta import preparar
+    from agente_nw.nucleo.consulta import preparar, rotulo_da_fonte
 
     contexto = pedido_mod.para_contexto(resultado.pedido, frase)
     consulta = preparar(
@@ -801,6 +796,8 @@ def pedir_cmd(
         agora=datetime.now(UTC).isoformat(),
         avisar=None if saida_json else _avisar_etapa,
     )
+    if not saida_json:
+        print(rotulo_da_fonte(consulta.fonte_noticias, consulta.google_bloqueado_ate))
     if menu:
         print()
         print(f"Consulta #{consulta.consulta_id} gravada para {resultado.perfil.nome}.")
@@ -828,6 +825,7 @@ def pedir_cmd(
             agora_redacao,
             frase=frase,
             limite_tokens=int(num_ctx * FRACAO_DO_CONTEXTO_NO_PROMPT),
+            meses_fato_antigo=config.limiares.redacao.meses_fato_antigo,
         )
     except FalhaJsonInvalido as erro:
         print(f"FALHA: não consegui redigir os ganchos ({erro})")

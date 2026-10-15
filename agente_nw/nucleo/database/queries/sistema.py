@@ -36,3 +36,28 @@ def progresso_gravar(
         "atualizado_em = excluded.atualizado_em",
         (etapa, ultimo_id, data_ciclo, agora),
     )
+
+
+# Estado da coleta de notícias que precisa atravessar pedidos e reinícios. Cabe na tabela `progresso`
+# (chave por etapa): o bloqueio de um host guarda em `data_ciclo` até quando ele vale, e o termo
+# buscado guarda em `atualizado_em` quando foi buscado.
+_PREFIXO_BLOQUEIO = "bloqueio:"
+_PREFIXO_TERMO = "termo:"
+
+
+def bloqueio_ate(conexao: sqlite3.Connection, host: str) -> str | None:
+    linha = progresso_obter(conexao, _PREFIXO_BLOQUEIO + host)
+    return str(linha["data_ciclo"]) if linha is not None and linha["data_ciclo"] else None
+
+
+def gravar_bloqueio(conexao: sqlite3.Connection, host: str, ate: str, agora: str) -> None:
+    progresso_gravar(conexao, _PREFIXO_BLOQUEIO + host, None, ate, agora)
+
+
+def termo_buscado_em(conexao: sqlite3.Connection, termo: str) -> str | None:
+    linha = progresso_obter(conexao, _PREFIXO_TERMO + termo)
+    return str(linha["atualizado_em"]) if linha is not None else None
+
+
+def gravar_termo_buscado(conexao: sqlite3.Connection, termo: str, agora: str) -> None:
+    progresso_gravar(conexao, _PREFIXO_TERMO + termo, None, None, agora)

@@ -64,6 +64,8 @@ class Cenario:
         migracoes.aplicar(self.conn)
         self.cliente = ClienteLLMFalso()
         self.chamadas_preparar: list[dict[str, Any]] = []
+        self.fonte_noticias = "google"
+        self.google_bloqueado_ate: str | None = None
         self.redes_localizadas: list[str] = []
         self.deps = fluxo_mod.Dependencias(
             caminho_banco=self.caminho,
@@ -102,7 +104,15 @@ class Cenario:
         item = ItemMenu(
             ac_id=1, assunto_id=self.assunto_id, tipo="conector", titulo="Regata", por_que=None, score=80.0
         )
-        return ResultadoConsulta(kwargs["perfil_id"], consulta.id, [item], ResumoRedeSocial(), "")
+        return ResultadoConsulta(
+            kwargs["perfil_id"],
+            consulta.id,
+            [item],
+            ResumoRedeSocial(),
+            "",
+            fonte_noticias=self.fonte_noticias,
+            google_bloqueado_ate=self.google_bloqueado_ate,
+        )
 
     def _redigir(self, *_a: Any, **_kw: Any) -> Redacao:
         gancho = Gancho(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import sqlite3
 from dataclasses import dataclass
 from typing import Protocol, TypeVar
@@ -30,6 +31,21 @@ class ClienteCruzamentoConsulta(ClienteCruzamento, Protocol):
 
 
 _MAXIMO_INTERESSA_NO_APOIO = 5
+
+
+# O "por quê" recebe só o título do assunto e os temas: qualquer posição do contato ("ele apoia X") é
+# invenção do modelo. Frase assim é trocada por uma que liga o assunto ao objetivo do usuário.
+_ATRIBUICAO = re.compile(
+    r"\b(ele|ela)\s+(apoia|apoiam|defende|vota|votou|torce|simpatiza|milita|acredita|odeia|ama|critica"
+    r"|é\s+(contra|a\s+favor|de\s+\w+|eleitor|apoiador|partidári))",
+    re.IGNORECASE,
+)
+
+
+def sem_atribuicao(por_que: str, contexto: ContextoConsulta) -> str:
+    if _ATRIBUICAO.search(por_que) is None:
+        return por_que
+    return f"o assunto se liga ao que você quer: {contexto.objetivo}"
 
 
 @dataclass
@@ -288,13 +304,13 @@ def cruzar_contato_por_consulta(
             )
         )
 
-    # Na consulta só entra o que tem relação com o pedido, o contato ou os temas do usuário ("conector"):
-    # o "viável com esforço" não tem relação nenhuma e entregá-lo seria inventar gancho.
+    # Na consulta só entra o que tem relação com o pedido ("conector"): contato e temas do usuário não
+    # bastam, e entregar assunto sem relação com o objetivo seria inventar gancho.
     for assunto, avaliacao in avaliacoes:
         if avaliacao.tipo == "conector":
             continue
         assert assunto.id is not None
-        motivo = "fora do domínio" if avaliacao.tipo == "fora_do_dominio" else "pouca relação com o pedido"
+        motivo = "pouca relação com o pedido"
         assunto_contato.inserir(
             conexao,
             AssuntoContato(
@@ -358,7 +374,7 @@ def cruzar_contato_por_consulta(
                 aderencia_usuario=avaliacao.aderencia_usuario,
                 conversavel=avaliacao.conversavel,
                 score=avaliacao.score,
-                por_que=por_ques[indice] if por_ques is not None else None,
+                por_que=sem_atribuicao(por_ques[indice], contexto) if por_ques is not None else None,
                 status="novo",
                 aderencia_consulta=avaliacao.aderencia_consulta,
             ),

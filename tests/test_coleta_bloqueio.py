@@ -80,7 +80,8 @@ def test_bloqueio_do_site_para_a_coleta_avisa_e_a_proxima_tenta_o_feed_de_novo(
     assert not any(url.endswith("/feed3.xml") for url in pedidos)  # parou de insistir
 
     bloqueado["ligado"] = False
-    segunda = leitor.coletar(banco, cliente, fontes, limiares, tmp_path / "PARE")
+    depois_do_cooldown = datetime.now(UTC) + timedelta(minutes=limiares.cooldown_bloqueio_minutos + 1)
+    segunda = leitor.coletar(banco, cliente, fontes, limiares, tmp_path / "PARE", agora=depois_do_cooldown)
 
     assert segunda.bloqueio is None
     assert segunda.fontes_processadas == 2  # o feed que falhou não foi dado como processado

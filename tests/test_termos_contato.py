@@ -77,7 +77,8 @@ def test_termos_filtrados_e_limitados(conexao: sqlite3.Connection) -> None:
 
     termos = termos_contato.termos_do_contato(cliente, conexao, perfil_id)
 
-    assert termos == ["sotaque inglês trabalho", "esqui Geórgia", "viagem neve"]
+    # repetido e termo longo demais saem; tema de saúde fica (o usuário decide); o teto é de 3
+    assert termos == ["sotaque inglês trabalho", "vacinação em massa", "esqui Geórgia"]
     assert "Sotaque não atrapalha" in cliente.prompts[0]
 
 

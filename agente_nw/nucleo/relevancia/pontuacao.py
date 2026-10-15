@@ -124,14 +124,13 @@ def avaliar_por_consulta(
     elif centroide_contato is not None and aderencia_contato >= limiares.adjacencia_minima:
         sustentos.append(("", aderencia_contato))
 
+    # A relação com o pedido é condição necessária: contato, temas do usuário e tags enriquecem o
+    # score e dão o ponto de apoio, mas não promovem sozinhos um assunto fora do objetivo.
     ponto_de_apoio: str | None
-    if sustentos:
+    if aderencia_consulta >= limiares.consulta.minima and sustentos:
         tipo: TipoConector = "conector"
         nome_apoio = max(sustentos, key=lambda par: par[1])[0]
         ponto_de_apoio = nome_apoio or None
-    elif conversavel >= limiares.conversavel_viavel:
-        tipo = "viavel_com_esforco"
-        ponto_de_apoio = None
     else:
         tipo = "fora_do_dominio"
         ponto_de_apoio = None

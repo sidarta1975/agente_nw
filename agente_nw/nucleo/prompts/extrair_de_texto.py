@@ -16,16 +16,6 @@ _GUIA_CAMPOS = """\
 - faixa_etaria: uma faixa aproximada de idade (ex.: "30-40"), nunca a idade exata.\
 """
 
-_CATEGORIAS_PROIBIDAS = """\
-- saúde (doenças, tratamentos, condições físicas ou mentais)
-- religião
-- posição política ou partidária
-- sindicalização ou participação em movimento sindical
-- orientação ou vida sexual
-- raça, etnia ou cor
-- dados de menores de idade (nome, idade exata ou identificação de filhos menores)\
-"""
-
 _EXEMPLO_ENTRADA = (
     "Beatriz é advogada tributarista em Belo Horizonte. Joga xadrez nas noites de "
     "sexta e participa de um clube de leitura de ficção científica."
@@ -81,11 +71,6 @@ esteja no texto.
 objetos {{"data": "AAAA-MM-DD ou null", "tipo": "...", "conteudo": "...",
 "fonte": "... ou null"}}. Se o texto não mencionar nenhum evento datado,
 devolva uma lista vazia.
-
-Nunca extraia nem mencione, em nenhum campo, tag ou fato, informação sobre
-estas categorias — se o texto tocar em uma delas, simplesmente ignore aquele
-trecho e extraia só o resto:
-{_CATEGORIAS_PROIBIDAS}
 
 Exemplo resolvido:
 Texto: "{_EXEMPLO_ENTRADA}"

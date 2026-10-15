@@ -31,8 +31,14 @@ coleta:
   retencao_texto_dias: 90
   intervalo_google_news_segundos: 2
   dias_alerta_feed_vazio: 2
+  cooldown_bloqueio_minutos: 180    # após 429/503 o host não recebe pedido por este tempo
+  max_consultas_por_pedido: 4       # buscas de notícia por pedido (assunto, contato, termos_busca, interessa)
+  horas_reuso_termo: 24             # termo buscado há menos que isto não vai de novo à rede
+  candidatos_suficientes: 10        # notícias novas que bastam: as buscas seguintes não são abertas
+  usar_fonte_alternativa: true      # Google bloqueado -> Bing News RSS (sem chave)
   minutos_reaproveitamento: 120     # correção em texto reaproveita a coleta feita há menos que isto
   maximo_itens_novos_por_feed: 15  # notícias novas por feed em cada coleta (as mais recentes)
+  tempo_maximo_segundos: 240  # teto de uma coleta; passado isso ela para e segue com o que já tem
   maximo_blocos_por_rede: 10      # blocos lidos por rede do contato; cada um custa uma chamada ao modelo
   maximo_imagens_por_rede: 8      # imagens publicadas descritas por rede (modelo de visão); 0 = não lê
   largura_minima_imagem: 250      # abaixo disso é ícone ou foto de perfil, não publicação
@@ -57,3 +63,6 @@ extensao:                         # brief 044: leitura de rede social pelo Chrom
   espera_render_s: 8              # redes que desenham a página depois de carregar (X, Instagram)
   navegador_app: Google Chrome    # macOS: aplicativo que abre a aba da ponte (o navegador padrão pode ser outro)
   navegador_perfil: Default       # perfil do Chrome em que a extensão está instalada (pasta em ~/Library/Application Support/Google/Chrome)
+
+redacao:                          # brief 046
+  meses_fato_antigo: 12           # fato mais velho que isto vai ao prompt marcado [antigo]

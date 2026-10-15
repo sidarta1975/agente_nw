@@ -297,8 +297,9 @@ def test_preparar_coleta_so_com_feeds_do_contexto_quando_fontes_yaml_ausente(
     assert len(chamadas) == 1
     args, kwargs = chamadas[0]
     assert args[2] is None  # sem fontes.yaml: só os feeds do contexto
-    nomes = [feed.nome for feed in kwargs["feeds_extras"]]
-    assert any("mercado" in nome or "reunião trimestral" in nome for nome in nomes)
+    termos = kwargs["termos"]
+    assert any("mercado" in termo or "reunião trimestral" in termo for termo in termos)
+    assert len(termos) <= _limiares().coleta.max_consultas_por_pedido
 
 
 def test_preparar_com_rodar_coleta_falso_pula_coleta_mesmo_com_fontes_existente(
