@@ -39,7 +39,7 @@
     <a class="item-link" href="{{ url_for('ver_pedido', pedido_id=pedido.id) }}">{{ pedido.criado_em[:10] }}</a>
     — “{{ pedido.texto[:140] }}{{ '…' if pedido.texto|length > 140 else '' }}” <span class="cinza">({{ pedido.status }})</span>
     {% for gancho, status in ganchos %}
-      <br>{{ '✔' if status == 'usado' else '•' }} {{ gancho.titulo }}
+      <br>{{ '✔' if status == 'usado' else '•' }} {{ gancho.titulo or 'Mensagem base' }}
     {% endfor %}
   </div>
 {% else %}

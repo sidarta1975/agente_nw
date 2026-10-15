@@ -24,11 +24,29 @@ from agente_nw.nucleo.modelos.redacao import Gancho, RespostaRedacao
 AGORA = "2026-10-12T10:00:00+00:00"
 
 
-class _LLMFalso:
-    """Devolve respostas prontas, uma por chamada, e guarda os prompts recebidos."""
+def _base(
+    mensagem: str = "Oi, Irene! Faz tempo. Vi seu trabalho com cooperativas e lembrei de você.",
+) -> Gancho:
+    return Gancho(
+        peculiaridade="o trabalho com cooperativas de crédito",
+        por_que_para_esta_pessoa="Retoma a conversa pelo trabalho dela.",
+        mensagem=mensagem,
+        abordagem_presencial="Comece perguntando como vai o trabalho.",
+    )
 
-    def __init__(self, *respostas: RespostaRedacao) -> None:
-        self._respostas = list(respostas)
+
+def _com_base(resposta: RespostaRedacao) -> RespostaRedacao:
+    if any(g.assunto_id is None for g in resposta.ganchos):
+        return resposta
+    return resposta.model_copy(update={"ganchos": [_base(), *resposta.ganchos]})
+
+
+class _LLMFalso:
+    """Devolve respostas prontas, uma por chamada, e guarda os prompts recebidos. Por padrão acrescenta a
+    mensagem base às respostas que vieram só com ganchos de notícia."""
+
+    def __init__(self, *respostas: RespostaRedacao, com_base: bool = True) -> None:
+        self._respostas = [_com_base(r) if com_base else r for r in respostas]
         self.prompts: list[str] = []
 
     def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
@@ -112,9 +130,9 @@ def test_tres_assuntos_geram_tres_ganchos(conn: sqlite3.Connection) -> None:
 
     redacao = redacao_mod.redigir(llm, conn, _pedido(), resultado, contato, usuario, AGORA)
 
-    assert [g.assunto_id for g in redacao.ganchos] == ids
+    assert [g.assunto_id for g in redacao.ganchos] == [None, *ids]
     assert redacao.registro_usado == "cordial"
-    assert redacao.aviso is None
+    assert redacao.aviso == "Pouca informação sobre a pessoa; mensagem mais geral."
     assert "Davi Pires" in llm.prompts[0] and "Irene Duarte" in llm.prompts[0]
 
 
@@ -129,35 +147,35 @@ def test_gancho_ja_usado_no_historico_nao_e_entregue(conn: sqlite3.Connection) -
 
     redacao = redacao_mod.redigir(llm, conn, _pedido(), resultado, contato, usuario, AGORA)
 
-    assert [g.assunto_id for g in redacao.ganchos] == [outro, terceiro]
+    assert [g.assunto_id for g in redacao.ganchos] == [None, outro, terceiro]
     assert f"[assunto {usado}]" not in llm.prompts[0]
     assert f"[assunto {outro}]" in llm.prompts[0]
 
 
-def test_todos_os_assuntos_ja_usados_nao_chama_o_modelo(conn: sqlite3.Connection) -> None:
+def test_todos_os_assuntos_ja_usados_ainda_gera_a_mensagem_base(conn: sqlite3.Connection) -> None:
     usuario, contato, resultado = _montar(conn, n_assuntos=1)
     assunto_id = resultado.itens_menu[0].assunto_id
     anterior = _consulta_anterior(conn, contato)
     gancho_uso.inserir_entregues(conn, anterior, [(assunto_id, "{}")], AGORA)
     gancho_uso.marcar(conn, anterior, assunto_id, "usado", AGORA)
-    llm = _LLMFalso()
+    llm = _LLMFalso(RespostaRedacao(ganchos=[_base()]))
 
     redacao = redacao_mod.redigir(llm, conn, _pedido(), resultado, contato, usuario, AGORA)
 
-    assert redacao.ganchos == []
+    assert [g.assunto_id for g in redacao.ganchos] == [None]
     assert redacao.aviso is not None and "já foram usados" in redacao.aviso
-    assert llm.prompts == []
+    assert len(llm.prompts) == 1 and f"[assunto {assunto_id}]" not in llm.prompts[0]
 
 
-def test_sem_assunto_devolve_lista_vazia_com_aviso_e_nao_chama_o_modelo(conn: sqlite3.Connection) -> None:
+def test_sem_assunto_o_modelo_e_chamado_e_a_base_sai_com_aviso_informativo(conn: sqlite3.Connection) -> None:
     usuario, contato, resultado = _montar(conn, n_assuntos=0)
-    llm = _LLMFalso()
+    llm = _LLMFalso(RespostaRedacao(ganchos=[_base()]))
 
     redacao = redacao_mod.redigir(llm, conn, _pedido(), resultado, contato, usuario, AGORA)
 
-    assert redacao.ganchos == []
-    assert redacao.aviso
-    assert llm.prompts == []
+    assert [g.assunto_id for g in redacao.ganchos] == [None]
+    assert redacao.aviso is not None and "mensagem a partir do perfil" in redacao.aviso
+    assert len(llm.prompts) == 1 and "escreva só a mensagem base" in llm.prompts[0]
 
 
 def test_meio_presencial_traz_a_abordagem_e_whatsapp_nao(conn: sqlite3.Connection) -> None:
@@ -183,8 +201,8 @@ def test_meio_presencial_traz_a_abordagem_e_whatsapp_nao(conn: sqlite3.Connectio
         AGORA,
     )
 
-    assert presencial.ganchos[0].abordagem_presencial
-    assert zap.ganchos[0].abordagem_presencial is None
+    assert presencial.ganchos[1].abordagem_presencial
+    assert zap.ganchos[1].abordagem_presencial is None
 
 
 def test_mensagem_com_termo_de_evitar_cai_e_o_aviso_diz_por_que(conn: sqlite3.Connection) -> None:
@@ -196,26 +214,25 @@ def test_mensagem_com_termo_de_evitar_cai_e_o_aviso_diz_por_que(conn: sqlite3.Co
 
     redacao = redacao_mod.redigir(llm, conn, _pedido(evitar=["eleicao"]), resultado, contato, usuario, AGORA)
 
-    assert [g.assunto_id for g in redacao.ganchos] == [segundo]
+    assert [g.assunto_id for g in redacao.ganchos] == [None, segundo]
     assert redacao.aviso is not None and "eleicao" in redacao.aviso
 
 
-def test_se_todas_as_mensagens_forem_recusadas_o_modelo_tem_uma_segunda_chance(
-    conn: sqlite3.Connection,
-) -> None:
+def test_sem_mensagem_base_valida_o_modelo_tem_uma_segunda_chance(conn: sqlite3.Connection) -> None:
     usuario, contato, resultado = _montar(conn, n_assuntos=1)
     assunto_id = resultado.itens_menu[0].assunto_id
     longa = " ".join(["palavra"] * 200)
     llm = _LLMFalso(
-        RespostaRedacao(ganchos=[_gancho(assunto_id, longa)]),
-        RespostaRedacao(ganchos=[_gancho(assunto_id)]),
+        RespostaRedacao(ganchos=[_base(longa), _gancho(assunto_id)]),
+        RespostaRedacao(ganchos=[_base(), _gancho(assunto_id)]),
+        com_base=False,
     )
 
     redacao = redacao_mod.redigir(llm, conn, _pedido(), resultado, contato, usuario, AGORA)
 
     assert len(llm.prompts) == 2
     assert "foi recusada" in llm.prompts[1] and "limite 80" in llm.prompts[1]
-    assert [g.assunto_id for g in redacao.ganchos] == [assunto_id]
+    assert [g.assunto_id for g in redacao.ganchos] == [None, assunto_id]
 
 
 def test_registrar_grava_na_tabela_e_o_historico_mostra_o_status(conn: sqlite3.Connection) -> None:
@@ -229,7 +246,10 @@ def test_registrar_grava_na_tabela_e_o_historico_mostra_o_status(conn: sqlite3.C
     redacao_mod.registrar(conn, resultado.consulta_id, redacao, AGORA)
 
     gravados = redacao_mod.ganchos_da_consulta(conn, resultado.consulta_id)
-    assert [(g.assunto_id, status) for g, status in gravados] == [(assunto_id, "entregue")]
+    assert [(g.assunto_id, status) for g, status in gravados] == [
+        (None, "entregue"),
+        (assunto_id, "entregue"),
+    ]
     gancho_uso.marcar(conn, resultado.consulta_id, assunto_id, "usado", AGORA)
     texto = historico.historico_recente_para_prompt(conn, contato.id or 0)
     assert f"Gancho {assunto_id} (usado)" in texto
@@ -261,11 +281,11 @@ def test_links_das_noticias_vem_do_banco_e_nao_do_modelo(conn: sqlite3.Connectio
 
     redacao = redacao_mod.redigir(llm, conn, _pedido(), resultado, contato, usuario, AGORA)
 
-    assert [(link.veiculo, link.url) for link in redacao.ganchos[0].links] == [
+    assert [(link.veiculo, link.url) for link in redacao.ganchos[1].links] == [
         ("jornal.test", "https://jornal.test/materia-1")
     ]
     redacao_mod.registrar(conn, resultado.consulta_id, redacao, AGORA)
-    gravado = redacao_mod.ganchos_da_consulta(conn, resultado.consulta_id)[0][0]
+    gravado = redacao_mod.ganchos_da_consulta(conn, resultado.consulta_id)[1][0]
     assert gravado.links[0].titulo == "Matéria sobre cooperativas"
     assert gravado.links[0].texto == "Texto integral da matéria sobre cooperativas, com todos os parágrafos."
 

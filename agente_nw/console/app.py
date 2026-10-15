@@ -266,8 +266,9 @@ def criar_app(
             _despachar_execucao(pedido_id)
         return redirect(url_for("ver_pedido", pedido_id=pedido_id))
 
+    @app.route("/pedido/<int:pedido_id>/gancho/base/<acao>", methods=["POST"], defaults={"assunto_id": None})
     @app.route("/pedido/<int:pedido_id>/gancho/<int:assunto_id>/<acao>", methods=["POST"])
-    def marcar_gancho(pedido_id: int, assunto_id: int, acao: str) -> Response:
+    def marcar_gancho(pedido_id: int, assunto_id: int | None, acao: str) -> Response:
         conn = _conn()
         pedido = _pedido_ou_404(pedido_id)
         if acao not in ("usado", "nao_serve") or pedido.consulta_id is None or pedido.perfil_id is None:
@@ -275,7 +276,8 @@ def criar_app(
         agora = datetime.now(UTC).isoformat()
         status = cast(gancho_uso.StatusGancho, acao)
         gancho_uso.marcar(conn, pedido.consulta_id, assunto_id, status, agora)
-        assunto_contato.marcar_do_assunto(conn, pedido.perfil_id, assunto_id, status)
+        if assunto_id is not None:
+            assunto_contato.marcar_do_assunto(conn, pedido.perfil_id, assunto_id, status)
         conn.commit()
         return redirect(url_for("ver_pedido", pedido_id=pedido_id))
 

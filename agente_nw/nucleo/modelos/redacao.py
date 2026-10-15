@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from agente_nw.nucleo.modelos.contexto_consulta import MeioContato
 from agente_nw.nucleo.modelos.pedido import RegistroPedido
@@ -23,28 +23,42 @@ class LinkNoticia(BaseModel):
 
 
 class Gancho(BaseModel):
-    """Um assunto pronto para a conversa: a notícia, o motivo e a mensagem redigida."""
+    """Uma mensagem pronta. Com `assunto_id` é um gancho de notícia; sem ele (`None`) é a mensagem base,
+    que nasce do objetivo e da pessoa e cita uma peculiaridade dela (brief 047)."""
 
     model_config = ConfigDict(frozen=True)
 
-    assunto_id: int
-    titulo: str = Field(min_length=1)
-    noticia: str = Field(min_length=1)
-    por_que_para_esta_pessoa: str = Field(min_length=1)
+    assunto_id: int | None = None
+    titulo: str | None = None
+    noticia: str | None = None
+    peculiaridade: str | None = None
+    por_que_para_esta_pessoa: str = ""
     mensagem: str = Field(min_length=1)
     abordagem_presencial: str | None = None
     links: list[LinkNoticia] = Field(default_factory=list)
 
-    @field_validator("titulo", "noticia", "por_que_para_esta_pessoa", "mensagem")
+    @field_validator("por_que_para_esta_pessoa", "mensagem")
     @classmethod
     def sem_espacos_nas_pontas(cls, valor: str) -> str:
         return valor.strip()
 
-    @field_validator("abordagem_presencial")
+    @field_validator("titulo", "noticia", "peculiaridade", "abordagem_presencial")
     @classmethod
     def vazio_vira_none(cls, valor: str | None) -> str | None:
         limpo = (valor or "").strip()
         return limpo or None
+
+    @model_validator(mode="after")
+    def gancho_de_noticia_tem_titulo_e_noticia(self) -> Gancho:
+        if self.assunto_id is not None and (
+            self.titulo is None or self.noticia is None or not self.por_que_para_esta_pessoa
+        ):
+            raise ValueError("gancho de notícia exige titulo, noticia e por_que_para_esta_pessoa")
+        return self
+
+    @property
+    def e_base(self) -> bool:
+        return self.assunto_id is None
 
 
 class RespostaRedacao(BaseModel):
@@ -80,21 +94,26 @@ def validar_ganchos(
 ) -> tuple[list[Gancho], list[str]]:
     """Fica com os ganchos que obedecem às regras de redação; devolve também o motivo de cada descarte.
 
-    Descarta: assunto fora dos selecionados, assunto repetido, assunto já usado antes, mensagem com
-    termo de `evitar`, mensagem acima do limite do registro e título acima de doze palavras. A
-    abordagem presencial só fica quando o meio é "pessoalmente"."""
+    Descarta: mensagem base repetida, assunto fora dos selecionados, assunto repetido, assunto já usado
+    antes, mensagem com termo de `evitar`, mensagem acima do limite do registro e título acima de doze
+    palavras. A mensagem base (sem assunto) pula as checagens de assunto e vai sempre em primeiro; fica
+    uma base e até `MAXIMO_GANCHOS` ganchos de notícia. A abordagem presencial só fica quando o meio é
+    "pessoalmente"."""
     limite = LIMITE_PALAVRAS_MENSAGEM[registro]
     termos_evitar = [t for t in (sem_acento_e_caixa(e) for e in evitar) if t]
+    base: list[Gancho] = []
     aceitos: list[Gancho] = []
     motivos: list[str] = []
     vistos: set[int] = set()
     for gancho in ganchos:
-        rotulo = f"gancho do assunto {gancho.assunto_id}"
-        if gancho.assunto_id not in assuntos_validos:
+        rotulo = "mensagem base" if gancho.assunto_id is None else f"gancho do assunto {gancho.assunto_id}"
+        if gancho.assunto_id is None and base:
+            motivos.append(f"{rotulo} descartada: já existe uma mensagem base")
+        elif gancho.assunto_id is not None and gancho.assunto_id not in assuntos_validos:
             motivos.append(f"{rotulo} descartado: assunto que não foi selecionado")
-        elif gancho.assunto_id in vistos:
+        elif gancho.assunto_id is not None and gancho.assunto_id in vistos:
             motivos.append(f"{rotulo} descartado: assunto repetido")
-        elif gancho.assunto_id in usados:
+        elif gancho.assunto_id is not None and gancho.assunto_id in usados:
             motivos.append(f"{rotulo} descartado: assunto já usado antes com esta pessoa")
         else:
             mensagem_normal = sem_acento_e_caixa(gancho.mensagem)
@@ -106,11 +125,14 @@ def validar_ganchos(
                     f"{rotulo} descartado: mensagem com {_palavras(gancho.mensagem)} palavras "
                     f"(limite {limite} no registro {registro})"
                 )
-            elif _palavras(gancho.titulo) > MAXIMO_PALAVRAS_TITULO:
+            elif _palavras(gancho.titulo or "") > MAXIMO_PALAVRAS_TITULO:
                 motivos.append(f"{rotulo} descartado: título com mais de {MAXIMO_PALAVRAS_TITULO} palavras")
             else:
-                vistos.add(gancho.assunto_id)
                 if meio != "pessoalmente" and gancho.abordagem_presencial is not None:
                     gancho = gancho.model_copy(update={"abordagem_presencial": None})
-                aceitos.append(gancho)
-    return aceitos[:MAXIMO_GANCHOS], motivos
+                if gancho.assunto_id is None:
+                    base.append(gancho)
+                else:
+                    vistos.add(gancho.assunto_id)
+                    aceitos.append(gancho)
+    return [*base, *aceitos[:MAXIMO_GANCHOS]], motivos

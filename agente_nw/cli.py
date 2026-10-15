@@ -846,9 +846,13 @@ def _imprimir_redacao(resultado: ResultadoPedido, redacao: Redacao) -> None:
     print(f'Objetivo: {pedido.objetivo} — "{pedido.objetivo_texto}" · {pedido.meio} · {pedido.registro}')
     for numero, gancho in enumerate(redacao.ganchos, start=1):
         print()
-        print(f"{numero}. {gancho.titulo}")
-        print(f"   Notícia: {gancho.noticia}")
-        print(f"   Por que serve: {gancho.por_que_para_esta_pessoa}")
+        print(f"{numero}. {gancho.titulo or 'Mensagem base'}")
+        if gancho.noticia:
+            print(f"   Notícia: {gancho.noticia}")
+        if gancho.peculiaridade:
+            print(f"   Peculiaridade: {gancho.peculiaridade}")
+        if gancho.por_que_para_esta_pessoa:
+            print(f"   Por que serve: {gancho.por_que_para_esta_pessoa}")
         print("   Mensagem:")
         print(f'   "{gancho.mensagem}"')
         if gancho.abordagem_presencial:

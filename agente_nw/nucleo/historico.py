@@ -48,6 +48,8 @@ def _formatar_ganchos(conexao: sqlite3.Connection, consulta_id: int) -> str | No
         except json.JSONDecodeError:
             continue
         titulo = dados.get("titulo") if isinstance(dados, dict) else None
+        if isinstance(dados, dict) and not titulo and dados.get("assunto_id") is None:
+            titulo = "mensagem base"
         if isinstance(titulo, str) and titulo:
             mensagem = dados.get("mensagem")
             trecho = f' — mensagem: "{mensagem[:100]}"' if isinstance(mensagem, str) and mensagem else ""

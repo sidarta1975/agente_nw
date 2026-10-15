@@ -212,22 +212,22 @@ def redigir(
     limite_tokens: int = prompt_mod.LIMITE_TOKENS_PADRAO,
     meses_fato_antigo: int = 12,
 ) -> Redacao:
-    """Uma chamada ao modelo com todos os assuntos selecionados pelo motor. Não grava nada: quem
-    entrega chama `registrar`. Sem assunto disponível, devolve `ganchos=[]` com aviso e não chama o
-    modelo; assuntos que o usuário já usou com esta pessoa saem antes do prompt."""
+    """Uma chamada ao modelo: sempre devolve a mensagem base (objetivo + pessoa + uma peculiaridade) e,
+    havendo assunto ligado ao pedido, também os ganchos de notícia. Sem assunto o modelo é chamado do mesmo
+    jeito (brief 047; reverte a regra do 038). Não grava nada: quem entrega chama `registrar`. Assuntos que
+    o usuário já usou com esta pessoa saem antes do prompt."""
     del agora
     assert perfil.id is not None
     registro = pedido.registro
     usados = gancho_uso_q.assuntos_usados_do_perfil(conexao, perfil.id)
     disponiveis = [item for item in resultado_consulta.itens_menu if item.assunto_id not in usados]
-
+    informativos: list[str] = []
     if not disponiveis:
-        sem_assunto = (
-            "Todos os assuntos selecionados já foram usados com esta pessoa."
+        informativos.append(
+            "Todos os assuntos selecionados já foram usados com esta pessoa; mensagem a partir do perfil."
             if resultado_consulta.itens_menu
-            else resultado_consulta.aviso or "Nenhum assunto qualificado para esta pessoa agora."
+            else "Sem notícia relevante agora; mensagem a partir do perfil."
         )
-        return Redacao(ganchos=[], aviso=sem_assunto, registro_usado=registro)
 
     entrada = montar_entrada(
         conexao,
@@ -240,22 +240,30 @@ def redigir(
         disponiveis,
         meses_fato_antigo,
     )
+    if not entrada.fatos:
+        informativos.append("Pouca informação sobre a pessoa; mensagem mais geral.")
     prompt = prompt_mod.construir_prompt(entrada, limite_tokens)
     validos = {item.assunto_id for item in disponiveis}
     resposta = cliente_llm.gerar_json("redigir_ganchos", prompt, RespostaRedacao)
     ganchos, motivos = _validar(resposta, pedido, validos, usados)
-    if not ganchos and motivos:
+    if not any(g.e_base for g in ganchos):
+        motivos.append('faltou a mensagem base ("assunto_id": null), que é obrigatória')
         # Segunda tentativa dizendo ao modelo o que foi recusado: sem ela, um excesso de palavras na
-        # mensagem deixaria a pessoa sem nenhum gancho.
+        # mensagem deixaria a pessoa sem a mensagem base.
         recusas = "\n".join(f"- {motivo}" for motivo in motivos)
         retorno = f"{prompt}\n\nA resposta anterior foi recusada. Refaça respeitando as regras:\n{recusas}\n"
         resposta = cliente_llm.gerar_json("redigir_ganchos", retorno, RespostaRedacao)
         ganchos, motivos = _validar(resposta, pedido, validos, usados)
+        if not any(g.e_base for g in ganchos):
+            motivos.append("o modelo não devolveu a mensagem base")
     links_por_assunto = {a.assunto_id: a.links for a in entrada.assuntos}
-    ganchos = [g.model_copy(update={"links": links_por_assunto.get(g.assunto_id, [])}) for g in ganchos]
-    aviso = _juntar_avisos([resposta.aviso or "", *motivos])
+    ganchos = [
+        g if g.assunto_id is None else g.model_copy(update={"links": links_por_assunto.get(g.assunto_id, [])})
+        for g in ganchos
+    ]
+    aviso = _juntar_avisos([*informativos, resposta.aviso or "", *motivos])
     if not ganchos and aviso is None:
-        aviso = "O modelo não devolveu nenhum gancho para estes assuntos."
+        aviso = "O modelo não devolveu nenhuma mensagem."
     return Redacao(ganchos=ganchos, aviso=aviso, registro_usado=registro)
 
 

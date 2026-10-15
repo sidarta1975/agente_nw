@@ -53,7 +53,13 @@ class _LLMFalso:
             mensagem="Oi, Otávio! Li que o reajuste dos seguros vai mudar e lembrei de você.",
             abordagem_presencial="Pergunte como o setor reagiu à mudança.",
         )
-        return RespostaRedacao(ganchos=[gancho])
+        base = Gancho(
+            peculiaridade="atua no setor de seguros",
+            por_que_para_esta_pessoa="Retoma a conversa pelo setor dele.",
+            mensagem="Oi, Otávio! Faz tempo que a gente não se fala. Como anda o setor de seguros?",
+            abordagem_presencial="Comece perguntando do setor.",
+        )
+        return RespostaRedacao(ganchos=[base, gancho])
 
 
 def _preparar_falso(**kwargs: Any) -> ResultadoConsulta:
@@ -107,14 +113,16 @@ def test_pedir_entrega_a_redacao_por_padrao(
 
     saida = capsys.readouterr().out
     assert "Ganchos para Otávio" in saida
-    assert "1. Seguradora muda regra de reajuste" in saida
+    assert "1. Mensagem base" in saida
+    assert "Peculiaridade: atua no setor de seguros" in saida
+    assert "2. Seguradora muda regra de reajuste" in saida
     assert "Mensagem:" in saida
     assert "Abordagem presencial: Pergunte como o setor reagiu" in saida
     assert "Links:" in saida
     assert "- gazeta.test: Seguradora muda regra de reajuste" in saida
     assert "https://gazeta.test/reajuste" in saida
     linhas = conn.execute("SELECT status FROM gancho_uso").fetchall()
-    assert [linha["status"] for linha in linhas] == ["entregue"]
+    assert [linha["status"] for linha in linhas] == ["entregue", "entregue"]
 
 
 def test_pedido_por_whatsapp_traz_so_a_mensagem(capsys: pytest.CaptureFixture[str]) -> None:
@@ -142,7 +150,7 @@ def test_json_imprime_a_redacao(capsys: pytest.CaptureFixture[str]) -> None:
 
     dados = json.loads(capsys.readouterr().out)
     assert dados["registro_usado"] == "cordial"
-    assert dados["ganchos"][0]["titulo"] == "Seguradora muda regra de reajuste"
+    assert dados["ganchos"][1]["titulo"] == "Seguradora muda regra de reajuste"
 
 
 def test_homonimos_nao_preparam_nem_gravam_rede_em_quem_pode_ser_outro(

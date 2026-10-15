@@ -106,13 +106,15 @@
   {% if visao.fonte_noticias %}<p class="cinza">{{ visao.fonte_noticias }}</p>{% endif %}
   {% for aviso in visao.avisos %}<p class="aviso">{{ aviso }}</p>{% endfor %}
   {% for gancho, status in visao.ganchos %}
+    {% set chave = 'base' if gancho.assunto_id is none else gancho.assunto_id %}
     <div class="gancho {{ status }}">
-      <h3 style="margin-top:0">{{ loop.index }}. {{ gancho.titulo }}</h3>
-      <p><strong>Notícia:</strong> {{ gancho.noticia }}</p>
-      <p><strong>Por que serve:</strong> {{ gancho.por_que_para_esta_pessoa }}</p>
+      <h3 style="margin-top:0">{{ loop.index }}. {{ gancho.titulo or 'Mensagem base' }}</h3>
+      {% if gancho.noticia %}<p><strong>Notícia:</strong> {{ gancho.noticia }}</p>{% endif %}
+      {% if gancho.peculiaridade %}<p><strong>Peculiaridade da pessoa:</strong> {{ gancho.peculiaridade }}</p>{% endif %}
+      {% if gancho.por_que_para_esta_pessoa %}<p><strong>Por que serve:</strong> {{ gancho.por_que_para_esta_pessoa }}</p>{% endif %}
       <strong>Mensagem</strong>
-      <pre class="mensagem" id="mensagem-{{ gancho.assunto_id }}">{{ gancho.mensagem }}</pre>
-      <button type="button" onclick="copiarMensagem('mensagem-{{ gancho.assunto_id }}', this)">Copiar</button>
+      <pre class="mensagem" id="mensagem-{{ chave }}">{{ gancho.mensagem }}</pre>
+      <button type="button" onclick="copiarMensagem('mensagem-{{ chave }}', this)">Copiar</button>
       {% if gancho.abordagem_presencial %}
         <p><strong>Abordagem presencial:</strong> {{ gancho.abordagem_presencial }}</p>
       {% endif %}
