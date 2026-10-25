@@ -10,7 +10,7 @@ quê. Cada canal continua dono de como pergunta e de como mostra o progresso: el
 from __future__ import annotations
 
 import sqlite3
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
@@ -23,17 +23,21 @@ from agente_nw.nucleo import pedido as pedido_mod
 from agente_nw.nucleo import redacao as redacao_mod
 from agente_nw.nucleo.consulta import ResultadoConsulta
 from agente_nw.nucleo.llm import FalhaJsonInvalido
-from agente_nw.nucleo.modelos.configuracao import Limiares
+from agente_nw.nucleo.localizacao import ContextoNavegacao
+from agente_nw.nucleo.modelos.configuracao import Limiares, ListasLimiares
 from agente_nw.nucleo.modelos.localizacao import Localizacao
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido, ResultadoPedido
 from agente_nw.nucleo.modelos.perfil import Perfil
 from agente_nw.nucleo.modelos.redacao import Redacao
+
+SEM_PESSOA = "Pedido sem pessoa: não há contato para preparar."
 
 
 class Desfecho(Enum):
     SEGUIR = "seguir"  # nada a perguntar: o pedido continua
     ESPERAR = "esperar"  # o canal ficou com perguntas e o pedido só continua com a resposta
     PARAR = "parar"  # o pedido termina aqui, sem redação
+    REINICIAR = "reiniciar"  # o usuário escolheu outro contato: o pedido recomeça com ele (terminal)
 
 
 class Encaminhamento(Enum):
@@ -75,6 +79,38 @@ class Canal(Protocol):
 class Entrega:
     consulta: ResultadoConsulta
     redacao: Redacao
+
+
+def entender_pedido(
+    cliente_llm: Any,
+    conexao: sqlite3.Connection,
+    frase: str,
+    agora: str,
+    *,
+    limiares_listas: ListasLimiares,
+    contato_id_forcado: int | None = None,
+    navegacao: ContextoNavegacao | None = None,
+    trocar_perfil: bool = False,
+    perfis_informados: Sequence[str] = (),
+    confirmar_contato: Callable[[str, str], bool] | None = None,
+    pedido_id: int | None = None,
+) -> ResultadoPedido:
+    """Entende o pedido e resolve o contato. A regra de contato divergente (o nome do pedido não bate com
+    o contato escolhido; limiar `listas.similaridade_contato_forcado`) é aplicada aqui, igual nos dois
+    canais; o que fazer com a divergência é do canal (`Canal.contato_divergente`)."""
+    return pedido_mod.processar(
+        cliente_llm,
+        conexao,
+        frase,
+        agora,
+        contato_id_forcado,
+        navegacao=navegacao,
+        trocar_perfil=trocar_perfil,
+        perfis_informados=perfis_informados,
+        confirmar_contato=confirmar_contato,
+        similaridade_minima_contato=limiares_listas.similaridade_contato_forcado,
+        pedido_id=pedido_id,
+    )
 
 
 def encaminhar_localizacao(localizacao: Localizacao, sem_perguntar: bool) -> Encaminhamento:

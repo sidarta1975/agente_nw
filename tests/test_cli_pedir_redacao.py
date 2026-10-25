@@ -165,7 +165,7 @@ def test_homonimos_nao_preparam_nem_gravam_rede_em_quem_pode_ser_outro(
 
     monkeypatch.setattr(consulta_mod, "preparar", _nao_deveria_preparar)
 
-    assert cli.pedir_cmd("Almoço com o Otávio", True, False, None) == 0
+    assert cli.pedir_cmd("Almoço com o Otávio", True, False, None, sem_perguntar=True) == 0
 
     saida = capsys.readouterr().out
     assert "escolha um com --contato" in saida

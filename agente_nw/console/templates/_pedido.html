@@ -28,7 +28,15 @@
 {% elif pedido.status == 'aguardando_pessoa' %}
   {% for pergunta in visao.perguntas %}
     <section class="cartao">
-    {% if pergunta.tipo == 'contato' %}
+    {% if pergunta.tipo == 'divergencia' %}
+      <h3>O pedido fala de <strong>{{ pergunta.nome_pedido }}</strong>, mas o contato escolhido é <strong>{{ pergunta.contato.nome }}</strong>.</h3>
+      <p class="cinza">{{ pergunta.contato.detalhe }}</p>
+      <form class="bloco" method="post" action="{{ url_for('responder_pessoa', pedido_id=pedido.id) }}">
+        <input type="hidden" name="tipo" value="divergencia">
+        <button class="primario" name="resposta" value="sim">Sim, é essa pessoa</button>
+        <button name="resposta" value="nao">Não, escolher outro contato</button>
+      </form>
+    {% elif pergunta.tipo == 'contato' %}
       <h3>Há mais de um contato com esse nome. Qual deles?</h3>
       {% for c in pergunta.candidatos %}
         <form class="bloco" method="post" action="{{ url_for('responder_pessoa', pedido_id=pedido.id) }}">

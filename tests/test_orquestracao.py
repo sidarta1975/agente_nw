@@ -402,3 +402,142 @@ def test_opcao_do_link_usa_o_cabecalho_da_lista_quando_o_link_esta_nela(
         rede="linkedin", nome=LINK_COLADO, cabecalho="", link=LINK_COLADO, fonte="link_colado"
     )
     assert localizacao_mod.opcao_do_link(conn, "https://exemplo.test/x") is None
+
+
+# ---- brief 059: homônimos no terminal, falha em preparar e texto único ----------------------------------
+
+
+class _LLMDoTerminal:
+    def __init__(self, nome: str = "Otávio") -> None:
+        self.nome = nome
+
+    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: Any) -> Any:
+        return PedidoExtraido(
+            pessoa_nome=self.nome,
+            objetivo="retomar",
+            objetivo_texto="retomar o contato",
+            meio="whatsapp",
+            registro="cordial",
+            assunto_principal="seguros",
+            termos_busca=["seguros"],
+            confianca=0.9,
+        )
+
+
+@pytest.fixture
+def terminal(
+    conn: sqlite3.Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> list[dict[str, Any]]:
+    """O terminal com o LLM, a rede e a consulta simulados. Devolve as chamadas a `preparar`."""
+    from agente_nw.nucleo import consulta as consulta_mod
+
+    chamadas: list[dict[str, Any]] = []
+
+    def preparar(**kwargs: Any) -> Any:
+        chamadas.append(kwargs)
+        return SimpleNamespace(
+            consulta_id=1, fonte_noticias="google", google_bloqueado_ate=None, aviso=None, itens_menu=[]
+        )
+
+    monkeypatch.setattr(cli, "banco", lambda: conn)
+    monkeypatch.setattr(cli, "llm", lambda: _LLMDoTerminal())
+    monkeypatch.setattr(cli, "http", lambda: httpx.Client(transport=httpx.MockTransport(lambda _r: None)))
+    monkeypatch.setattr(cli, "_contexto_de_navegacao", lambda *_a, **_k: None)
+    monkeypatch.setattr(consulta_mod, "preparar", preparar)
+    monkeypatch.setattr(redacao_mod, "redigir", lambda *_a, **_k: Redacao(registro_usado="cordial"))
+    monkeypatch.setattr(redacao_mod, "registrar", lambda *_a, **_k: None)
+    return chamadas
+
+
+def _dois_otavios(conn: sqlite3.Connection) -> None:
+    perfis.inserir_novo_contato(conn, "Otávio Alves", None, None, AGORA)
+    perfis.inserir_novo_contato(conn, "Otávio Souza", None, None, AGORA)
+    conn.commit()
+
+
+def test_homonimos_no_terminal_interativo_listam_e_seguem_com_o_numero(
+    conn: sqlite3.Connection, terminal: list[dict[str, Any]], capsys: pytest.CaptureFixture[str]
+) -> None:
+    import re
+
+    _dois_otavios(conn)
+    perguntas: list[str] = []
+
+    def responder(pergunta: str) -> str:
+        perguntas.append(pergunta)
+        return "2"
+
+    assert cli.pedir_cmd("Almoço com o Otávio", True, False, None, entrada=responder) == 0
+
+    saida = capsys.readouterr().out
+    assert "Há mais de um contato chamado Otávio. Qual deles?" in saida
+    linha_2 = next(linha for linha in saida.splitlines() if linha.startswith("  2. "))
+    escolhido = int(re.search(r"#(\d+)", linha_2).group(1))  # type: ignore[union-attr]
+    assert len(perguntas) == 1
+    assert [c["perfil_id"] for c in terminal] == [escolhido]
+    assert "Ganchos para" in saida
+
+
+def test_homonimos_com_sem_perguntar_ficam_como_hoje(
+    conn: sqlite3.Connection, terminal: list[dict[str, Any]], capsys: pytest.CaptureFixture[str]
+) -> None:
+    _dois_otavios(conn)
+
+    assert cli.pedir_cmd("Almoço com o Otávio", True, False, None, sem_perguntar=True) == 0
+
+    saida = capsys.readouterr().out
+    assert "AVISO: encontrei 2 contatos chamados Otávio" in saida
+    assert "escolha um com --contato" in saida
+    assert terminal == []
+
+
+def test_homonimos_com_json_seguem_com_o_palpite(
+    conn: sqlite3.Connection, terminal: list[dict[str, Any]], capsys: pytest.CaptureFixture[str]
+) -> None:
+    _dois_otavios(conn)
+
+    assert cli.pedir_cmd("Almoço com o Otávio", True, True, None) == 0
+
+    assert len(terminal) == 1
+    assert "Qual deles?" not in capsys.readouterr().out
+
+
+def test_falha_de_json_em_preparar_mostra_falha_e_sai_com_erro(
+    conn: sqlite3.Connection,
+    terminal: list[dict[str, Any]],
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from agente_nw.nucleo import consulta as consulta_mod
+
+    def quebra(**_kwargs: Any) -> Any:
+        raise FalhaJsonInvalido("extrair_termos_contato", 3, "saída quebrada")
+
+    monkeypatch.setattr(consulta_mod, "preparar", quebra)
+
+    assert cli.pedir_cmd("Almoço com o Otávio", True, False, None) == 1
+
+    saida = capsys.readouterr().out
+    assert "FALHA: não consegui preparar a consulta" in saida
+    assert "saída quebrada" in saida
+
+
+def test_pedido_sem_pessoa_tem_o_mesmo_texto_nos_dois_canais(
+    conn: sqlite3.Connection,
+    terminal: list[dict[str, Any]],
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from tests.test_fluxo import Cenario
+
+    monkeypatch.setattr(cli, "llm", lambda: _LLMDoTerminal(nome=""))
+    assert cli.pedir_cmd("Um assunto geral", True, False, None) == 0
+    assert f"AVISO: {orquestracao.SEM_PESSOA}" in capsys.readouterr().out
+
+    cenario = Cenario(tmp_path, monkeypatch)
+    cenario.cliente.nome = ""
+    pedido_id = cenario.pedido("Um assunto geral")
+    fluxo_mod.executar_pedido(cenario.deps, pedido_id)
+    gravado = cenario.ler(pedido_id)
+    assert gravado.avisos_json is not None and orquestracao.SEM_PESSOA in gravado.avisos_json

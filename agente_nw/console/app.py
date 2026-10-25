@@ -207,6 +207,16 @@ def criar_app(
         conn = _conn()
         pedido = _pedido_ou_404(pedido_id)
         agora = datetime.now(UTC).isoformat()
+        if request.form.get("tipo") == "divergencia":
+            erro = fluxo_mod.decidir_divergencia(conn, pedido_id, request.form.get("resposta") == "sim")
+            gravado = _pedido_ou_404(pedido_id)
+            if erro is None and gravado.status == "na_fila":
+                _despachar_execucao(pedido_id)  # sem contato parecido: recomeça com a pessoa do pedido
+            elif erro is None and fluxo_mod.sem_perguntas(conn, pedido_id):
+                pedidos.atualizar_status(conn, pedido_id, "na_fila")
+                conn.commit()
+                _despachar_execucao(pedido_id, continuar=True)
+            return redirect(url_for("ver_pedido", pedido_id=pedido.id, erro=erro))
         if request.form.get("tipo") == "contato":
             erro = fluxo_mod.decidir_contato(conn, pedido_id, int(request.form.get("perfil_id", "0") or 0))
             if erro is None:

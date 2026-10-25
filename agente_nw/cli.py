@@ -728,6 +728,7 @@ class CanalTerminal:
         self._menu = menu
         self._resultado: ResultadoPedido | None = None
         self.codigo_de_saida = 0
+        self.contato_escolhido: int | None = None
 
     def avisar(self, texto: str) -> None:
         if not self._saida_json:
@@ -735,6 +736,8 @@ class CanalTerminal:
 
     def pedido_entendido(self, resultado: ResultadoPedido) -> None:
         self._resultado = resultado
+        if self.pergunta_o_contato(resultado):
+            return  # o pedido é mostrado depois, já com o contato escolhido
         if self._saida_json:
             if not self._preparar_depois:
                 print(resultado.pedido.model_dump_json(indent=2))
@@ -767,19 +770,42 @@ class CanalTerminal:
         self.codigo_de_saida = 1
         return Desfecho.PARAR
 
+    def pergunta_o_contato(self, resultado: ResultadoPedido) -> bool:
+        """Homônimos: no terminal interativo (sem `--json` nem `--sem-perguntar`, e com a consulta a seguir)
+        o usuário escolhe; nos modos de script o pedido usa o palpite e avisa."""
+        return (
+            resultado.contato_ambiguo
+            and self._preparar_depois
+            and not self._saida_json
+            and not self._sem_perguntar
+        )
+
     def contato_ambiguo(self, resultado: ResultadoPedido) -> Desfecho:
         if self._saida_json:
             return Desfecho.SEGUIR
-        print("Há mais de um contato com esse nome: escolha um com --contato <id> e repita o pedido.")
-        return Desfecho.PARAR
+        if not self.pergunta_o_contato(resultado):
+            print("Há mais de um contato com esse nome: escolha um com --contato <id> e repita o pedido.")
+            return Desfecho.PARAR
+        print(f"Há mais de um contato chamado {resultado.pedido.pessoa_nome}. Qual deles?")
+        for numero, candidato in enumerate(resultado.candidatos, start=1):
+            detalhe = ", ".join(p for p in (candidato.cargo, candidato.empresa, candidato.cidade) if p)
+            print(f"  {numero}. #{candidato.id} {candidato.nome}" + (f" — {detalhe}" if detalhe else ""))
+        while True:
+            resposta = self._entrada("número (q = cancelar): ").strip().lower()
+            if resposta == "q":
+                print("Pedido cancelado.")
+                return Desfecho.PARAR
+            if resposta.isdigit() and 1 <= int(resposta) <= len(resultado.candidatos):
+                self.contato_escolhido = resultado.candidatos[int(resposta) - 1].id
+                return Desfecho.REINICIAR
+            print("Opção inválida.")
 
     def sem_pessoa(self, resultado: ResultadoPedido) -> Desfecho:
-        sem_pessoa = "pedido sem pessoa — não há contato para preparar."
         if self._saida_json:
-            vazia = Redacao(aviso=sem_pessoa, registro_usado=resultado.pedido.registro)
+            vazia = Redacao(aviso=orquestracao.SEM_PESSOA, registro_usado=resultado.pedido.registro)
             print(vazia.model_dump_json(indent=2))
         else:
-            print(f"AVISO: {sem_pessoa}")
+            print(f"AVISO: {orquestracao.SEM_PESSOA}")
         return Desfecho.PARAR
 
     def consulta_pronta(self, consulta: ResultadoConsulta) -> bool:
@@ -817,44 +843,51 @@ def pedir_cmd(
     menu: bool = False,
     perfis_informados: list[str] | None = None,
 ) -> int:
-    from agente_nw.nucleo import pedido as pedido_mod
     from agente_nw.nucleo.llm import FalhaJsonInvalido
 
     conn = banco()
     agora = datetime.now(UTC).isoformat()
     navegacao = None if saida_json else _contexto_de_navegacao(abrir_pagina, not sem_perguntar)
-    try:
-        resultado = pedido_mod.processar(
-            llm(),
+    contato_forcado = contato_id
+    pedido_id: int | None = None
+    while True:  # recomeça uma vez se o usuário escolher entre homônimos
+        try:
+            resultado = orquestracao.entender_pedido(
+                llm(),
+                conn,
+                frase,
+                agora,
+                limiares_listas=configuracao().limiares.listas,
+                contato_id_forcado=contato_forcado,
+                navegacao=navegacao,
+                trocar_perfil=trocar_perfil,
+                perfis_informados=perfis_informados or (),
+                confirmar_contato=None if saida_json or sem_perguntar else _confirmar_contato(entrada),
+                pedido_id=pedido_id,
+            )
+        except FalhaJsonInvalido as erro:
+            print(f"FALHA: não consegui entender o pedido ({erro})")
+            return 1
+        except ValueError as erro:
+            print(f"FALHA: {erro}")
+            return 1
+
+        canal = CanalTerminal(
             conn,
             frase,
             agora,
-            contato_id,
-            navegacao=navegacao,
+            entrada=entrada,
+            sem_perguntar=sem_perguntar,
             trocar_perfil=trocar_perfil,
-            perfis_informados=perfis_informados or (),
-            confirmar_contato=None if saida_json or sem_perguntar else _confirmar_contato(entrada),
-            similaridade_minima_contato=configuracao().limiares.listas.similaridade_contato_forcado,
+            saida_json=saida_json,
+            preparar_depois=preparar_depois,
+            menu=menu,
         )
-    except FalhaJsonInvalido as erro:
-        print(f"FALHA: não consegui entender o pedido ({erro})")
-        return 1
-    except ValueError as erro:
-        print(f"FALHA: {erro}")
-        return 1
-
-    canal = CanalTerminal(
-        conn,
-        frase,
-        agora,
-        entrada=entrada,
-        sem_perguntar=sem_perguntar,
-        trocar_perfil=trocar_perfil,
-        saida_json=saida_json,
-        preparar_depois=preparar_depois,
-        menu=menu,
-    )
-    desfecho = orquestracao.encaminhar_pedido(resultado, canal, seguir_para_redacao=preparar_depois)
+        desfecho = orquestracao.encaminhar_pedido(resultado, canal, seguir_para_redacao=preparar_depois)
+        if desfecho is not Desfecho.REINICIAR:
+            break
+        contato_forcado = canal.contato_escolhido
+        pedido_id = resultado.pedido_id
     if desfecho is not Desfecho.SEGUIR:
         return canal.codigo_de_saida
     assert resultado.perfil is not None  # SEGUIR garante que há pessoa
@@ -883,6 +916,9 @@ def pedir_cmd(
             rodar_coleta=True,
             ler_redes_sociais=True,
         )
+    except FalhaJsonInvalido as erro:  # só chega aqui o que veio de `preparar`; ao redigir é FalhaNaRedacao
+        print(f"FALHA: não consegui preparar a consulta ({erro})")
+        return 1
     except orquestracao.FalhaNaRedacao as erro:
         print(f"FALHA: não consegui redigir os ganchos ({erro})")
         return 1

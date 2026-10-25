@@ -22,7 +22,6 @@ import httpx
 
 from agente_nw.nucleo import localizacao as localizacao_mod
 from agente_nw.nucleo import orquestracao
-from agente_nw.nucleo import pedido as pedido_mod
 from agente_nw.nucleo.consulta import ResultadoConsulta, preparar
 from agente_nw.nucleo.database import conexao as conexao_bd
 from agente_nw.nucleo.database.queries import listas as queries_listas
@@ -114,6 +113,19 @@ def pergunta_de_contato(candidatos: list[Any]) -> dict[str, Any]:
     }
 
 
+def pergunta_de_divergencia(nome_do_pedido: str, contato: Any) -> dict[str, Any]:
+    """O pedido fala de uma pessoa e o contato escolhido tem outro nome: confirmar antes de redigir."""
+    return {
+        "tipo": "divergencia",
+        "nome_pedido": nome_do_pedido,
+        "contato": {
+            "perfil_id": contato.id,
+            "nome": contato.nome,
+            "detalhe": ", ".join(p for p in (contato.cargo, contato.empresa, contato.cidade) if p),
+        },
+    }
+
+
 def perguntas_pendentes(pedido: pedidos.PedidoGravado) -> list[dict[str, Any]]:
     if not pedido.localizacao_json:
         return []
@@ -191,7 +203,8 @@ class CanalWeb:
         return self._esperar([pergunta_de_rede(loc) for loc in resultado.localizacoes])
 
     def contato_divergente(self, resultado: ResultadoPedido) -> Desfecho:
-        return Desfecho.SEGUIR  # o console não confirma o nome do contato escolhido pelo usuário
+        assert resultado.perfil is not None
+        return self._esperar([pergunta_de_divergencia(resultado.pedido.pessoa_nome, resultado.perfil)])
 
     def contato_ambiguo(self, resultado: ResultadoPedido) -> Desfecho:
         return self._esperar([pergunta_de_contato(resultado.candidatos)])
@@ -266,11 +279,12 @@ def _entender(deps: Dependencias, conexao: sqlite3.Connection, pedido_id: int) -
             gravar_usuario=deps.gravar_usuario,
             avisar=lambda texto: _etapa(conexao, pedido_id, texto),
         )
-    resultado = pedido_mod.processar(
+    resultado = orquestracao.entender_pedido(
         cliente_llm,
         conexao,
         pedido.texto,
         _agora(),
+        limiares_listas=deps.limiares.listas,
         contato_id_forcado=pedido.perfil_id,  # correção, ou contato já escolhido pelo usuário
         navegacao=navegacao,
         pedido_id=pedido_id,
@@ -293,7 +307,7 @@ def _escrever(deps: Dependencias, conexao: sqlite3.Connection, pedido_id: int) -
     pedido = pedidos.obter_por_id(conexao, pedido_id)
     assert pedido is not None
     if pedido.perfil_id is None or pedido.extraido_json is None:
-        sem_pessoa = ["Pedido sem pessoa: não há contato para preparar."]
+        sem_pessoa = [orquestracao.SEM_PESSOA]
         pedidos.gravar_avisos(conexao, pedido_id, json.dumps(sem_pessoa, ensure_ascii=False))
         pedidos.atualizar_status(conexao, pedido_id, "concluido")
         conexao.commit()
@@ -378,6 +392,33 @@ def decidir_rede(
         localizacao_mod.confirmar(conexao, pedido.perfil_id, escolhida, agora)
 
     _gravar_perguntas(conexao, pedido_id, [p for p in perguntas if p is not pergunta])
+    return None
+
+
+def decidir_divergencia(conexao: sqlite3.Connection, pedido_id: int, aceita: bool) -> str | None:
+    """Resposta à pergunta "o pedido fala de X, mas o contato é Y; seguir com Y?".
+
+    Sim: a pergunta some e o pedido segue com o contato. Não: aparece a pergunta de contatos parecidos com o
+    nome do pedido; sem nenhum, o pedido recomeça sem contato escolhido (a pessoa do pedido vira contato)."""
+    pedido = pedidos.obter_por_id(conexao, pedido_id)
+    if pedido is None:
+        return "Pedido inexistente."
+    perguntas = perguntas_pendentes(pedido)
+    divergencia = next((p for p in perguntas if p["tipo"] == "divergencia"), None)
+    if divergencia is None:
+        return None  # já respondida (clique repetido)
+    restantes = [p for p in perguntas if p is not divergencia]
+    if aceita:
+        _gravar_perguntas(conexao, pedido_id, restantes)
+        return None
+    candidatos = perfis.buscar_por_nome(conexao, divergencia["nome_pedido"])
+    if candidatos:
+        _gravar_perguntas(conexao, pedido_id, [*restantes, pergunta_de_contato(candidatos)])
+        return None
+    pedidos.gravar_resolucao(conexao, pedido_id, None, False, False)
+    _gravar_perguntas(conexao, pedido_id, restantes)
+    pedidos.atualizar_status(conexao, pedido_id, "na_fila")
+    conexao.commit()
     return None
 
 
