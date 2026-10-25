@@ -24,7 +24,7 @@ def _ollama_disponivel() -> bool:
         return False
 
 
-pytestmark = pytest.mark.skipif(not _ollama_disponivel(), reason="Ollama fora do ar")
+pytestmark = [pytest.mark.skipif(not _ollama_disponivel(), reason="Ollama fora do ar"), pytest.mark.llm_real]
 
 
 class _EsquemaFumaca(BaseModel):

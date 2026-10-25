@@ -54,5 +54,8 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-m 'not rede_real'"
-markers = ["rede_real: usa a rede de verdade (feeds e Google News); só roda com: pytest -m rede_real"]
+addopts = "-m 'not rede_real and not llm_real'"
+markers = [
+    "rede_real: usa a rede de verdade (feeds e Google News); só roda com: pytest -m rede_real",
+    "llm_real: chama o Ollama de verdade; fora do gate, só roda com: pytest -m llm_real",
+]

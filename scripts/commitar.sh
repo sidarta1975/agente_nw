@@ -13,7 +13,7 @@
 #   3. git status antes do add.
 #   4. git add em cada arquivo, um por um (§5 do AGENTS.md: nunca -A).
 #   5. git status para mostrar o staged.
-#   6. Pede confirmação (S/n).
+#   6. Pede confirmação (S/n); com SEM_PERGUNTA=1 pula a pergunta (usado por agente_entregar.sh).
 #   7. git commit -F <arquivo_de_mensagem>.
 #   8. git log --oneline -3.
 #
@@ -67,11 +67,13 @@ echo "=== mensagem do commit ==="
 cat "$MSG"
 
 echo
-read -r -p "Commitar? [S/n] " resposta
-resposta="${resposta:-S}"
-if [[ ! "$resposta" =~ ^[SsYy]$ ]]; then
-  echo "abortado — o staged fica como está."
-  exit 0
+if [[ "${SEM_PERGUNTA:-}" != "1" ]]; then
+  read -r -p "Commitar? [S/n] " resposta
+  resposta="${resposta:-S}"
+  if [[ ! "$resposta" =~ ^[SsYy]$ ]]; then
+    echo "abortado — o staged fica como está."
+    exit 0
+  fi
 fi
 
 git commit -F "$MSG"

@@ -38,6 +38,7 @@ def conn(tmp_path: Path) -> sqlite3.Connection:
     return conexao_aberta
 
 
+@pytest.mark.llm_real
 def test_extracao_real_produz_tags_e_campos_esperados(conn: sqlite3.Connection, tmp_path: Path) -> None:
     agora = "2026-01-01T00:00:00+00:00"
     conn.execute(

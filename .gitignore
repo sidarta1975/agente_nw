@@ -21,6 +21,7 @@ config/local.yaml
 !tests/fixtures/*.csv
 docs/*
 !docs/.gitkeep
-/.claude/
+/.claude/settings.local.json
+/.claude/estado/
 /Claude outputs/
 /_quarentena*/
