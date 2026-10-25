@@ -34,16 +34,22 @@ def _git(repo: Path, *args: str) -> str:
 def repo(tmp_path: Path) -> Path:
     pasta = tmp_path / "repo"
     (pasta / "scripts").mkdir(parents=True)
-    for nome in ("agente_entregar.sh", "commitar.sh"):
+    for nome in ("agente_entregar.sh", "commitar.sh", "agente_lacunas.py"):
         shutil.copy(RAIZ / "scripts" / nome, pasta / "scripts" / nome)
     (pasta / "scripts" / "verificar.sh").write_text(VERIFICAR_FALSO)
     for nome in ("agente_entregar.sh", "commitar.sh", "verificar.sh"):
         (pasta / "scripts" / nome).chmod(0o755)
-    (pasta / ".gitignore").write_text("/logs/\n/gate_rodou.txt\n")
+    (pasta / ".gitignore").write_text("/logs/\n/gate_rodou.txt\n/docs/\n")
     (pasta / "base.txt").write_text("base\n")
     _git(pasta, "init", "-b", "main")
     _git(pasta, "config", "user.email", "teste@example.com")
     _git(pasta, "config", "user.name", "Teste")
+    (pasta / "docs" / "docs").mkdir(parents=True)
+    (pasta / "docs" / "PLAN.md").write_text("## Backlog\n\n- 040 · algo · não iniciado\n\n## Done\n")
+    (pasta / "docs" / "docs" / "doc_001_teste_2026-10-25.md").write_text(
+        "# DOC 001\n\n## Lacunas\n\n| # | Lacuna | Destino | Impacto |\n|---|---|---|---|\n"
+        "| 1 | Falta medir | backlog | nice |\n"
+    )
     _git(pasta, "add", "--", ".gitignore", "base.txt", "scripts")
     _git(pasta, "commit", "-m", "inicial")
     (pasta / "logs").mkdir()
@@ -104,6 +110,8 @@ def test_manifesto_completo_faz_gate_commit_push_e_renomeia(repo: Path, ambiente
     curto = _git(repo, "rev-parse", "--short", "HEAD")
     assert linhas[-1] == f"✓ brief 001: commit {curto}, enviado ao GitHub"
     assert (repo / "logs" / "entregar_ultimo.txt").exists()
+    assert linhas[-2] == "lacunas do 001: 1 no Backlog, 0 em Pendências, 0 em Dívidas, 0 em Decisões"
+    assert "- [001-1] Falta medir · nice · " in (repo / "docs" / "PLAN.md").read_text()
 
 
 def test_arquivo_fora_da_lista_para_antes_do_gate(repo: Path, ambiente: dict[str, str]) -> None:

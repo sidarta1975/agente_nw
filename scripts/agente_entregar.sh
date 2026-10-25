@@ -9,7 +9,7 @@
 # Sem NNN, usa o maior número que tem os dois arquivos. Para no primeiro erro:
 #   1. confere o manifesto; 2. confere que nada fora da lista foi alterado; 3. gate (scripts/verificar.sh);
 #   4. commit (scripts/commitar.sh, sem pergunta); 5. git push; 6. renomeia o manifesto para entregue_*;
-#   7. imprime uma linha final.
+#   6b. copia as lacunas do relatório para o PLAN (scripts/agente_lacunas.py); 7. imprime uma linha final.
 # --simular mostra os passos sem rodar o gate nem tocar no git. O detalhe vai para logs/entregar_ultimo.txt.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -122,6 +122,10 @@ PUSH_OK=1
 git push >> "$LOG" 2>&1 || PUSH_OK=0
 mv "$MENSAGEM" "logs/entregue_${NUMERO}_commit.txt"
 mv "$LISTA" "logs/entregue_${NUMERO}_arquivos.txt"
+# Lacunas do relatório vão para o PLAN (fora do git; não muda o commit). Nunca derruba a entrega.
+if [[ -f scripts/agente_lacunas.py ]]; then
+  python3 scripts/agente_lacunas.py "$NUMERO" 2>> "$LOG" | tee -a "$LOG" || true
+fi
 if (( ! PUSH_OK )); then
   tail -n 3 "$LOG"
   echo "✗ brief $NUMERO: commit $HASH feito localmente; falhou só o envio. Rode: !git push"

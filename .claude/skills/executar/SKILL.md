@@ -15,7 +15,7 @@ Execute o brief `$ARGUMENTS` sozinho, nesta ordem. Não peça ao usuário para r
 4. Implemente só nos arquivos-alvo do brief.
 5. Rode os testes do brief (`pytest tests/test_x.py -q`) até passarem.
 6. Grave, antes de entregar:
-   - o relatório `docs/docs/doc_$ARGUMENTS_<slug>_<data>.md`, com o bloco do AGENTS §8 e a saída dos comandos colada;
+   - o relatório `docs/docs/doc_$ARGUMENTS_<slug>_<data>.md`, com o bloco do AGENTS §8, a saída dos comandos colada e, no fim, a seção `## Lacunas` em tabela (`# | Lacuna | Destino | Impacto`; destino: backlog, pendência, dívida, decisão ou nenhum; sem lacunas: `Sem lacunas.`). Não copie lacunas para o PLAN à mão: o `agente_entregar.sh` faz isso;
    - o manifesto: `logs/commit_$ARGUMENTS.txt` (mensagem do commit) e `logs/arquivos_$ARGUMENTS.txt` (um caminho por linha, só o que entra no commit);
    - as linhas Resumo, Doing e Done do `docs/PLAN.md`.
 7. Rode `scripts/agente_entregar.sh $ARGUMENTS`. Ele roda o gate, commita só o manifesto e faz o push. Se falhar, corrija a causa e rode de novo, **no máximo 3 vezes**. Na terceira falha, pare e descreva no relatório o que falhou.
