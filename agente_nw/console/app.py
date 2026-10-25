@@ -24,6 +24,7 @@ from agente_nw.nucleo.database.queries import (
     fatos,
     fila_extracao,
     gancho_uso,
+    nota_contato,
     pedidos,
     perfil_tema,
     perfis,
@@ -156,6 +157,8 @@ def criar_app(
         extraido = PedidoExtraido.model_validate_json(pedido.extraido_json) if pedido.extraido_json else None
         perfil = perfis.obter_por_id(conn, pedido.perfil_id) if pedido.perfil_id is not None else None
         ganchos = redacao_mod.ganchos_da_consulta(conn, pedido.consulta_id) if pedido.consulta_id else []
+        consulta_id = pedido.consulta_id
+        comentarios = gancho_uso.comentarios_por_consulta(conn, consulta_id) if consulta_id else {}
         avisos: list[str] = json.loads(pedido.avisos_json) if pedido.avisos_json else []
         fonte = (
             consulta_mod.rotulo_da_fonte(pedido.noticias_fonte, pedido.noticias_bloqueado_ate)
@@ -168,6 +171,8 @@ def criar_app(
             "extraido": extraido,
             "perfil": perfil,
             "ganchos": ganchos,
+            "comentarios": comentarios,
+            "notas": nota_contato.listar_por_pedido(conn, pedido.id),
             "avisos": avisos,
             "perguntas": fluxo_mod.perguntas_pendentes(pedido),
             "em_andamento": pedido.status in ("na_fila", "processando"),
@@ -279,6 +284,34 @@ def criar_app(
         if assunto_id is not None:
             assunto_contato.marcar_do_assunto(conn, pedido.perfil_id, assunto_id, status)
         conn.commit()
+        return redirect(url_for("ver_pedido", pedido_id=pedido_id))
+
+    @app.route(
+        "/pedido/<int:pedido_id>/gancho/base/comentar", methods=["POST"], defaults={"assunto_id": None}
+    )
+    @app.route("/pedido/<int:pedido_id>/gancho/<int:assunto_id>/comentar", methods=["POST"])
+    def comentar_gancho(pedido_id: int, assunto_id: int | None) -> Response:
+        conn = _conn()
+        pedido = _pedido_ou_404(pedido_id)
+        if pedido.consulta_id is None:
+            abort(400)
+        agora = datetime.now(UTC).isoformat()
+        gancho_uso.comentar(conn, pedido.consulta_id, assunto_id, request.form.get("comentario", ""), agora)
+        conn.commit()
+        return redirect(url_for("ver_pedido", pedido_id=pedido_id))
+
+    @app.route("/pedido/<int:pedido_id>/nota", methods=["POST"])
+    def nota_do_pedido(pedido_id: int) -> Response:
+        conn = _conn()
+        pedido = _pedido_ou_404(pedido_id)
+        if pedido.perfil_id is None:
+            abort(400)
+        texto = request.form.get("nota", "").strip()
+        if texto:
+            geral = request.form.get("escopo") == "contato"
+            agora = datetime.now(UTC).isoformat()
+            nota_contato.inserir(conn, pedido.perfil_id, texto, agora, None if geral else pedido_id)
+            conn.commit()
         return redirect(url_for("ver_pedido", pedido_id=pedido_id))
 
     @app.route("/pessoa/<int:perfil_id>")
