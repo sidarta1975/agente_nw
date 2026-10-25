@@ -9,70 +9,25 @@
 
 Você implementa briefs. Não tem latitude criativa. Se o brief não cobre algo, pare e registre no relatório final como pendência — não invente.
 
-Leia, nesta ordem, antes de qualquer alteração: este arquivo → `docs/PLANO.md` → `docs/ARQUITETURA.md` → `docs/PLAN.md` → o brief da sessão → o código já existente na área afetada.
+O Claude Code carrega este arquivo sozinho no início da sessão (versão 2.1.277 ou posterior; sem `CLAUDE.md` na pasta). Antes de alterar qualquer coisa, leia: `docs/PLAN.md` até o fim de `## Dívidas conhecidas`; as seções do PLANO, da ARQUITETURA e das armadilhas citadas em "Seções a ler" no cabeçalho do brief; o brief; o código existente da área afetada. O histórico (`docs/historico/`) é consultado por busca, nunca lido inteiro. Não criar `CLAUDE.md` nem `CLAUDE.local.md` neste repositório: com eles, o Claude Code deixa de ler este arquivo.
 
 ## 2. Estrutura do repositório
 
-```
-agente_nw/
-├── AGENTS.md
-├── pyproject.toml
-├── .gitignore
-├── temas.exemplo.yaml
-├── fontes.exemplo.yaml
-├── config/
-│   ├── container.py          # fábrica de dependências: llm(), banco(), http()
-│   ├── llm_routing.yaml      # tarefa → modelo, num_ctx, temperatura, format
-│   ├── limiares.yaml         # valores calibrados; nunca constante no código
-│   └── local.exemplo.yaml    # caminhos e URLs identificadoras (o local.yaml fica fora do git)
-├── agente_nw/                # pacote Python
-│   ├── cli.py                # comandos: verificar-ambiente, importar-temas, importar-agenda,
-│   │                         #   ficha, ativar, confirmar-tags, coletar, ciclo, copiar-banco, ...
-│   ├── nucleo/
-│   │   ├── modelos/          # contratos Pydantic v2, frozen=True, um módulo por entidade
-│   │   ├── prompts/          # um arquivo por contrato, com esquema JSON e um exemplo resolvido
-│   │   ├── database/
-│   │   │   ├── conexao.py    # abre o banco: WAL, foreign_keys, busy_timeout, sqlite-vec
-│   │   │   ├── migracoes.py  # aplica scripts/migracoes/*.sql em ordem
-│   │   │   └── queries/      # todo SQL isolado aqui
-│   │   ├── llm.py            # cliente único do Ollama
-│   │   ├── vetores.py        # embeddings, cosseno, centróide
-│   │   ├── relevancia/       # qualificação, pontuação, piso, tipo (regra do conector)
-│   │   ├── agrupamento/      # centróide, janela, reabertura, divisão
-│   │   └── saidas/           # cartão, menu, exportação Markdown
-│   ├── coleta/
-│   │   ├── rss/              # feedparser, trafilatura, canonicalização, google news
-│   │   └── capturas/         # leitura de rede social sob demanda (backend: extensao_backend.py)
-│   ├── ponte/                 # servidor local 127.0.0.1:8766 + página-ponte (brief 044)
-│   ├── perfil/                # importação da agenda, extração de texto, lacunas, centróide de perfil
-│   ├── console/                # Flask + templates + estáticos; a tela única (`/`) é a interface principal
-│   └── integracoes/          # (Etapa 3)
-├── extensao/                  # extensão do Chrome (manifest v3): lê rede social no navegador do usuário
-├── scripts/
-│   ├── migracoes/             # 001_inicial.sql, 002_..., aplicados em ordem
-│   ├── instalar_macos.sh
-│   └── verificar.sh          # ruff + mypy --strict + pytest
-├── docs/                      # fora do git, exceto o que a governança listar
-├── dados/                     # agente.db, backups/ — fora do git
-├── saidas/                    # menu_AAAA-MM-DD.md — fora do git
-├── logs/                      # fora do git
-└── tests/
-```
-
-Nome do pacote e da pasta é sempre `agente_nw`. Desvio de nomenclatura é corrigido imediatamente.
+Estrutura do repositório: `docs/ARQUITETURA.md` §2. Nome do pacote e da pasta é sempre `agente_nw`; desvio de nomenclatura é corrigido imediatamente.
 
 ## 3. Stack
 
+Descrição (perfis `air16`/`pro48`, tarefas de LLM, embeddings): `docs/ARQUITETURA.md` §8. Aqui só o que é regra.
+
 - Python 3.12 do Homebrew; Bash para utilitários.
-- SQLite em modo WAL, `busy_timeout` e `foreign_keys` ligados, arquivo único em `dados/agente.db`. Nunca compartilhado entre processos. `sqlite-vec` carregado na abertura da conexão.
-- Ollama para inferência local, subido pelo próprio usuário fora do aplicativo do Ollama (nunca o Ollama.app, nunca `brew services`), acessado pela `ollama_url` de `config/local.yaml` — por máquina. Modelo por tarefa vem do **perfil ativo** de `config/llm_routing.yaml`, escolhido por `perfil_llm` em `config/local.yaml` (ausente = `air16`): `air16` no Air (produção: `qwen3:4b` como único modelo de geração e julgamento, `qwen3:8b` só em `agente_nw calibrar-agrupamento`), `pro48` no Pro (desenvolvimento: `qwen2.5:14b`). Verificar com `ollama list` antes de sugerir download. Tarefas de LLM: `qualificar`, `rotular`, `cartao`, `cruzar_por_que`, `extrair_de_texto`, `extrair_captura_rede_social`, `extrair_pedido` (pedido em texto livre, brief 036), `desempatar_perfil` (pessoa nas listas do usuário, brief 037), `redigir_ganchos` (ganchos e mensagens prontas, brief 038), `extrair_termos_contato` (assuntos que o contato publica, viram buscas de notícia), `descrever_imagem` (descrição das imagens publicadas pelo contato, modelo com visão: `gemma3:12b` no pro48, `gemma3:4b` no air16), `prerotular_calibracao`. `think: false` obrigatório em toda tarefa; o perfil pode omitir a chave do payload com `enviar_think: false`, para modelos sem modo de raciocínio. `bge-m3` para embeddings nos dois perfis. No Air, subir com `OLLAMA_MAX_LOADED_MODELS=2 OLLAMA_KEEP_ALIVE=30m ollama serve`. No Pro, **não subir servidor próprio**: `ollama_url` aponta para a instância compartilhada já existente (`http://127.0.0.1:11435`, mantida pelo `cervello`); nunca parar ou reiniciar essa instância a partir deste projeto.
-- Embeddings: `bge-m3` (1024 dimensões, multilíngue).
-- Índice vetorial: `sqlite-vec`, no mesmo arquivo do banco.
-- Contratos: Pydantic v2 com `frozen=True`.
-- Arquitetura hexagonal; dependências via `config/container.py`.
+- SQLite em modo WAL, arquivo único em `dados/agente.db`, nunca compartilhado entre processos.
+- Ollama para inferência local, subido pelo próprio usuário fora do aplicativo (nunca o Ollama.app, nunca `brew services`), acessado pela `ollama_url` de `config/local.yaml`. Rodar `ollama list` antes de sugerir download.
+- No Pro, **não subir servidor próprio**: `ollama_url` aponta para a instância compartilhada já existente (`http://127.0.0.1:11435`, mantida pelo `cervello`); nunca parar ou reiniciar essa instância a partir deste projeto.
+- `think: false` obrigatório em toda tarefa; o perfil pode omitir a chave do payload com `enviar_think: false`, para modelos sem modo de raciocínio.
 - Saída estruturada do LLM sempre em modo JSON com esquema (`format: json`); `num_ctx` explícito em toda chamada.
-- Interface: console web local em `console/`, Flask, `http://localhost:8765`, só em `127.0.0.1`.
-- Coleta em rede social: extensão do Chrome do usuário (`extensao/`), comandada pelo programa por uma ponte local (`ponte/`, `127.0.0.1:8766`, token por execução); nunca navegador separado. Abre aba em segundo plano, uma rede por vez, com pausa entre páginas, na hora da consulta, com a sessão do próprio usuário. Ações fixas: `ola`, `abrir`, `estado`, `rolar`, `links`, `imagens`, `fechar`. As imagens publicadas são baixadas só para serem descritas por um modelo de visão (tarefa `descrever_imagem`); a imagem nunca é gravada, só a descrição.
+- Contratos: Pydantic v2 com `frozen=True`. Arquitetura hexagonal; dependências via `config/container.py`.
+- Console web (`http://localhost:8765`) e ponte da extensão (`127.0.0.1:8766`) só em `127.0.0.1`.
+- Coleta em rede social: extensão do Chrome do usuário (`extensao/`), comandada pelo programa por uma ponte local (`ponte/`, token por execução); nunca navegador separado. Uma rede por vez, com pausa entre páginas, na hora da consulta, com a sessão do próprio usuário. Ações fixas: `ola`, `abrir`, `estado`, `rolar`, `links`, `imagens`, `fechar`. As imagens publicadas são baixadas só para serem descritas por um modelo de visão (tarefa `descrever_imagem`); a imagem nunca é gravada, só a descrição.
 - Agendamento: não existe. Nenhuma tarefa periódica. Toda execução é disparada explicitamente por Sidarta pelo console ou pela CLI.
 - Testes: pytest. Tipagem: mypy strict. Lint: ruff. Suíte roda via `scripts/verificar.sh`, sempre por Sidarta no terminal — nunca pelo executor.
 
@@ -95,6 +50,7 @@ Nome do pacote e da pasta é sempre `agente_nw`. Desvio de nomenclatura é corri
 - Trunk-based em `main`. Sem branches de longa duração, sem recursos avançados de git.
 - **Git nunca roda de forma autônoma.** O executor prepara a lista de arquivos e o texto do commit no relatório final; Sidarta autoriza.
 - Remoção de arquivo rastreado: `git rm`, com critérios explícitos e exclusão de `__init__.py`, `.gitkeep` e afins.
+- Sidarta roda o git com `scripts/commitar.sh <arquivo_de_mensagem> <arquivos…>`, no terminal ou digitando `!scripts/commitar.sh …` dentro do Claude Code. O executor grava a mensagem do commit em `logs/commit_<NNN>.txt` e lista os arquivos no relatório. Push só por Sidarta.
 
 ## 6. Tarefas não assistidas
 
@@ -108,13 +64,15 @@ A leitura das listas do usuário nas redes (conexões, seguidos, amigos) é sob 
 
 **Nunca rodam sozinhos:** git, leitura de rede social, alteração de ficha de contato, a suíte de testes padrão (`scripts/verificar.sh`, pytest, ruff, mypy) — o executor escreve e mantém o script; quem roda é Sidarta, no terminal dele.
 
+O gate completo é `scripts/verificar.sh`, digitado por Sidarta no terminal ou com `!scripts/verificar.sh` dentro do Claude Code. O executor nunca o roda, nem em segundo plano.
+
 ## 7. Comportamento do software
 
 O usuário escreve um pedido em texto livre sobre uma pessoa ou um grupo e um objetivo. O sistema extrai quem, o quê, como e em que registro; reconhece ou cria o contato; decide sozinho o que buscar na notícia; localiza a pessoa nas redes do usuário com confirmação quando há dúvida; lê o que estiver disponível; seleciona assuntos e **redige o conteúdo**: sempre uma mensagem base nascida do objetivo e da pessoa (com uma peculiaridade dela) e, havendo notícia ligada ao pedido, ganchos de notícia adicionais (brief 047), tudo no registro da relação. Nenhum cadastro é pré-requisito: contato, perfil do usuário, temas, tags e fatos são criados e mantidos pelo sistema; o usuário corrige em texto e pode comentar cada mensagem e anotar o contato; a nota vira contexto da próxima redação (brief 050). Não existe envio de mensagem. A interface principal é a tela única do console (brief 039): o usuário escreve a frase, confirma a pessoa quando perguntado, recebe os ganchos, marca "usei" ou "não serve" e corrige em texto livre; as telas antigas (contatos, menu, temas, eu) ficam em "bastidores". O pedido roda em segundo plano, uma tarefa por vez, com `pedido.status` e `pedido.etapa`. Nunca rodam sozinhos: git, leitura de rede social, alteração de ficha de contato.
 
 ## 8. Relatório final obrigatório
 
-Todo brief termina com este bloco preenchido. Sem ele, a sessão é considerada incompleta.
+Todo brief termina com este bloco preenchido, escrito no relatório do brief, `docs/docs/doc_<NNN>_<slug>_<data>.md`, e não na resposta da conversa. Sem ele, a sessão é considerada incompleta. A resposta final da sessão tem três linhas: o caminho do relatório, uma linha do que foi feito e o comando que Sidarta roda. Sem saída de comando colada no relatório, não se escreve que algo passou.
 
 Pendência só pode ser (a) decisão de produto, que cabe a Sidarta, ou (b) algo que exige a máquina ou a presença dele — login em rede social, teste com pessoa real, aprovação de limiar. Defeito, inconsistência, limpeza ou verificação que o executor consiga resolver ou rodar sozinho é resolvido antes do relatório, não listado. Quando um critério de aceite depende de rede social ou do modelo real, o executor roda o que está ao seu alcance (por exemplo `agente_nw listas ver --rede instagram --filtro a`) e cola a saída no relatório; o que fica para Sidarta é só o que exige Sidarta.
 
@@ -130,9 +88,17 @@ O executor não roda a suíte de testes padrão (pytest, ruff, mypy, `scripts/ve
 - Comandos executados:
 - Lista de arquivos para `git add` e texto sugerido do commit:
 - Pendências e decisões que ficaram abertas:
-- `docs/PLAN.md` atualizado: sim/não
+- Resumo, Doing, Backlog e Done do `docs/PLAN.md` atualizados: sim/não
 ```
 
 ## 9. Certificação
 
-Uma tarefa só está certificada quando: Sidarta roda o script de verificação apresentado no relatório e confirma testes verdes, escopo respeitado (nada além do brief), relatório final completo e `docs/PLAN.md` atualizado. Auditoria independente em doze passes é aplicada ao fim de cada fase de implementação, com validação cruzada em outro modelo.
+Uma tarefa só está certificada quando: Sidarta roda o script de verificação apresentado no relatório e confirma testes verdes, escopo respeitado (nada além do brief), relatório final completo e Resumo, Doing, Backlog e Done do `docs/PLAN.md` atualizados. Auditoria independente em doze passes é aplicada ao fim de cada fase de implementação, com validação cruzada em outro modelo.
+
+## 10. Briefs e numeração
+
+- Briefs e DOCs seguem uma única sequência numérica. O próximo número é o maior encontrado em `docs/briefs/` e `docs/docs/`, mais um.
+- Todo brief escrito no Projeto é gravado em `docs/briefs/` antes de ser executado. O executor não executa brief que não esteja no disco.
+- O cabeçalho do brief segue `docs/briefs/_modelo.md`: Conjunto, Arquivos-alvo, Seções a ler, Modelo, Teste de aceite.
+- Havendo teste de aceite, o executor cria o teste antes do código.
+- Não editar este arquivo, regra ou skill numa sessão de execução, salvo quando o brief tiver esse arquivo como alvo.
