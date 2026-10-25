@@ -81,6 +81,7 @@ class EntradaRedacao:
     historico: list[str]
     assuntos: list[AssuntoParaRedacao]
     contexto_relacao: list[str] = field(default_factory=list)  # tags: família, amigos, trabalho...
+    notas: list[str] = field(default_factory=list)  # notas do usuário sobre o contato (brief 050)
 
 
 def estimar_tokens(texto: str) -> int:
@@ -127,9 +128,17 @@ def _bloco_pedido(entrada: EntradaRedacao) -> str:
 
 
 def _bloco_historico(entrada: EntradaRedacao) -> str:
+    notas = ""
+    if entrada.notas:
+        notas = "\nNotas do usuário sobre esta pessoa (valem como fato dito por ele):\n" + "\n".join(
+            f"- {nota}" for nota in entrada.notas
+        )
     if not entrada.historico:
-        return "HISTÓRICO: (nenhuma consulta anterior)"
-    return "HISTÓRICO (consultas anteriores; não repita o que já foi usado):\n" + "\n".join(entrada.historico)
+        return "HISTÓRICO: (nenhuma consulta anterior)" + notas
+    return (
+        "HISTÓRICO (consultas anteriores; não repita o que já foi usado; comentário do usuário diz por que "
+        "uma mensagem serviu ou não):\n" + "\n".join(entrada.historico) + notas
+    )
 
 
 def _bloco_assuntos(entrada: EntradaRedacao) -> str:

@@ -16,6 +16,7 @@ from agente_nw.nucleo.database.queries import fatos as fatos_q
 from agente_nw.nucleo.database.queries import gancho_uso as gancho_uso_q
 from agente_nw.nucleo.database.queries import itens as itens_q
 from agente_nw.nucleo.database.queries import listas as listas_q
+from agente_nw.nucleo.database.queries import nota_contato as nota_contato_q
 from agente_nw.nucleo.database.queries import perfil_tema as perfil_tema_q
 from agente_nw.nucleo.modelos.fato import Fato
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
@@ -38,6 +39,8 @@ _FATOS_CANDIDATOS = 40
 _TRECHO_DO_FATO_NO_PROMPT = 600  # o fato fica inteiro no banco; o prompt leva o começo
 _FATOS_RECENTES_GARANTIDOS = 4
 _CONSULTAS_NO_HISTORICO = 3
+_NOTAS_NO_PROMPT = 5
+_TRECHO_DA_NOTA = 400
 _MANCHETES_POR_ASSUNTO = 3
 _DIAS_POR_MES = 30
 _MARCA_ANTIGO = "[antigo]"
@@ -144,6 +147,14 @@ def _historico(conexao: sqlite3.Connection, perfil_id: int, consulta_id: int) ->
     return [historico_mod.formatar_uma(c, conexao) for c in anteriores]
 
 
+def _notas(conexao: sqlite3.Connection, perfil_id: int) -> list[str]:
+    """As notas mais recentes do usuário sobre o contato, com a data (brief 050)."""
+    return [
+        f"[{nota.criado_em[:10]}] {nota.texto[:_TRECHO_DA_NOTA]}"
+        for nota in nota_contato_q.listar_por_perfil(conexao, perfil_id, _NOTAS_NO_PROMPT)
+    ]
+
+
 def _texto_da_consulta(pedido: PedidoExtraido, assuntos: list[ItemMenu]) -> str:
     return ". ".join([pedido.assunto_principal, *pedido.interessa, *(item.titulo for item in assuntos)])
 
@@ -186,6 +197,7 @@ def montar_entrada(
         historico=_historico(conexao, contato.id, resultado_consulta.consulta_id),
         assuntos=[_assunto_para_redacao(conexao, item) for item in assuntos],
         contexto_relacao=perfil_tema_q.listar_nomes_do_contato(conexao, contato.id),
+        notas=_notas(conexao, contato.id),
     )
 
 

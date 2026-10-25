@@ -129,11 +129,24 @@
         <form class="acao" method="post" action="{{ url_for('marcar_gancho', pedido_id=pedido.id, assunto_id=gancho.assunto_id, acao='nao_serve') }}"><button>Não serve</button></form>
       {% elif status == 'usado' %}<span class="selo selo-ativo">usado</span>
       {% else %}<span class="selo selo-inativo">não serve</span>{% endif %}
+      <form class="bloco" method="post" action="{{ url_for('comentar_gancho', pedido_id=pedido.id, assunto_id=gancho.assunto_id) }}">
+        <label for="comentario-{{ chave }}" class="cinza">Comentário (opcional): por que serviu, por que não, o que mudar</label>
+        <textarea id="comentario-{{ chave }}" name="comentario" rows="2">{{ visao.comentarios.get(gancho.assunto_id, '') }}</textarea>
+        <button>Salvar comentário</button>
+      </form>
     </div>
   {% else %}
     {% if not visao.avisos %}<p class="vazio">Nenhum gancho para este pedido.</p>{% endif %}
   {% endfor %}
   {% if perfil %}
+    <form class="bloco" method="post" action="{{ url_for('nota_do_pedido', pedido_id=pedido.id) }}">
+      <label for="nota">Nota sobre {{ perfil.nome }} (opcional; entra como contexto nos próximos pedidos sobre a pessoa)</label>
+      <textarea id="nota" name="nota" rows="2" placeholder="Ex.: trocou de escritório; da próxima vez foca na OAB"></textarea>
+      <label><input type="radio" name="escopo" value="contato" checked> sobre a pessoa em geral</label>
+      <label><input type="radio" name="escopo" value="pedido"> só sobre este pedido</label>
+      <button>Salvar nota</button>
+    </form>
+    {% for nota in visao.notas %}<p class="cinza">Nota ({{ nota.criado_em[:10] }}): {{ nota.texto }}</p>{% endfor %}
     <form class="bloco" method="post" action="{{ url_for('corrigir_pedido', pedido_id=pedido.id) }}">
       <label for="correcao">Corrigir (ex.: “mais informal”, “ele é do Rio”, “não fale de política”)</label>
       <input type="text" id="correcao" name="correcao" placeholder="O que mudar?">

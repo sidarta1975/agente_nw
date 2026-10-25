@@ -46,6 +46,18 @@ def marcar(
     return cursor.rowcount > 0
 
 
+def comentar(
+    conexao: sqlite3.Connection, consulta_id: int, assunto_id: int | None, texto: str, agora: str
+) -> bool:
+    """Grava o comentário livre do usuário sobre a mensagem (brief 050); texto vazio apaga o comentário.
+    `assunto_id` nulo é a mensagem base."""
+    cursor = conexao.execute(
+        "UPDATE gancho_uso SET comentario = ?, atualizado_em = ? WHERE consulta_id = ? AND assunto_id IS ?",
+        (texto.strip() or None, agora, consulta_id, assunto_id),
+    )
+    return cursor.rowcount > 0
+
+
 def listar_por_consulta(
     conexao: sqlite3.Connection, consulta_id: int
 ) -> list[tuple[int | None, StatusGancho, str]]:
@@ -55,6 +67,15 @@ def listar_por_consulta(
         (consulta_id,),
     ).fetchall()
     return [(linha["assunto_id"], linha["status"], linha["gancho_json"]) for linha in linhas]
+
+
+def comentarios_por_consulta(conexao: sqlite3.Connection, consulta_id: int) -> dict[int | None, str]:
+    """{assunto_id: comentario} das mensagens da consulta que têm comentário; nulo é a base."""
+    linhas = conexao.execute(
+        "SELECT assunto_id, comentario FROM gancho_uso WHERE consulta_id = ? AND comentario IS NOT NULL",
+        (consulta_id,),
+    ).fetchall()
+    return {linha["assunto_id"]: linha["comentario"] for linha in linhas}
 
 
 def assuntos_usados_do_perfil(conexao: sqlite3.Connection, perfil_id: int) -> set[int]:

@@ -42,7 +42,8 @@ def _formatar_assuntos(assuntos_entregues_json: str) -> str:
 def _formatar_ganchos(conexao: sqlite3.Connection, consulta_id: int) -> str | None:
     """Os ganchos redigidos na consulta, cada um com o que o usuário fez com ele (brief 038)."""
     partes: list[str] = []
-    for _assunto_id, status, gancho_json in gancho_uso_queries.listar_por_consulta(conexao, consulta_id):
+    comentarios = gancho_uso_queries.comentarios_por_consulta(conexao, consulta_id)
+    for assunto_id, status, gancho_json in gancho_uso_queries.listar_por_consulta(conexao, consulta_id):
         try:
             dados = json.loads(gancho_json)
         except json.JSONDecodeError:
@@ -53,7 +54,9 @@ def _formatar_ganchos(conexao: sqlite3.Connection, consulta_id: int) -> str | No
         if isinstance(titulo, str) and titulo:
             mensagem = dados.get("mensagem")
             trecho = f' — mensagem: "{mensagem[:100]}"' if isinstance(mensagem, str) and mensagem else ""
-            partes.append(f"{titulo} ({status}){trecho}")
+            comentario = comentarios.get(assunto_id)
+            nota = f' — comentário do usuário: "{comentario[:300]}"' if comentario else ""
+            partes.append(f"{titulo} ({status}){trecho}{nota}")
     return " · ".join(partes) or None
 
 
