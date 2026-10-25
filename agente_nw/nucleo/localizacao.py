@@ -393,11 +393,7 @@ def opcao_do_link(conexao: sqlite3.Connection, link: str) -> Opcao | None:
     if rede is None:
         return None
     canonico = canonicalizar_link(bruto)
-    linha = conexao.execute(
-        "SELECT nome, cabecalho FROM lista_rede_social WHERE link = ?", (canonico,)
-    ).fetchone()
-    nome = linha["nome"] if linha is not None else canonico
-    cabecalho = linha["cabecalho"] if linha is not None else ""
+    nome, cabecalho = queries_listas.nome_e_cabecalho_do_link(conexao, canonico) or (canonico, "")
     return Opcao(rede=rede, nome=nome, cabecalho=cabecalho, link=canonico, fonte="link_colado")
 
 

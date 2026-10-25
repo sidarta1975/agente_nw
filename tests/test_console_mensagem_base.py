@@ -24,7 +24,7 @@ def cenario(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Cenario:
         aviso = "Sem notícia relevante agora; mensagem a partir do perfil."
         return Redacao(ganchos=[base], aviso=aviso, registro_usado="cordial")
 
-    monkeypatch.setattr("agente_nw.nucleo.fluxo.redacao_mod.redigir", so_a_base)
+    monkeypatch.setattr("agente_nw.nucleo.redacao.redigir", so_a_base)
     return cenario
 
 

@@ -109,6 +109,16 @@ def atualizar_status(
     conexao.execute("UPDATE pedido SET status = ?, erro = ? WHERE id = ?", (status, erro, pedido_id))
 
 
+def marcar_interrompidos(conexao: sqlite3.Connection) -> int:
+    """Pedido que ficou 'na_fila' ou 'processando' porque o console foi encerrado não vai terminar sozinho.
+    Devolve quantos marcou; quem chama faz o commit."""
+    cursor = conexao.execute(
+        "UPDATE pedido SET status = 'erro', erro = 'O console foi encerrado durante o pedido.' "
+        "WHERE status IN ('na_fila', 'processando')"
+    )
+    return cursor.rowcount
+
+
 def atualizar_etapa(conexao: sqlite3.Connection, pedido_id: int, etapa: str) -> None:
     conexao.execute("UPDATE pedido SET etapa = ? WHERE id = ?", (etapa, pedido_id))
 

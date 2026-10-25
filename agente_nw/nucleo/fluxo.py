@@ -21,15 +21,16 @@ from typing import Any
 import httpx
 
 from agente_nw.nucleo import localizacao as localizacao_mod
+from agente_nw.nucleo import orquestracao
 from agente_nw.nucleo import pedido as pedido_mod
-from agente_nw.nucleo import redacao as redacao_mod
-from agente_nw.nucleo.consulta import preparar
+from agente_nw.nucleo.consulta import ResultadoConsulta, preparar
 from agente_nw.nucleo.database import conexao as conexao_bd
 from agente_nw.nucleo.database.queries import listas as queries_listas
 from agente_nw.nucleo.database.queries import pedidos, perfis, rede_sem_perfil, sistema
 from agente_nw.nucleo.modelos.configuracao import Limiares
 from agente_nw.nucleo.modelos.localizacao import Localizacao, Opcao
-from agente_nw.nucleo.modelos.pedido import PedidoExtraido
+from agente_nw.nucleo.modelos.pedido import PedidoExtraido, ResultadoPedido
+from agente_nw.nucleo.orquestracao import Desfecho
 
 FRACAO_DO_CONTEXTO_NO_PROMPT = 0.73  # 8192 de contexto → ~6000 tokens estimados de prompt
 ETAPA_DA_COLETA = "coleta"
@@ -154,12 +155,60 @@ def criar_correcao(conexao: sqlite3.Connection, pedido_pai_id: int, correcao: st
 
 def marcar_interrompidos(conexao: sqlite3.Connection) -> int:
     """Pedido que ficou 'processando' porque o console foi encerrado não vai terminar sozinho."""
-    cursor = conexao.execute(
-        "UPDATE pedido SET status = 'erro', erro = 'O console foi encerrado durante o pedido.' "
-        "WHERE status IN ('na_fila', 'processando')"
-    )
+    marcados = pedidos.marcar_interrompidos(conexao)
     conexao.commit()
-    return cursor.rowcount
+    return marcados
+
+
+# ---- o canal do console ------------------------------------------------------------------------------
+
+
+class CanalWeb:
+    """Como o console pergunta e mostra o andamento: grava as perguntas e a etapa no próprio pedido."""
+
+    def __init__(self, conexao: sqlite3.Connection, pedido_id: int) -> None:
+        self._conexao = conexao
+        self._pedido_id = pedido_id
+        self.avisos: list[str] = []
+
+    def avisar(self, texto: str) -> None:
+        if texto.startswith(_PREFIXO_AVISO):
+            self.avisos.append(texto)
+        _etapa(self._conexao, self._pedido_id, texto)
+
+    def pedido_entendido(self, resultado: ResultadoPedido) -> None:
+        """A página do pedido já mostra o que foi entendido."""
+
+    def _esperar(self, perguntas: list[dict[str, Any]]) -> Desfecho:
+        if not perguntas:
+            return Desfecho.SEGUIR
+        _gravar_perguntas(self._conexao, self._pedido_id, perguntas)
+        pedidos.atualizar_status(self._conexao, self._pedido_id, "aguardando_pessoa")
+        self._conexao.commit()
+        return Desfecho.ESPERAR
+
+    def localizacoes(self, resultado: ResultadoPedido) -> Desfecho:
+        return self._esperar([pergunta_de_rede(loc) for loc in resultado.localizacoes])
+
+    def contato_divergente(self, resultado: ResultadoPedido) -> Desfecho:
+        return Desfecho.SEGUIR  # o console não confirma o nome do contato escolhido pelo usuário
+
+    def contato_ambiguo(self, resultado: ResultadoPedido) -> Desfecho:
+        return self._esperar([pergunta_de_contato(resultado.candidatos)])
+
+    def sem_pessoa(self, resultado: ResultadoPedido) -> Desfecho:
+        return Desfecho.SEGUIR  # `_escrever` conclui o pedido com o aviso
+
+    def consulta_pronta(self, consulta: ResultadoConsulta) -> bool:
+        pedidos.gravar_consulta(self._conexao, self._pedido_id, consulta.consulta_id)
+        pedidos.gravar_fonte_noticias(
+            self._conexao, self._pedido_id, consulta.fonte_noticias, consulta.google_bloqueado_ate
+        )
+        self._conexao.commit()
+        return True
+
+    def redigindo(self) -> None:
+        _etapa(self._conexao, self._pedido_id, "Escrevendo os ganchos e as mensagens")
 
 
 # ---- execução --------------------------------------------------------------------------------------
@@ -227,15 +276,7 @@ def _entender(deps: Dependencias, conexao: sqlite3.Connection, pedido_id: int) -
         pedido_id=pedido_id,
     )
 
-    perguntas: list[dict[str, Any]] = []
-    if resultado.contato_ambiguo:
-        perguntas.append(pergunta_de_contato(resultado.candidatos))
-    else:
-        perguntas.extend(pergunta_de_rede(loc) for loc in resultado.localizacoes)
-    if perguntas:
-        _gravar_perguntas(conexao, pedido_id, perguntas)
-        pedidos.atualizar_status(conexao, pedido_id, "aguardando_pessoa")
-        conexao.commit()
+    if orquestracao.encaminhar_pedido(resultado, CanalWeb(conexao, pedido_id)) is Desfecho.ESPERAR:
         return
     _escrever(deps, conexao, pedido_id)
 
@@ -251,7 +292,6 @@ def _coleta_recente(conexao: sqlite3.Connection, minutos: int, agora: str) -> bo
 def _escrever(deps: Dependencias, conexao: sqlite3.Connection, pedido_id: int) -> None:
     pedido = pedidos.obter_por_id(conexao, pedido_id)
     assert pedido is not None
-    avisos: list[str] = []
     if pedido.perfil_id is None or pedido.extraido_json is None:
         sem_pessoa = ["Pedido sem pessoa: não há contato para preparar."]
         pedidos.gravar_avisos(conexao, pedido_id, json.dumps(sem_pessoa, ensure_ascii=False))
@@ -261,55 +301,34 @@ def _escrever(deps: Dependencias, conexao: sqlite3.Connection, pedido_id: int) -
     perfil = perfis.obter_por_id(conexao, pedido.perfil_id)
     assert perfil is not None
     extraido = PedidoExtraido.model_validate_json(pedido.extraido_json)
-    cliente_llm = deps.fabrica_llm(conexao)
-    usuario = pedido_mod.garantir_usuario(conexao, _agora())
+    canal = CanalWeb(conexao, pedido_id)
     correcao = pedido.pedido_pai_id is not None
-
-    def avisar(texto: str) -> None:
-        if texto.startswith(_PREFIXO_AVISO):
-            avisos.append(texto)
-        _etapa(conexao, pedido_id, texto)
-
-    agora = _agora()
-    reaproveita = correcao and _coleta_recente(conexao, deps.limiares.coleta.minutos_reaproveitamento, agora)
+    reaproveita = correcao and _coleta_recente(
+        conexao, deps.limiares.coleta.minutos_reaproveitamento, _agora()
+    )
     with deps.fabrica_http() as cliente_http:
-        consulta = preparar(
+        entrega = orquestracao.preparar_e_redigir(
+            canal,
+            preparar=preparar,
             conexao=conexao,
-            cliente_llm=cliente_llm,
+            cliente_llm=deps.fabrica_llm(conexao),
             cliente_http=cliente_http,
-            perfil_id=perfil.id or 0,
-            contexto=pedido_mod.para_contexto(extraido, pedido.texto),
+            perfil=perfil,
+            extraido=extraido,
+            texto=pedido.texto,
             limiares=deps.limiares,
             caminho_fontes=deps.caminho_fontes,
             caminho_sentinela=deps.caminho_sentinela,
             abrir_pagina=deps.abrir_pagina,
             pasta_navegador=deps.pasta_navegador,
-            agora=agora,
+            limite_tokens=int(deps.num_ctx_redacao * FRACAO_DO_CONTEXTO_NO_PROMPT),
             rodar_coleta=not reaproveita,
             ler_redes_sociais=not correcao,
-            avisar=avisar,
         )
-    pedidos.gravar_consulta(conexao, pedido_id, consulta.consulta_id)
-    pedidos.gravar_fonte_noticias(conexao, pedido_id, consulta.fonte_noticias, consulta.google_bloqueado_ate)
-    conexao.commit()
-
-    _etapa(conexao, pedido_id, "Escrevendo os ganchos e as mensagens")
-    agora_redacao = _agora()
-    redacao = redacao_mod.redigir(
-        cliente_llm,
-        conexao,
-        extraido,
-        consulta,
-        perfil,
-        usuario,
-        agora_redacao,
-        frase=pedido.texto,
-        limite_tokens=int(deps.num_ctx_redacao * FRACAO_DO_CONTEXTO_NO_PROMPT),
-        meses_fato_antigo=deps.limiares.redacao.meses_fato_antigo,
-    )
-    redacao_mod.registrar(conexao, consulta.consulta_id, redacao, agora_redacao)
-    if redacao.aviso:
-        avisos.append(redacao.aviso)
+    assert entrega is not None  # o console sempre segue para a redação
+    avisos = canal.avisos
+    if entrega.redacao.aviso:
+        avisos.append(entrega.redacao.aviso)
     pedidos.gravar_avisos(conexao, pedido_id, json.dumps(avisos, ensure_ascii=False) if avisos else None)
     pedidos.atualizar_status(conexao, pedido_id, "concluido")
     _etapa(conexao, pedido_id, "Pronto")

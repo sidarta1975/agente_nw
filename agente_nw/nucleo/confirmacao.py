@@ -5,9 +5,11 @@ from collections.abc import Callable
 
 from agente_nw.coleta.capturas.busca import REDES_SUPORTADAS
 from agente_nw.nucleo import localizacao as localizacao_mod
+from agente_nw.nucleo import orquestracao
 from agente_nw.nucleo.database.queries import listas as queries_listas
 from agente_nw.nucleo.database.queries import rede_sem_perfil
 from agente_nw.nucleo.modelos.localizacao import Localizacao, Opcao
+from agente_nw.nucleo.orquestracao import Encaminhamento
 
 _OPCOES_MOSTRADAS = 5
 _POR_PAGINA = 20
@@ -146,17 +148,18 @@ def conduzir(
 
     permitir = localizacao.rede is not None
     escolhida: Opcao | _SemPerfil | None = None
-    if localizacao.status == "claro" and localizacao.escolhido is not None:
-        if sem_perguntar:
+    encaminhamento = orquestracao.encaminhar_localizacao(localizacao, sem_perguntar)
+    if encaminhamento is Encaminhamento.GRAVAR_ESCOLHIDO:
+        escolhida = localizacao.escolhido
+    elif encaminhamento is Encaminhamento.CONFIRMAR_ESCOLHIDO:
+        assert localizacao.escolhido is not None
+        saida(f"É esta pessoa? {_descrever(localizacao.escolhido)}")
+        if entrada("[S/n] ").strip().lower() in ("", "s", "sim"):
             escolhida = localizacao.escolhido
         else:
-            saida(f"É esta pessoa? {_descrever(localizacao.escolhido)}")
-            if entrada("[S/n] ").strip().lower() in ("", "s", "sim"):
-                escolhida = localizacao.escolhido
-            else:
-                saida("Candidatos com esse nome:")
-                escolhida = _menu(conexao, localizacao.opcoes, entrada, saida, permitir)
-    elif not sem_perguntar and len(localizacao.opcoes) == 1:
+            saida("Candidatos com esse nome:")
+            escolhida = _menu(conexao, localizacao.opcoes, entrada, saida, permitir)
+    elif encaminhamento is Encaminhamento.CONFIRMAR_UNICA:
         unica = localizacao.opcoes[0]
         if localizacao.status == "nenhum":
             saida("Não achei nas suas listas.")
@@ -167,9 +170,9 @@ def conduzir(
             escolhida = unica
         elif resposta != "p":
             escolhida = _menu(conexao, [unica], entrada, saida, permitir)
-    elif not sem_perguntar and localizacao.status == "nenhum" and not localizacao.opcoes:
+    elif encaminhamento is Encaminhamento.PEDIR_LINK:
         escolhida = _pedir_link(conexao, localizacao.rede, entrada, saida)
-    elif not sem_perguntar:
+    elif encaminhamento is Encaminhamento.ESCOLHER:
         if localizacao.status == "nenhum":
             saida("Não achei nas suas listas.")
             if localizacao.opcoes:

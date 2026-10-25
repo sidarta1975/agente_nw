@@ -57,6 +57,14 @@ def listar_por_rede(conexao: sqlite3.Connection, rede: str) -> list[EntradaGrava
     return [_para_entrada(linha) for linha in linhas]
 
 
+def nome_e_cabecalho_do_link(conexao: sqlite3.Connection, link: str) -> tuple[str, str] | None:
+    """Nome e cabeçalho que a lista lida guarda para um link (já canônico), ou None se não estiver nela."""
+    linha = conexao.execute(
+        "SELECT nome, cabecalho FROM lista_rede_social WHERE link = ?", (link,)
+    ).fetchone()
+    return (linha["nome"], linha["cabecalho"]) if linha is not None else None
+
+
 def contar_por_rede(conexao: sqlite3.Connection, rede: str) -> int:
     (total,) = conexao.execute("SELECT COUNT(*) FROM lista_rede_social WHERE rede = ?", (rede,)).fetchone()
     return int(total)

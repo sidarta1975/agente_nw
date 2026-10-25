@@ -19,9 +19,11 @@ from agente_nw.coleta.capturas.busca import REDES_SUPORTADAS, redes_automaticas
 from agente_nw.coleta.capturas.listas import PaginaLista
 from agente_nw.coleta.rss import leitor
 from agente_nw.console.app import criar_app
+from agente_nw.nucleo import orquestracao
 from agente_nw.nucleo.agrupamento import agrupador
 from agente_nw.nucleo.agrupamento import calibracao as calibracao_agrupamento
 from agente_nw.nucleo.agrupamento.agrupador import ClienteEmbeddagem
+from agente_nw.nucleo.consulta import ResultadoConsulta
 from agente_nw.nucleo.database import backup, conexao
 from agente_nw.nucleo.database.queries import assunto_contato, assuntos, perfil_tema, perfis, sistema
 from agente_nw.nucleo.database.queries import listas as queries_listas
@@ -31,6 +33,7 @@ from agente_nw.nucleo.localizacao import ContextoNavegacao, atualizar_lista
 from agente_nw.nucleo.modelos.configuracao import PerfilRoteamento, Roteamento, TemasArquivo
 from agente_nw.nucleo.modelos.pedido import ResultadoPedido
 from agente_nw.nucleo.modelos.redacao import Redacao
+from agente_nw.nucleo.orquestracao import Desfecho
 from agente_nw.nucleo.relevancia import cartoes, cruzamento, qualificador
 from agente_nw.nucleo.saidas import markdown
 from agente_nw.perfil import agenda_google_csv, agenda_macos, extrator
@@ -699,6 +702,109 @@ def _avisar_etapa(texto: str) -> None:
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {texto}", flush=True)
 
 
+class CanalTerminal:
+    """Como o terminal pergunta (`input`) e mostra o andamento (`print`)."""
+
+    def __init__(
+        self,
+        conexao: sqlite3.Connection,
+        frase: str,
+        agora: str,
+        entrada: Callable[[str], str] = input,
+        sem_perguntar: bool = False,
+        trocar_perfil: bool = False,
+        saida_json: bool = False,
+        preparar_depois: bool = True,
+        menu: bool = False,
+    ) -> None:
+        self._conexao = conexao
+        self._frase = frase
+        self._agora = agora
+        self._entrada = entrada
+        self._sem_perguntar = sem_perguntar
+        self._trocar_perfil = trocar_perfil
+        self._saida_json = saida_json
+        self._preparar_depois = preparar_depois
+        self._menu = menu
+        self._resultado: ResultadoPedido | None = None
+        self.codigo_de_saida = 0
+
+    def avisar(self, texto: str) -> None:
+        if not self._saida_json:
+            _avisar_etapa(texto)
+
+    def pedido_entendido(self, resultado: ResultadoPedido) -> None:
+        self._resultado = resultado
+        if self._saida_json:
+            if not self._preparar_depois:
+                print(resultado.pedido.model_dump_json(indent=2))
+            return
+        _imprimir_pedido(resultado, self._frase)
+        if resultado.link_gravado is not None:
+            print(f"Rede social gravada a partir do link do pedido: {resultado.link_gravado.link}")
+        for nao_reconhecido in resultado.links_nao_reconhecidos:
+            print(f"AVISO: link não reconhecido em --perfil: {nao_reconhecido}")
+
+    def localizacoes(self, resultado: ResultadoPedido) -> Desfecho:
+        from agente_nw.nucleo import confirmacao
+
+        assert resultado.perfil is not None and resultado.perfil.id is not None
+        for localizacao in resultado.localizacoes:
+            confirmacao.conduzir(
+                self._conexao,
+                resultado.perfil.id,
+                localizacao,
+                self._agora,
+                entrada=self._entrada,
+                sem_perguntar=self._sem_perguntar,
+                substituir=self._trocar_perfil,
+            )
+        return Desfecho.SEGUIR
+
+    def contato_divergente(self, resultado: ResultadoPedido) -> Desfecho:
+        if not self._saida_json:
+            print("Contato não confirmado: confira o id em --contato e repita o pedido.")
+        self.codigo_de_saida = 1
+        return Desfecho.PARAR
+
+    def contato_ambiguo(self, resultado: ResultadoPedido) -> Desfecho:
+        if self._saida_json:
+            return Desfecho.SEGUIR
+        print("Há mais de um contato com esse nome: escolha um com --contato <id> e repita o pedido.")
+        return Desfecho.PARAR
+
+    def sem_pessoa(self, resultado: ResultadoPedido) -> Desfecho:
+        sem_pessoa = "pedido sem pessoa — não há contato para preparar."
+        if self._saida_json:
+            vazia = Redacao(aviso=sem_pessoa, registro_usado=resultado.pedido.registro)
+            print(vazia.model_dump_json(indent=2))
+        else:
+            print(f"AVISO: {sem_pessoa}")
+        return Desfecho.PARAR
+
+    def consulta_pronta(self, consulta: ResultadoConsulta) -> bool:
+        from agente_nw.nucleo.consulta import rotulo_da_fonte
+
+        if not self._saida_json:
+            print(rotulo_da_fonte(consulta.fonte_noticias, consulta.google_bloqueado_ate))
+        if not self._menu:
+            return True
+        assert self._resultado is not None and self._resultado.perfil is not None
+        print()
+        print(f"Consulta #{consulta.consulta_id} gravada para {self._resultado.perfil.nome}.")
+        if consulta.aviso:
+            print(f"AVISO: {consulta.aviso}")
+        for item in consulta.itens_menu:
+            print(f"[{item.tipo}] {item.titulo} (score={item.score:.1f})")
+            if item.por_que:
+                print(f"  por quê: {item.por_que}")
+        return False
+
+    def redigindo(self) -> None:
+        if not self._saida_json:
+            _avisar_etapa("Redigindo os ganchos e as mensagens...")
+
+
 def pedir_cmd(
     frase: str,
     preparar_depois: bool,
@@ -711,7 +817,6 @@ def pedir_cmd(
     menu: bool = False,
     perfis_informados: list[str] | None = None,
 ) -> int:
-    from agente_nw.nucleo import confirmacao
     from agente_nw.nucleo import pedido as pedido_mod
     from agente_nw.nucleo.llm import FalhaJsonInvalido
 
@@ -738,105 +843,57 @@ def pedir_cmd(
         print(f"FALHA: {erro}")
         return 1
 
-    if saida_json and not preparar_depois:
-        print(resultado.pedido.model_dump_json(indent=2))
-        return 0
-
-    if not saida_json:
-        _imprimir_pedido(resultado, frase)
-        if resultado.link_gravado is not None:
-            print(f"Rede social gravada a partir do link do pedido: {resultado.link_gravado.link}")
-        for nao_reconhecido in resultado.links_nao_reconhecidos:
-            print(f"AVISO: link não reconhecido em --perfil: {nao_reconhecido}")
-    if resultado.perfil is not None and resultado.perfil.id is not None:
-        for localizacao in resultado.localizacoes:
-            confirmacao.conduzir(
-                conn,
-                resultado.perfil.id,
-                localizacao,
-                agora,
-                entrada=entrada,
-                sem_perguntar=sem_perguntar,
-                substituir=trocar_perfil,
-            )
-    if not preparar_depois:
-        return 0
-    if resultado.contato_divergente:
-        if not saida_json:
-            print("Contato não confirmado: confira o id em --contato e repita o pedido.")
-        return 1
-    if resultado.contato_ambiguo and not saida_json:
-        print("Há mais de um contato com esse nome: escolha um com --contato <id> e repita o pedido.")
-        return 0
-    if resultado.perfil is None or resultado.perfil.id is None:
-        sem_pessoa = "pedido sem pessoa — não há contato para preparar."
-        if saida_json:
-            vazia = Redacao(aviso=sem_pessoa, registro_usado=resultado.pedido.registro)
-            print(vazia.model_dump_json(indent=2))
-        else:
-            print(f"AVISO: {sem_pessoa}")
-        return 0
+    canal = CanalTerminal(
+        conn,
+        frase,
+        agora,
+        entrada=entrada,
+        sem_perguntar=sem_perguntar,
+        trocar_perfil=trocar_perfil,
+        saida_json=saida_json,
+        preparar_depois=preparar_depois,
+        menu=menu,
+    )
+    desfecho = orquestracao.encaminhar_pedido(resultado, canal, seguir_para_redacao=preparar_depois)
+    if desfecho is not Desfecho.SEGUIR:
+        return canal.codigo_de_saida
+    assert resultado.perfil is not None  # SEGUIR garante que há pessoa
 
     from agente_nw.coleta.capturas.extensao_backend import abrir_pagina_extensao
-    from agente_nw.nucleo import redacao as redacao_mod
-    from agente_nw.nucleo.consulta import preparar, rotulo_da_fonte
+    from agente_nw.nucleo import consulta as consulta_mod
 
-    contexto = pedido_mod.para_contexto(resultado.pedido, frase)
-    consulta = preparar(
-        conexao=conn,
-        cliente_llm=llm(),
-        cliente_http=http(),
-        perfil_id=resultado.perfil.id,
-        contexto=contexto,
-        limiares=configuracao().limiares,
-        caminho_fontes=RAIZ / "fontes.yaml",
-        caminho_sentinela=caminho_sentinela(),
-        abrir_pagina=abrir_pagina_extensao,
-        pasta_navegador=RAIZ / "dados" / "navegador",
-        agora=datetime.now(UTC).isoformat(),
-        avisar=None if saida_json else _avisar_etapa,
-    )
-    if not saida_json:
-        print(rotulo_da_fonte(consulta.fonte_noticias, consulta.google_bloqueado_ate))
-    if menu:
-        print()
-        print(f"Consulta #{consulta.consulta_id} gravada para {resultado.perfil.nome}.")
-        if consulta.aviso:
-            print(f"AVISO: {consulta.aviso}")
-        for item in consulta.itens_menu:
-            print(f"[{item.tipo}] {item.titulo} (score={item.score:.1f})")
-            if item.por_que:
-                print(f"  por quê: {item.por_que}")
-        return 0
-
-    if not saida_json:
-        _avisar_etapa("Redigindo os ganchos e as mensagens...")
     config = configuracao()
     num_ctx = config.roteamento.perfis[config.roteamento.perfil_ativo].tarefas["redigir_ganchos"].num_ctx
-    agora_redacao = datetime.now(UTC).isoformat()
     try:
-        redacao = redacao_mod.redigir(
-            llm(),
-            conn,
-            resultado.pedido,
-            consulta,
-            resultado.perfil,
-            pedido_mod.garantir_usuario(conn, agora_redacao),
-            agora_redacao,
-            frase=frase,
+        entrega = orquestracao.preparar_e_redigir(
+            canal,
+            preparar=consulta_mod.preparar,
+            conexao=conn,
+            cliente_llm=llm(),
+            cliente_http=http(),
+            perfil=resultado.perfil,
+            extraido=resultado.pedido,
+            texto=frase,
+            limiares=config.limiares,
+            caminho_fontes=RAIZ / "fontes.yaml",
+            caminho_sentinela=caminho_sentinela(),
+            abrir_pagina=abrir_pagina_extensao,
+            pasta_navegador=RAIZ / "dados" / "navegador",
             limite_tokens=int(num_ctx * FRACAO_DO_CONTEXTO_NO_PROMPT),
-            meses_fato_antigo=config.limiares.redacao.meses_fato_antigo,
+            rodar_coleta=True,
+            ler_redes_sociais=True,
         )
-    except FalhaJsonInvalido as erro:
+    except orquestracao.FalhaNaRedacao as erro:
         print(f"FALHA: não consegui redigir os ganchos ({erro})")
         return 1
-    redacao_mod.registrar(conn, consulta.consulta_id, redacao, agora_redacao)
+    if entrega is None:  # `--menu`: o canal já imprimiu o menu
+        return canal.codigo_de_saida
     if saida_json:
-        print(redacao.model_dump_json(indent=2))
+        print(entrega.redacao.model_dump_json(indent=2))
     else:
         print()
-        print(f"Consulta #{consulta.consulta_id} gravada para {resultado.perfil.nome}.")
-        _imprimir_redacao(resultado, redacao)
+        print(f"Consulta #{entrega.consulta.consulta_id} gravada para {resultado.perfil.nome}.")
+        _imprimir_redacao(resultado, entrega.redacao)
     return 0
 
 

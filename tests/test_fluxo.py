@@ -9,6 +9,7 @@ import pytest
 
 from agente_nw.nucleo import fluxo as fluxo_mod
 from agente_nw.nucleo import localizacao as localizacao_mod
+from agente_nw.nucleo import redacao as redacao_mod
 from agente_nw.nucleo.consulta import ItemMenu, ResultadoConsulta, ResumoRedeSocial
 from agente_nw.nucleo.database import conexao as conexao_bd
 from agente_nw.nucleo.database import migracoes
@@ -92,7 +93,7 @@ class Cenario:
         )
         self.conn.commit()
         monkeypatch.setattr(fluxo_mod, "preparar", self._preparar)
-        monkeypatch.setattr(fluxo_mod.redacao_mod, "redigir", self._redigir)
+        monkeypatch.setattr(redacao_mod, "redigir", self._redigir)
         monkeypatch.setattr(localizacao_mod, "localizar_rede", self._localizar_rede)
         self.localizacao_por_rede: dict[str, Localizacao] = {}
 
