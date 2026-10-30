@@ -74,11 +74,16 @@ def processar_fila(
             resumo.tags_gravadas += 1
 
         for fato_extraido in resposta.fatos_datados:
+            data = fato_extraido.data
+            if item.origem.startswith("whatsapp:"):
+                # Bloco é um mês inteiro de mensagens; a data do mês (não o palpite do modelo sobre o
+                # dia) é o que faz a marca [antigo] (brief 046) valer sozinha (brief 061).
+                data = f"{item.origem.removeprefix('whatsapp:')}-01"
             fatos.inserir(
                 conexao,
                 Fato(
                     perfil_id=item.perfil_id,
-                    data_do_fato=fato_extraido.data,
+                    data_do_fato=data,
                     tipo=fato_extraido.tipo,
                     conteudo=fato_extraido.conteudo,
                     fonte=fato_extraido.fonte,

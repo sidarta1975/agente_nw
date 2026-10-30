@@ -72,7 +72,12 @@ def test_bloqueio_do_site_para_a_coleta_avisa_e_a_proxima_tenta_o_feed_de_novo(
     migracoes.aplicar(banco)
     fontes = _fontes(tmp_path / "fontes.yaml")
 
-    primeira = leitor.coletar(banco, cliente, fontes, limiares, tmp_path / "PARE")
+    # Hora fixa, não datetime.now(UTC): com o cooldown padrão (180 min) somado ao horário real da
+    # execução, perto da virada do dia em UTC a segunda chamada cai no dia seguinte, zera o progresso
+    # do ciclo (`data_ciclo`) e reprocessa a Fonte1 — achado ao rodar a suíte às 22h UTC (brief 061,
+    # fora do escopo do brief, corrigido à parte por decisão de Sidarta).
+    primeiro_momento = datetime(2026, 1, 1, 8, 0, tzinfo=UTC)
+    primeira = leitor.coletar(banco, cliente, fontes, limiares, tmp_path / "PARE", agora=primeiro_momento)
 
     assert primeira.fontes_processadas == 1
     assert primeira.bloqueio == "exemplo.com respondeu 503"
@@ -80,7 +85,7 @@ def test_bloqueio_do_site_para_a_coleta_avisa_e_a_proxima_tenta_o_feed_de_novo(
     assert not any(url.endswith("/feed3.xml") for url in pedidos)  # parou de insistir
 
     bloqueado["ligado"] = False
-    depois_do_cooldown = datetime.now(UTC) + timedelta(minutes=limiares.cooldown_bloqueio_minutos + 1)
+    depois_do_cooldown = primeiro_momento + timedelta(minutes=limiares.cooldown_bloqueio_minutos + 1)
     segunda = leitor.coletar(banco, cliente, fontes, limiares, tmp_path / "PARE", agora=depois_do_cooldown)
 
     assert segunda.bloqueio is None

@@ -42,3 +42,17 @@ def marcar_processado(conexao: sqlite3.Connection, item_id: int) -> None:
 
 def marcar_erro(conexao: sqlite3.Connection, item_id: int, erro: str) -> None:
     conexao.execute("UPDATE fila_extracao SET erro = ? WHERE id = ?", (erro, item_id))
+
+
+def contar_whatsapp(conexao: sqlite3.Connection, perfil_id: int) -> tuple[int, int]:
+    """(pendentes, total) dos blocos de conversa do WhatsApp (origem `whatsapp:*`) deste contato —
+    "processando conversa… (x de y blocos)" na página da pessoa (brief 061)."""
+    (pendentes,) = conexao.execute(
+        "SELECT COUNT(*) FROM fila_extracao WHERE perfil_id = ? AND origem LIKE 'whatsapp:%' "
+        "AND processado = 0 AND erro IS NULL",
+        (perfil_id,),
+    ).fetchone()
+    (total,) = conexao.execute(
+        "SELECT COUNT(*) FROM fila_extracao WHERE perfil_id = ? AND origem LIKE 'whatsapp:%'", (perfil_id,)
+    ).fetchone()
+    return int(pendentes), int(total)

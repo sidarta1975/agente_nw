@@ -12,6 +12,7 @@ from agente_nw.nucleo import historico as historico_mod
 from agente_nw.nucleo.consulta import ItemMenu, ResultadoConsulta
 from agente_nw.nucleo.database.queries import assuntos as assuntos_q
 from agente_nw.nucleo.database.queries import consulta_contato as consulta_contato_q
+from agente_nw.nucleo.database.queries import conversa as conversa_q
 from agente_nw.nucleo.database.queries import fatos as fatos_q
 from agente_nw.nucleo.database.queries import gancho_uso as gancho_uso_q
 from agente_nw.nucleo.database.queries import itens as itens_q
@@ -155,6 +156,13 @@ def _notas(conexao: sqlite3.Connection, perfil_id: int) -> list[str]:
     ]
 
 
+def _trocas_whatsapp(
+    conexao: sqlite3.Connection, perfil_id: int, nome_contato: str, limite: int
+) -> list[str]:
+    """As últimas mensagens trocadas no WhatsApp, para o tom da redação (brief 061)."""
+    return conversa_q.ultimas_trocas(conexao, perfil_id, limite, nome_contato)
+
+
 def _texto_da_consulta(pedido: PedidoExtraido, assuntos: list[ItemMenu]) -> str:
     return ". ".join([pedido.assunto_principal, *pedido.interessa, *(item.titulo for item in assuntos)])
 
@@ -169,6 +177,7 @@ def montar_entrada(
     usuario: Perfil,
     assuntos: list[ItemMenu],
     meses_fato_antigo: int = 12,
+    trocas_whatsapp_no_prompt: int = 10,
 ) -> EntradaRedacao:
     assert contato.id is not None and usuario.id is not None
     temas_usuario = [
@@ -198,6 +207,9 @@ def montar_entrada(
         assuntos=[_assunto_para_redacao(conexao, item) for item in assuntos],
         contexto_relacao=perfil_tema_q.listar_nomes_do_contato(conexao, contato.id),
         notas=_notas(conexao, contato.id),
+        trocas_whatsapp=_trocas_whatsapp(
+            conexao, contato.id, contato.apelido or contato.nome, trocas_whatsapp_no_prompt
+        ),
     )
 
 
@@ -223,6 +235,7 @@ def redigir(
     frase: str = "",
     limite_tokens: int = prompt_mod.LIMITE_TOKENS_PADRAO,
     meses_fato_antigo: int = 12,
+    trocas_whatsapp_no_prompt: int = 10,
 ) -> Redacao:
     """Uma chamada ao modelo: sempre devolve a mensagem base (objetivo + pessoa + uma peculiaridade) e,
     havendo assunto ligado ao pedido, também os ganchos de notícia. Sem assunto o modelo é chamado do mesmo
@@ -251,6 +264,7 @@ def redigir(
         usuario,
         disponiveis,
         meses_fato_antigo,
+        trocas_whatsapp_no_prompt,
     )
     if not entrada.fatos:
         informativos.append("Pouca informação sobre a pessoa; mensagem mais geral.")

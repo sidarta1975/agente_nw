@@ -82,6 +82,7 @@ class EntradaRedacao:
     assuntos: list[AssuntoParaRedacao]
     contexto_relacao: list[str] = field(default_factory=list)  # tags: família, amigos, trabalho...
     notas: list[str] = field(default_factory=list)  # notas do usuário sobre o contato (brief 050)
+    trocas_whatsapp: list[str] = field(default_factory=list)  # tom da relação, "você"/nome (brief 061)
 
 
 def estimar_tokens(texto: str) -> int:
@@ -128,16 +129,20 @@ def _bloco_pedido(entrada: EntradaRedacao) -> str:
 
 
 def _bloco_historico(entrada: EntradaRedacao) -> str:
-    notas = ""
+    extras = ""
+    if entrada.trocas_whatsapp:
+        extras += "\nConversa recente no WhatsApp (para o tom; não é fato atual):\n" + "\n".join(
+            f"- {troca}" for troca in entrada.trocas_whatsapp
+        )
     if entrada.notas:
-        notas = "\nNotas do usuário sobre esta pessoa (valem como fato dito por ele):\n" + "\n".join(
+        extras += "\nNotas do usuário sobre esta pessoa (valem como fato dito por ele):\n" + "\n".join(
             f"- {nota}" for nota in entrada.notas
         )
     if not entrada.historico:
-        return "HISTÓRICO: (nenhuma consulta anterior)" + notas
+        return "HISTÓRICO: (nenhuma consulta anterior)" + extras
     return (
         "HISTÓRICO (consultas anteriores; não repita o que já foi usado; comentário do usuário diz por que "
-        "uma mensagem serviu ou não):\n" + "\n".join(entrada.historico) + notas
+        "uma mensagem serviu ou não):\n" + "\n".join(entrada.historico) + extras
     )
 
 
@@ -230,12 +235,16 @@ def _montar(entrada: EntradaRedacao) -> str:
 
 
 def cortar_por_tamanho(entrada: EntradaRedacao, limite_tokens: int = LIMITE_TOKENS_PADRAO) -> EntradaRedacao:
-    """Se o prompt estimado passa de `limite_tokens`, fica com 1 consulta de histórico e 5 fatos."""
+    """Se o prompt estimado passa de `limite_tokens`, fica com 1 consulta de histórico e 5 fatos; se
+    ainda passar, a conversa do WhatsApp sai — as notas do usuário continuam protegidas (brief 050/061)."""
     if estimar_tokens(_montar(entrada)) <= limite_tokens:
         return entrada
-    return replace(
+    cortada = replace(
         entrada, historico=entrada.historico[:_HISTORICO_NO_CORTE], fatos=entrada.fatos[:_FATOS_NO_CORTE]
     )
+    if estimar_tokens(_montar(cortada)) <= limite_tokens:
+        return cortada
+    return replace(cortada, trocas_whatsapp=[])
 
 
 def construir_prompt(entrada: EntradaRedacao, limite_tokens: int = LIMITE_TOKENS_PADRAO) -> str:

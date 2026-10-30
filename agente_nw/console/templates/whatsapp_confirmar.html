@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block titulo %}conversa do WhatsApp{% endblock %}
+{% block conteudo %}
+<p><a class="item-link" href="{{ url_for('pessoa', perfil_id=perfil_id) }}">← voltar</a></p>
+<h1>Conversa do WhatsApp</h1>
+<ul class="simples">
+  <li>Participantes: {{ participantes|join(', ') }}</li>
+  <li>{{ total_mensagens }} mensagem(ns)</li>
+  {% if primeira_data %}<li>Período: {{ primeira_data }} a {{ ultima_data }}</li>{% endif %}
+</ul>
+<form class="bloco" method="post" action="{{ url_for('pessoa_whatsapp_confirmar', perfil_id=perfil_id) }}">
+  <input type="hidden" name="pending_id" value="{{ pending_id }}">
+  <p>Qual destes é você?</p>
+  {% for pessoa in participantes %}
+    <label>
+      <input type="radio" name="voce" value="{{ pessoa }}" {{ 'checked' if pessoa == voce_sugerido }}>
+      {{ pessoa }}
+    </label><br>
+  {% endfor %}
+  <p><button class="primario">Confirmar</button></p>
+</form>
+{% endblock %}

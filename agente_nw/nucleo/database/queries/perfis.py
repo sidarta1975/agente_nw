@@ -168,6 +168,7 @@ def apagar_contato_completo(conexao: sqlite3.Connection, perfil_id: int) -> None
     conexao.execute("DELETE FROM fila_extracao WHERE perfil_id = ?", (perfil_id,))
     conexao.execute("DELETE FROM descarte_sensivel WHERE perfil_id = ?", (perfil_id,))
     conexao.execute("DELETE FROM nota_contato WHERE perfil_id = ?", (perfil_id,))
+    conexao.execute("DELETE FROM conversa_mensagem WHERE perfil_id = ?", (perfil_id,))
     conexao.execute("DELETE FROM vetor_perfil WHERE perfil_id = ?", (perfil_id,))
     conexao.execute("DELETE FROM perfil WHERE id = ?", (perfil_id,))
 
@@ -281,6 +282,12 @@ def unir_contatos(conexao: sqlite3.Connection, canonico_id: int, duplicado_id: i
     conexao.execute(
         "UPDATE consulta_contato SET perfil_id = ? WHERE perfil_id = ?", (canonico_id, duplicado_id)
     )
+    # conversa_mensagem: UNIQUE (perfil_id, hash) — mesma estratégia do rede_sem_perfil acima.
+    conexao.execute(
+        "UPDATE OR IGNORE conversa_mensagem SET perfil_id = ? WHERE perfil_id = ?",
+        (canonico_id, duplicado_id),
+    )
+    conexao.execute("DELETE FROM conversa_mensagem WHERE perfil_id = ?", (duplicado_id,))
 
     # Centróide do canônico pode ficar defasado; deixamos para o próximo cruzar_contato
     # recalcular. Apagamos o do duplicado explicitamente antes do DELETE do perfil.

@@ -4,6 +4,7 @@
 <p><a class="item-link" href="{{ url_for('inicio') }}">← início</a></p>
 <h1>{{ perfil.nome }}</h1>
 {% if erro %}<p class="erro-caixa">{{ erro }}</p>{% endif %}
+{% if whatsapp_mensagem %}<p class="aviso">{{ whatsapp_mensagem }}</p>{% endif %}
 <p><a class="item-link" href="{{ url_for('pedir_pessoa', perfil_id=perfil.id) }}">Fazer um pedido para {{ perfil.nome }}</a></p>
 <h2>O que sei sobre esta pessoa</h2>
 <ul class="simples">
@@ -41,6 +42,16 @@
   <label for="link">Trocar o perfil numa rede social (cole o link certo)</label>
   <input type="text" id="link" name="link" placeholder="https://www.linkedin.com/in/...">
   <button>Trocar</button>
+</form>
+
+<h2>Conversas do WhatsApp</h2>
+{% if whatsapp_pendentes %}
+  <p class="cinza">processando conversa… ({{ whatsapp_total - whatsapp_pendentes }} de {{ whatsapp_total }} blocos)</p>
+{% endif %}
+<form class="bloco" method="post" action="{{ url_for('pessoa_whatsapp_enviar', perfil_id=perfil.id) }}" enctype="multipart/form-data">
+  <label for="arquivos">Enviar a exportação (.zip ou .txt; pode ser mais de um arquivo)</label>
+  <input type="file" id="arquivos" name="arquivos" accept=".zip,.txt" multiple>
+  <button>Enviar</button>
 </form>
 
 <h2>Pedidos anteriores</h2>

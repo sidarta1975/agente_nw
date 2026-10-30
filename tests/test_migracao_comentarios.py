@@ -36,7 +36,7 @@ def test_a_migracao_14_acrescenta_o_comentario_sem_perder_ganchos_antigos(tmp_pa
     linha = banco.execute("SELECT status, comentario FROM gancho_uso").fetchone()
     assert (linha["status"], linha["comentario"]) == ("usado", None)
     assert banco.execute("SELECT COUNT(*) FROM nota_contato").fetchone()[0] == 0
-    assert banco.execute("SELECT MAX(versao) FROM schema_version").fetchone()[0] == 14
+    assert banco.execute("SELECT MAX(versao) FROM schema_version").fetchone()[0] == 15
 
 
 def test_nota_exige_perfil_existente(tmp_path: Path) -> None:

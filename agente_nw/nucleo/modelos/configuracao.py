@@ -241,6 +241,19 @@ class RedacaoLimiares(BaseModel):
     """Fato com mais meses que isto entra no prompt marcado [antigo]: não vale como posição atual."""
 
 
+class WhatsappLimiares(BaseModel):
+    """Conversas do WhatsApp como fonte (brief 061)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    meses_extraidos: int = Field(default=24, ge=1)
+    """Meses mais recentes de mensagens do contato que entram na fila de extração de fatos."""
+    maximo_caracteres_bloco: int = Field(default=6000, ge=1)
+    """Tamanho máximo de cada bloco de texto enviado à extração (cada bloco é uma chamada ao modelo)."""
+    trocas_no_prompt: int = Field(default=10, ge=1)
+    """Últimas mensagens trocadas que entram no HISTÓRICO da redação, para acertar o tom."""
+
+
 class Limiares(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -252,6 +265,7 @@ class Limiares(BaseModel):
     listas: ListasLimiares
     extensao: ExtensaoLimiares = Field(default_factory=ExtensaoLimiares)
     redacao: RedacaoLimiares = Field(default_factory=RedacaoLimiares)
+    whatsapp: WhatsappLimiares = Field(default_factory=WhatsappLimiares)
 
 
 class TemaUsuario(BaseModel):

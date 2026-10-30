@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 import sqlite3
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -13,6 +14,8 @@ from pydantic import ValidationError
 from werkzeug.wrappers import Response
 
 from agente_nw.coleta.capturas import busca
+from agente_nw.coleta.whatsapp import importador as whatsapp_importador
+from agente_nw.coleta.whatsapp import leitor as whatsapp_leitor
 from agente_nw.nucleo import consulta as consulta_mod
 from agente_nw.nucleo import fluxo as fluxo_mod
 from agente_nw.nucleo import localizacao as localizacao_mod
@@ -43,12 +46,14 @@ from agente_nw.nucleo.modelos.perfil_tema import PerfilTema
 from agente_nw.nucleo.modelos.tema import Tema
 from agente_nw.nucleo.relevancia import cruzamento
 from agente_nw.nucleo.saidas.markdown import _MOTIVOS
+from agente_nw.nucleo.texto import sem_acento_e_caixa
 from agente_nw.perfil import configurador, extrator
 from agente_nw.perfil.lacunas import campos_faltando
 from agente_nw.perfil.normalizacao import telefone_e164
 
 _NIVEIS: tuple[NivelTema, ...] = ("dominio", "interesse", "curiosidade")
 _MEIOS: tuple[str, ...] = ("pessoalmente", "telefone", "whatsapp", "carta", "outro")
+_MAXIMO_BYTES_WHATSAPP = 20 * 1024 * 1024  # cada .zip ou .txt enviado (brief 061)
 
 
 def _lista_de_csv(bruto: str) -> list[str]:
@@ -144,6 +149,29 @@ def criar_app(
         deps = _dependencias()
         trabalho = fluxo_mod.continuar_pedido if continuar else fluxo_mod.executar_pedido
         despachar(lambda: trabalho(deps, pedido_id))
+
+    # Conversa do WhatsApp lida, à espera de confirmação de quem é "você" (brief 061): em memória, no
+    # processo do console, por um identificador temporário; reiniciar o console descarta.
+    pendentes_whatsapp: dict[str, whatsapp_leitor.ConversaWhatsapp] = {}
+
+    def _mesclar_conversas(
+        conversas: list[whatsapp_leitor.ConversaWhatsapp],
+    ) -> whatsapp_leitor.ConversaWhatsapp:
+        participantes = tuple(dict.fromkeys(p for c in conversas for p in c.participantes))
+        mensagens = sorted((m for c in conversas for m in c.mensagens), key=lambda m: m.quando)
+        return whatsapp_leitor.ConversaWhatsapp(participantes=participantes, mensagens=tuple(mensagens))
+
+    def _processar_whatsapp_em_fundo(perfil_id: int) -> None:
+        conn_fundo = conexao.abrir(caminho_banco)
+        try:
+            agora = datetime.now(UTC).isoformat()
+            whatsapp_importador.enfileirar_extracao(conn_fundo, perfil_id, limiares.whatsapp, agora)
+            cliente = ClienteOllama(
+                httpx.Client(timeout=120.0), conn_fundo, roteamento, ollama_url, caminho_log_llm
+            )
+            extrator.processar_fila(cliente, conn_fundo)
+        finally:
+            conn_fundo.close()
 
     def _pedido_ou_404(pedido_id: int) -> pedidos.PedidoGravado:
         pedido = pedidos.obter_por_id(_conn(), pedido_id)
@@ -340,6 +368,7 @@ def criar_app(
         redes = redes_sociais.listar_por_perfil(conn, perfil_id)
         sem_perfil = rede_sem_perfil.listar_redes(conn, perfil_id)
         sem_nenhuma_rede = not redes and set(busca.REDES_SUPORTADAS) <= sem_perfil
+        whatsapp_pendentes, whatsapp_total = fila_extracao.contar_whatsapp(conn, perfil_id)
         return render_template(
             "pessoa.html",
             perfil=perfil,
@@ -349,6 +378,9 @@ def criar_app(
             sem_nenhuma_rede=sem_nenhuma_rede,
             historico=historico,
             erro=request.args.get("erro"),
+            whatsapp_mensagem=request.args.get("whatsapp"),
+            whatsapp_pendentes=whatsapp_pendentes,
+            whatsapp_total=whatsapp_total,
         )
 
     @app.route("/pessoa/<int:perfil_id>/pedir")
@@ -387,6 +419,62 @@ def criar_app(
         conn.commit()
         erro = None if opcao is not None else "Link não reconhecido."
         return redirect(url_for("pessoa", perfil_id=perfil_id, erro=erro))
+
+    @app.route("/pessoa/<int:perfil_id>/whatsapp/enviar", methods=["POST"])
+    def pessoa_whatsapp_enviar(perfil_id: int) -> Response | str:
+        _perfil_ou_404(perfil_id)
+        conversas = []
+        for arquivo in request.files.getlist("arquivos"):
+            if not arquivo.filename:
+                continue
+            dados = arquivo.read()
+            if len(dados) > _MAXIMO_BYTES_WHATSAPP:
+                return redirect(
+                    url_for("pessoa", perfil_id=perfil_id, erro=f"{arquivo.filename}: maior que 20 MB.")
+                )
+            conversas.append(whatsapp_leitor.ler_arquivo(arquivo.filename, dados))
+        if not conversas:
+            return redirect(url_for("pessoa", perfil_id=perfil_id))
+
+        conversa = _mesclar_conversas(conversas)
+        if len(conversa.participantes) > 2:
+            return redirect(
+                url_for("pessoa", perfil_id=perfil_id, erro="Por enquanto só conversa individual.")
+            )
+
+        pending_id = secrets.token_urlsafe(16)
+        pendentes_whatsapp[pending_id] = conversa
+        usuario = _usuario_ou_none()
+        voce_sugerido = None
+        if usuario is not None:
+            alvo = sem_acento_e_caixa(usuario.nome)
+            voce_sugerido = next((p for p in conversa.participantes if sem_acento_e_caixa(p) == alvo), None)
+        return render_template(
+            "whatsapp_confirmar.html",
+            perfil_id=perfil_id,
+            pending_id=pending_id,
+            participantes=conversa.participantes,
+            total_mensagens=len(conversa.mensagens),
+            primeira_data=conversa.mensagens[0].quando.date().isoformat() if conversa.mensagens else None,
+            ultima_data=conversa.mensagens[-1].quando.date().isoformat() if conversa.mensagens else None,
+            voce_sugerido=voce_sugerido,
+        )
+
+    @app.route("/pessoa/<int:perfil_id>/whatsapp/confirmar", methods=["POST"])
+    def pessoa_whatsapp_confirmar(perfil_id: int) -> Response:
+        _perfil_ou_404(perfil_id)
+        conversa = pendentes_whatsapp.pop(request.form.get("pending_id", ""), None)
+        voce = request.form.get("voce", "")
+        if conversa is None or voce not in conversa.participantes:
+            return redirect(
+                url_for("pessoa", perfil_id=perfil_id, erro="Conversa não encontrada; envie de novo.")
+            )
+        resumo = whatsapp_importador.importar(
+            _conn(), perfil_id, conversa, voce, datetime.now(UTC).isoformat()
+        )
+        despachar(lambda: _processar_whatsapp_em_fundo(perfil_id))
+        mensagem = f"{resumo.novas} mensagens novas, {resumo.repetidas} já estavam"
+        return redirect(url_for("pessoa", perfil_id=perfil_id, whatsapp=mensagem))
 
     @app.route("/contatos")
     def contatos() -> str:
