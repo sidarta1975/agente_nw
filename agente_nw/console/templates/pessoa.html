@@ -4,15 +4,25 @@
 <p><a class="item-link" href="{{ url_for('inicio') }}">← início</a></p>
 <h1>{{ perfil.nome }}</h1>
 {% if erro %}<p class="erro-caixa">{{ erro }}</p>{% endif %}
+<p><a class="item-link" href="{{ url_for('pedir_pessoa', perfil_id=perfil.id) }}">Fazer um pedido para {{ perfil.nome }}</a></p>
 <h2>O que sei sobre esta pessoa</h2>
 <ul class="simples">
   {% if perfil.cargo %}<li>Cargo: {{ perfil.cargo }}</li>{% endif %}
   {% if perfil.empresa %}<li>Empresa: {{ perfil.empresa }}</li>{% endif %}
   {% if perfil.cidade %}<li>Cidade: {{ perfil.cidade }}</li>{% endif %}
   {% if perfil.notas %}<li>Notas: {{ perfil.notas }}</li>{% endif %}
-  {% for r in redes %}<li>{{ r.rede }}: <a class="item-link" href="{{ r.link }}" target="_blank" rel="noopener">{{ r.link }}</a></li>{% endfor %}
-  {% for rede in sem_perfil %}<li class="cinza">{{ rede }}: você disse que não tem perfil</li>{% endfor %}
+  {% if sem_nenhuma_rede %}
+    <li class="cinza">Sem redes sociais</li>
+  {% else %}
+    {% for r in redes %}<li>{{ r.rede }}: <a class="item-link" href="{{ r.link }}" target="_blank" rel="noopener">{{ r.link }}</a></li>{% endfor %}
+    {% for rede in sem_perfil %}<li class="cinza">{{ rede }}: você disse que não tem perfil</li>{% endfor %}
+  {% endif %}
 </ul>
+{% if not sem_nenhuma_rede %}
+<form class="bloco" method="post" action="{{ url_for('pessoa_sem_redes_sociais', perfil_id=perfil.id) }}">
+  <button>Esta pessoa não tem redes sociais</button>
+</form>
+{% endif %}
 {% if fatos %}
   <h3>O que ela publicou ou contou</h3>
   <ul class="simples">

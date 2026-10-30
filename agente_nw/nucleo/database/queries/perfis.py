@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import struct
+from dataclasses import dataclass
 from typing import Protocol
 
 import sqlite_vec
@@ -305,6 +306,59 @@ def listar_contatos_recentes(conexao: sqlite3.Connection, limite: int) -> list[P
         (limite,),
     ).fetchall()
     return [_para_perfil(linha) for linha in linhas]
+
+
+@dataclass(frozen=True)
+class ContatoParaInicio:
+    perfil_id: int
+    nome: str
+    ultimo_pedido_em: str | None
+
+
+def _ultimo_uso_por_contato(conexao: sqlite3.Connection) -> dict[int, str]:
+    """Data do último pedido ou da última consulta (menu antigo) de cada contato."""
+    linhas = conexao.execute(
+        "SELECT perfil_id, MAX(criado_em) AS ultimo FROM ("
+        "  SELECT perfil_id, criado_em FROM pedido WHERE perfil_id IS NOT NULL "
+        "  UNION ALL "
+        "  SELECT perfil_id, criado_em FROM consulta_contato"
+        ") GROUP BY perfil_id"
+    ).fetchall()
+    return {linha["perfil_id"]: linha["ultimo"] for linha in linhas}
+
+
+def listar_para_inicio(conexao: sqlite3.Connection, termo: str, limite: int) -> list[ContatoParaInicio]:
+    """Contatos para a lista da tela inicial do console (brief 060).
+
+    Sem `termo`: os `limite` contatos usados mais recentemente (último pedido ou consulta),
+    completando com os demais em ordem alfabética até `limite`. Com `termo`: até `limite` contatos
+    cujo nome ou apelido contém o termo, sem diferença de acento ou caixa."""
+    usos = _ultimo_uso_por_contato(conexao)
+    contatos = listar_todos(conexao)  # já em ordem alfabética por nome
+
+    if termo.strip():
+        alvo = sem_acento_e_caixa(termo)
+        selecionados = [
+            c
+            for c in contatos
+            if alvo in sem_acento_e_caixa(c.nome)
+            or (c.apelido is not None and alvo in sem_acento_e_caixa(c.apelido))
+        ][:limite]
+    else:
+
+        def _ultimo(contato: Perfil) -> str:
+            assert contato.id is not None
+            return usos.get(contato.id, "")
+
+        com_uso = sorted((c for c in contatos if _ultimo(c)), key=_ultimo, reverse=True)
+        sem_uso = [c for c in contatos if not _ultimo(c)]
+        selecionados = (com_uso + sem_uso)[:limite]
+
+    resultado: list[ContatoParaInicio] = []
+    for contato in selecionados:
+        assert contato.id is not None
+        resultado.append(ContatoParaInicio(contato.id, contato.nome, usos.get(contato.id)))
+    return resultado
 
 
 def buscar_por_nome(conexao: sqlite3.Connection, nome: str) -> list[Perfil]:

@@ -260,14 +260,14 @@ def test_pagina_da_pessoa_mostra_o_que_a_ia_sabe_e_aceita_texto_e_troca_de_perfi
     assert links == {"https://www.linkedin.com/in/marta-nova"}
 
 
-def test_inicio_lista_as_pessoas_recentes_e_as_telas_antigas_seguem_no_ar(cenario: Cenario) -> None:
+def test_inicio_lista_os_contatos_e_as_telas_antigas_seguem_no_ar(cenario: Cenario) -> None:
     cenario.contato(curar=True)
     client = _app(cenario)
     _pedir(client)
 
     inicio = client.get("/").get_data(as_text=True)
 
-    assert "Pessoas recentes" in inicio and "Marta Quintela" in inicio
+    assert "Marta Quintela" in inicio  # lista da tela inicial (brief 060)
     assert "Exemplos:" not in inicio  # só na primeira visita
     for rota in ("/contatos", "/menu", "/temas"):
         assert client.get(rota).status_code == 200

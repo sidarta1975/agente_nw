@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import sqlite3
 
+from agente_nw.coleta.capturas.busca import REDES_SUPORTADAS
+
 
 def declarar(conexao: sqlite3.Connection, perfil_id: int, rede: str, agora: str) -> None:
     """O usuário disse que o contato não tem conta nessa rede."""
@@ -19,3 +21,10 @@ def remover(conexao: sqlite3.Connection, perfil_id: int, rede: str) -> None:
 def listar_redes(conexao: sqlite3.Connection, perfil_id: int) -> set[str]:
     linhas = conexao.execute("SELECT rede FROM rede_sem_perfil WHERE perfil_id = ?", (perfil_id,)).fetchall()
     return {linha["rede"] for linha in linhas}
+
+
+def marcar_todas(conexao: sqlite3.Connection, perfil_id: int, agora: str) -> None:
+    """O usuário disse que o contato não tem nenhuma rede social: marca "sem perfil" em todas as
+    redes que o sistema procura (brief 060)."""
+    for rede in REDES_SUPORTADAS:
+        declarar(conexao, perfil_id, rede, agora)

@@ -146,8 +146,10 @@ def _gravar_perguntas(conexao: sqlite3.Connection, pedido_id: int, perguntas: li
 # ---- criação do pedido -----------------------------------------------------------------------------
 
 
-def criar_pedido(conexao: sqlite3.Connection, texto: str, agora: str) -> int:
-    pedido_id = pedidos.inserir(conexao, texto, agora, status="na_fila")
+def criar_pedido(conexao: sqlite3.Connection, texto: str, agora: str, perfil_id: int | None = None) -> int:
+    """`perfil_id`: a pessoa já escolhida na lista da tela inicial (brief 060); o orquestrador trata
+    esse valor como contato forçado (`nucleo.pedido.resolver_contato`), igual à correção."""
+    pedido_id = pedidos.inserir(conexao, texto, agora, perfil_id=perfil_id, status="na_fila")
     conexao.commit()
     return pedido_id
 

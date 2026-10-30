@@ -182,9 +182,12 @@ def criar_app(
     def inicio() -> str:
         conn = _conn()
         ultimo = pedidos.obter_ultimo(conn)
-        recentes = pedidos.pessoas_recentes(conn, 20)
+        termo = request.args.get("q", "").strip()
+        contatos = perfis.listar_para_inicio(conn, termo, 50 if termo else 20)
         visao = _visao_do_pedido(ultimo) if ultimo is not None else None
-        return render_template("inicio.html", visao=visao, recentes=recentes, primeira_vez=ultimo is None)
+        return render_template(
+            "inicio.html", visao=visao, contatos=contatos, termo=termo, primeira_vez=ultimo is None
+        )
 
     @app.route("/pedir", methods=["POST"])
     def pedir() -> Response:
@@ -192,7 +195,9 @@ def criar_app(
         texto = request.form.get("texto", "").strip()
         if not texto:
             return redirect(url_for("inicio"))
-        pedido_id = fluxo_mod.criar_pedido(conn, texto, datetime.now(UTC).isoformat())
+        perfil_id_bruto = request.form.get("perfil_id", "").strip()
+        perfil_id = int(perfil_id_bruto) if perfil_id_bruto.isdigit() else None
+        pedido_id = fluxo_mod.criar_pedido(conn, texto, datetime.now(UTC).isoformat(), perfil_id=perfil_id)
         _despachar_execucao(pedido_id)
         return redirect(url_for("ver_pedido", pedido_id=pedido_id))
 
@@ -332,15 +337,32 @@ def criar_app(
         for pedido in pedidos.listar_por_perfil(conn, perfil_id):
             ganchos = redacao_mod.ganchos_da_consulta(conn, pedido.consulta_id) if pedido.consulta_id else []
             historico.append((pedido, ganchos))
+        redes = redes_sociais.listar_por_perfil(conn, perfil_id)
+        sem_perfil = rede_sem_perfil.listar_redes(conn, perfil_id)
+        sem_nenhuma_rede = not redes and set(busca.REDES_SUPORTADAS) <= sem_perfil
         return render_template(
             "pessoa.html",
             perfil=perfil,
             fatos=fatos.listar_recentes(conn, perfil_id, 15),
-            redes=redes_sociais.listar_por_perfil(conn, perfil_id),
-            sem_perfil=sorted(rede_sem_perfil.listar_redes(conn, perfil_id)),
+            redes=redes,
+            sem_perfil=sorted(sem_perfil),
+            sem_nenhuma_rede=sem_nenhuma_rede,
             historico=historico,
             erro=request.args.get("erro"),
         )
+
+    @app.route("/pessoa/<int:perfil_id>/pedir")
+    def pedir_pessoa(perfil_id: int) -> str:
+        perfil = _perfil_ou_404(perfil_id)
+        return render_template("pedir_pessoa.html", perfil=perfil)
+
+    @app.route("/pessoa/<int:perfil_id>/sem-redes-sociais", methods=["POST"])
+    def pessoa_sem_redes_sociais(perfil_id: int) -> Response:
+        conn = _conn()
+        _perfil_ou_404(perfil_id)
+        rede_sem_perfil.marcar_todas(conn, perfil_id, datetime.now(UTC).isoformat())
+        conn.commit()
+        return redirect(url_for("pessoa", perfil_id=perfil_id))
 
     @app.route("/pessoa/<int:perfil_id>/contar", methods=["POST"])
     def pessoa_contar(perfil_id: int) -> Response:

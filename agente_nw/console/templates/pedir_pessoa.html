@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block titulo %}pedir — {{ perfil.nome }}{% endblock %}
+{% block conteudo %}
+<p><a class="item-link" href="{{ url_for('inicio') }}">← início</a></p>
+<h1>O que você quer com {{ perfil.nome }}?</h1>
+<form method="post" action="{{ url_for('pedir') }}" class="bloco">
+  <input type="hidden" name="perfil_id" value="{{ perfil.id }}">
+  <textarea class="frase" name="texto" rows="4" autofocus
+    placeholder="O que você quer com ela e como vai falar."></textarea>
+  <p><button class="primario">Pedir</button></p>
+</form>
+{% endblock %}
