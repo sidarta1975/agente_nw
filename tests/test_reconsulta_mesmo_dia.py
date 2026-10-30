@@ -21,7 +21,11 @@ from agente_nw.nucleo.modelos.configuracao import (
     QualificacaoLimiares,
 )
 from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
-from agente_nw.nucleo.modelos.cruzamento import RespostaCruzarPorQue
+from agente_nw.nucleo.modelos.cruzamento import (
+    AvaliacaoRelacaoObjetivo,
+    RespostaAvaliarRelacaoObjetivo,
+    RespostaCruzarPorQue,
+)
 from agente_nw.nucleo.relevancia.cruzamento import cruzar_contato_por_consulta
 
 AGORA = "2026-10-08T10:00:00+00:00"
@@ -41,6 +45,11 @@ class _ClienteFalso:
         return [_vetor(1.0, 0.0) for _ in textos]
 
     def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+        if tarefa_nome == "avaliar_relacao_objetivo":
+            quantidade = prompt.rsplit("Candidatos:\n", 1)[1].count('" — ')
+            return RespostaAvaliarRelacaoObjetivo(
+                avaliacoes=[AvaliacaoRelacaoObjetivo(relaciona=True, motivo="")] * quantidade
+            )
         quantidade = prompt.rsplit("Assuntos:\n", 1)[1].count('" — tipo:')
         return RespostaCruzarPorQue(por_que=["serve para a consulta"] * quantidade)
 

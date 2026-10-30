@@ -13,10 +13,18 @@ from agente_nw.nucleo.modelos.assunto import Assunto
 from agente_nw.nucleo.modelos.assunto_contato import AssuntoContato
 from agente_nw.nucleo.modelos.configuracao import Limiares
 from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
-from agente_nw.nucleo.modelos.cruzamento import RespostaCruzarPorQue
-from agente_nw.nucleo.prompts import cruzar_por_que
+from agente_nw.nucleo.modelos.cruzamento import (
+    AvaliacaoRelacaoObjetivo,
+    RespostaAvaliarRelacaoObjetivo,
+    RespostaCruzarPorQue,
+)
+from agente_nw.nucleo.modelos.perfil import Perfil
+from agente_nw.nucleo.prompts import avaliar_relacao_objetivo, cruzar_por_que
 from agente_nw.nucleo.relevancia import candidatos
 from agente_nw.nucleo.relevancia.pontuacao import Avaliacao, avaliar, avaliar_por_consulta
+
+_MOTIVO_GATE = "sem relação com o objetivo (juízo do modelo)"
+_SEM_RELACAO_COM_O_OBJETIVO = "nenhum candidato com relação ao objetivo (juízo do modelo)"
 
 _EsquemaT = TypeVar("_EsquemaT", bound=BaseModel)
 _MAX_TENTATIVAS = 2
@@ -83,6 +91,88 @@ def _chamar_cruzar_por_que(
         conexao, tarefa="cruzar_por_que", entrada=str(perfil_id), erro=ultimo_erro, agora=agora
     )
     return None
+
+
+def _ficha_para_gate(contato: Perfil) -> str:
+    partes = (("cargo", contato.cargo), ("empresa", contato.empresa), ("cidade", contato.cidade))
+    return ", ".join(f"{rotulo}: {valor}" for rotulo, valor in partes if valor)
+
+
+def _chamar_gate_objetivo(
+    cliente_llm: ClienteCruzamento,
+    conexao: sqlite3.Connection,
+    prompt: str,
+    quantidade_esperada: int,
+    perfil_id: int,
+    agora: str,
+) -> list[AvaliacaoRelacaoObjetivo] | None:
+    ultimo_erro = ""
+    for _tentativa in range(_MAX_TENTATIVAS):
+        try:
+            resposta = cliente_llm.gerar_json(
+                "avaliar_relacao_objetivo", prompt, RespostaAvaliarRelacaoObjetivo
+            )
+        except FalhaJsonInvalido as erro:
+            ultimo_erro = str(erro)
+            continue
+        if len(resposta.avaliacoes) == quantidade_esperada:
+            return resposta.avaliacoes
+        ultimo_erro = f"esperado {quantidade_esperada} itens em avaliacoes, veio {len(resposta.avaliacoes)}"
+
+    fila_revisao.inserir(
+        conexao, tarefa="avaliar_relacao_objetivo", entrada=str(perfil_id), erro=ultimo_erro, agora=agora
+    )
+    return None
+
+
+def _aplicar_gate_objetivo(
+    cliente_llm: ClienteCruzamento,
+    conexao: sqlite3.Connection,
+    perfil_id: int,
+    contexto: ContextoConsulta,
+    contato: Perfil,
+    demais: list[tuple[Assunto, Avaliacao]],
+    data: str,
+    agora: str,
+    resumo: ResumoContato,
+) -> list[tuple[Assunto, Avaliacao]]:
+    """Julgamento sim/não do modelo: só a notícia com relação real com o objetivo do pedido continua
+    `conector` (brief 049). Resposta de tamanho errado cai para `fila_revisao` e não filtra nada — o
+    pedido segue como hoje, sem o gate."""
+    candidatos_gate = [(assunto.titulo_gerado or "", assunto.resumo_cartao) for assunto, _ in demais]
+    prompt = avaliar_relacao_objetivo.construir_prompt(
+        contexto.objetivo, contexto.livre, _ficha_para_gate(contato), candidatos_gate
+    )
+    avaliacoes_gate = _chamar_gate_objetivo(cliente_llm, conexao, prompt, len(demais), perfil_id, agora)
+    if avaliacoes_gate is None:
+        resumo.erros += 1
+        return demais
+
+    mantidos: list[tuple[Assunto, Avaliacao]] = []
+    for (assunto, avaliacao), avaliacao_gate in zip(demais, avaliacoes_gate, strict=True):
+        if avaliacao_gate.relaciona:
+            mantidos.append((assunto, avaliacao))
+            continue
+        assert assunto.id is not None
+        assunto_contato.inserir(
+            conexao,
+            AssuntoContato(
+                assunto_id=assunto.id,
+                perfil_id=perfil_id,
+                gerado_em=data,
+                tipo="fora_do_dominio",
+                aderencia_contato=avaliacao.aderencia_contato,
+                aderencia_usuario=avaliacao.aderencia_usuario,
+                conversavel=avaliacao.conversavel,
+                score=avaliacao.score,
+                status="descartado",
+                motivo=_MOTIVO_GATE,
+                aderencia_consulta=avaliacao.aderencia_consulta,
+            ),
+        )
+        resumo.descartados += 1
+    conexao.commit()
+    return mantidos
 
 
 def cruzar_contato(
@@ -336,12 +426,24 @@ def cruzar_contato_por_consulta(
         resumo.motivo = "nenhum candidato passou do piso"
         return resumo
 
+    contato = perfis.obter_por_id(conexao, perfil_id)
+    assert contato is not None
+
+    # Gate (brief 049): o piso por embedding já cortou o grosso; o modelo decide, candidato a
+    # candidato, se a notícia tem relação real com o objetivo do pedido — o que o vetor não separa
+    # ("eleição da OAB" de "política nacional", por exemplo).
+    demais = _aplicar_gate_objetivo(
+        cliente_llm, conexao, perfil_id, contexto, contato, demais, data, agora, resumo
+    )
+    if not demais:
+        resumo.sem_assunto = True
+        resumo.motivo = _SEM_RELACAO_COM_O_OBJETIVO
+        return resumo
+
     ordem_tipo = {"conector": 0, "viavel_com_esforco": 1}
     demais.sort(key=lambda par: (ordem_tipo[par[1].tipo], -par[1].score))
     selecionados_para_menu = demais[: limiares.conector.itens_no_menu]
 
-    contato = perfis.obter_por_id(conexao, perfil_id)
-    assert contato is not None
     apelido_ou_nome = contato.apelido or contato.nome
     # As tags são contextos fixos da relação (família, amigos, trabalho): vão para o texto, não para o
     # centroide, que vem do que o contato publicou.

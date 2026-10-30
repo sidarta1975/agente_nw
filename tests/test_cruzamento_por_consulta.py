@@ -20,7 +20,11 @@ from agente_nw.nucleo.modelos.configuracao import (
     QualificacaoLimiares,
 )
 from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
-from agente_nw.nucleo.modelos.cruzamento import RespostaCruzarPorQue
+from agente_nw.nucleo.modelos.cruzamento import (
+    AvaliacaoRelacaoObjetivo,
+    RespostaAvaliarRelacaoObjetivo,
+    RespostaCruzarPorQue,
+)
 from agente_nw.nucleo.modelos.fato import Fato
 from agente_nw.nucleo.relevancia.cruzamento import cruzar_contato_por_consulta
 from agente_nw.nucleo.relevancia.pontuacao import avaliar, avaliar_por_consulta
@@ -49,6 +53,11 @@ class _ClienteFalso:
 
     def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
         self.prompts.append(prompt)
+        if tarefa_nome == "avaliar_relacao_objetivo":
+            quantidade = prompt.rsplit("Candidatos:\n", 1)[1].count('" — ')
+            return RespostaAvaliarRelacaoObjetivo(
+                avaliacoes=[AvaliacaoRelacaoObjetivo(relaciona=True, motivo="")] * quantidade
+            )
         quantidade = prompt.rsplit("Assuntos:\n", 1)[1].count('" — tipo:')
         return RespostaCruzarPorQue(por_que=[f"serve para a consulta #{i}" for i in range(quantidade)])
 
@@ -198,7 +207,7 @@ def test_tag_do_contato_e_ignorada_e_o_que_ele_publicou_eleva_o_score(
 
     assert tag.score == base.score and tag.aderencia_contato == 0.0  # tag não vale nada
     assert fato.score > base.score and fato.aderencia_contato > 0  # o que ele publicou vale
-    assert "Contexto da consulta: assunto: mercado de vela" in cliente.prompts[0]
+    assert "Contexto da consulta: assunto: mercado de vela" in cliente.prompts[-1]  # cruzar_por_que
 
 
 def test_avaliar_por_consulta_cita_a_tag_como_ponto_de_apoio(limiares: Limiares) -> None:
