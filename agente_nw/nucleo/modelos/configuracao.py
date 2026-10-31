@@ -254,6 +254,21 @@ class WhatsappLimiares(BaseModel):
     """Últimas mensagens trocadas que entram no HISTÓRICO da redação, para acertar o tom."""
 
 
+class TemasUsuarioLimiares(BaseModel):
+    """Temas do usuário inferidos dos pedidos e de declarações em texto (brief 040)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    similaridade_mesmo_tema: float = Field(default=0.85, ge=0, le=1)
+    """Cosseno mínimo para um termo novo casar com um tema já existente em vez de criar outro."""
+    usos_para_interesse: int = Field(default=3, ge=1)
+    usos_para_dominio: int = Field(default=6, ge=1)
+    janela_dias_interesse: int = Field(default=30, ge=1)
+    janela_dias_dominio: int = Field(default=90, ge=1)
+    dias_para_decair: int = Field(default=180, ge=1)
+    """Tema sem uso por mais que isto perde 1 de peso por mês (nunca abaixo de 1); `declarada` não decai."""
+
+
 class MoldesLimiares(BaseModel):
     """Mensagens que já funcionaram com outro contato, reaproveitadas por contexto (brief 048)."""
 
@@ -276,6 +291,7 @@ class Limiares(BaseModel):
     redacao: RedacaoLimiares = Field(default_factory=RedacaoLimiares)
     whatsapp: WhatsappLimiares = Field(default_factory=WhatsappLimiares)
     moldes: MoldesLimiares = Field(default_factory=MoldesLimiares)
+    temas_usuario: TemasUsuarioLimiares = Field(default_factory=TemasUsuarioLimiares)
 
 
 class TemaUsuario(BaseModel):

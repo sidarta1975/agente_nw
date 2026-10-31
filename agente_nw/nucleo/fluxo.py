@@ -287,6 +287,7 @@ def _entender(deps: Dependencias, conexao: sqlite3.Connection, pedido_id: int) -
         pedido.texto,
         _agora(),
         limiares_listas=deps.limiares.listas,
+        limiares_temas_usuario=deps.limiares.temas_usuario,
         contato_id_forcado=pedido.perfil_id,  # correção, ou contato já escolhido pelo usuário
         navegacao=navegacao,
         pedido_id=pedido_id,

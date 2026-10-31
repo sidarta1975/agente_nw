@@ -30,7 +30,7 @@ def test_a_migracao_16_acrescenta_genero_gramatical_com_padrao_desconhecido(tmp_
 
     (genero,) = banco.execute("SELECT genero_gramatical FROM perfil WHERE nome = 'Ana'").fetchone()
     assert genero == "desconhecido"
-    assert banco.execute("SELECT MAX(versao) FROM schema_version").fetchone()[0] == 16
+    assert banco.execute("SELECT MAX(versao) FROM schema_version").fetchone()[0] == 17
 
 
 def test_genero_gramatical_so_aceita_os_tres_valores(tmp_path: Path) -> None:

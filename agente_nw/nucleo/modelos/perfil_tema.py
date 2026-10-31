@@ -19,3 +19,5 @@ class PerfilTema(BaseModel):
     confirmado: bool = False
     nivel: NivelTema | None = None
     registrado_em: str
+    peso_decaido_em: str | None = None
+    """Mês ('AAAA-MM') do último decaimento de peso por inatividade (brief 040); None = nunca decaiu."""

@@ -2,7 +2,49 @@
 {% block titulo %}eu{% endblock %}
 {% block conteudo %}
   <h1>{{ usuario.apelido or usuario.nome }}</h1>
-  <p>Perfil do usuário — as redes cadastradas aqui são as contas cuja sessão o navegador usa para ler páginas de contatos na hora da consulta.</p>
+  <p>Nada aqui é cadastro: os temas abaixo foram inferidos dos seus pedidos e do que você contou sobre você mesmo (brief 040).</p>
+
+  <h2>O que você sabe, acompanha ou tem curiosidade</h2>
+  {% for nivel in niveis %}
+    <h3>{{ "domínio" if nivel == "dominio" else nivel }}</h3>
+    {% if temas_por_nivel[nivel] %}
+      <ul class="simples">
+        {% for tema, vinculo, ultima in temas_por_nivel[nivel] %}
+          <li>
+            {{ tema.nome }} — peso {{ vinculo.peso }}{% if vinculo.origem == "declarada" %}, você disse{% endif %}
+            {% if ultima %} — última menção: {{ ultima[:10] }}{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="vazio">Nenhum ainda.</p>
+    {% endif %}
+  {% endfor %}
+
+  <h2>Não me interessa</h2>
+  {% if nao_me_interessa %}
+    <ul class="simples">
+      {% for termo in nao_me_interessa %}
+        <li>{{ termo }}</li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="vazio">Nada declarado.</p>
+  {% endif %}
+
+  <h2>Conte algo sobre você</h2>
+  <p>Escreva em texto livre: o que você sabe ou gosta ("sou advogado tributarista", "gosto de vela"),
+  o que não lhe interessa ("não me interessa futebol"), seu nome ("me chamo Sidarta") ou para remover um
+  tema inferido ("não tenho mais interesse em X").</p>
+  <form class="bloco" method="post" action="{{ url_for('eu_contar') }}">
+    <textarea name="texto" placeholder="Conte algo sobre você" required></textarea>
+    <p><button type="submit">Contar</button></p>
+  </form>
+
+  <form class="bloco" method="post" action="{{ url_for('eu_esquecer') }}"
+        onsubmit="return confirm('Esquecer tudo o que foi inferido sobre você? O que você declarou diretamente continua.');">
+    <button type="submit" class="perigo">Esquecer tudo o que você inferiu sobre mim</button>
+  </form>
 
   <h2>Redes sociais</h2>
   {% if redes %}

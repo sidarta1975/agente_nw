@@ -14,7 +14,7 @@ from agente_nw.coleta.capturas.listas import PaginaLista
 from agente_nw.nucleo import localizacao as localizacao_mod
 from agente_nw.nucleo.database import conexao, migracoes
 from agente_nw.nucleo.database.queries import listas, perfis, rede_sem_perfil, redes_sociais
-from agente_nw.nucleo.modelos.configuracao import ListasLimiares
+from agente_nw.nucleo.modelos.configuracao import ListasLimiares, TemasUsuarioLimiares
 from agente_nw.nucleo.modelos.lista_rede_social import EntradaLista
 from agente_nw.nucleo.modelos.localizacao import RespostaDesempate
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
@@ -124,7 +124,8 @@ def _ambiente(conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setattr(cli, "banco", lambda: conn)
     falsa = SimpleNamespace(
         limiares=SimpleNamespace(
-            listas=ListasLimiares(maximo_entradas=2000, pausa_rolagem_s=0, validade_dias=30)
+            listas=ListasLimiares(maximo_entradas=2000, pausa_rolagem_s=0, validade_dias=30),
+            temas_usuario=TemasUsuarioLimiares(),
         ),
         local=SimpleNamespace(redes={}),
     )

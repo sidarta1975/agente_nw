@@ -50,6 +50,10 @@ class PedidoExtraido(BaseModel):
     termos_busca: list[str]
     continuacao: bool = False
     confianca: float = Field(ge=0, le=1)
+    sobre_o_usuario: list[str] = Field(default_factory=list)
+    """Frases curtas em que o próprio usuário fala dele mesmo: nome ('me chamo X', 'sou o X'), o que
+    sabe ou gosta ('sou advogado tributarista', 'gosto de vela') ou o que não lhe interessa ('não me
+    interessa futebol'). Alimenta `perfil/inferencia.py::aplicar_declaracoes` (brief 040)."""
 
     @field_validator("objetivo", "meio", "registro", mode="before")
     @classmethod
@@ -81,7 +85,7 @@ class PedidoExtraido(BaseModel):
             if chave in CHAVES_DE_PISTA and isinstance(texto, str) and texto.strip()
         }
 
-    @field_validator("interessa", "evitar")
+    @field_validator("interessa", "evitar", "sobre_o_usuario")
     @classmethod
     def lista_sem_duplicatas(cls, valor: list[str]) -> list[str]:
         return _sem_duplicatas(valor)[:_MAXIMO_INTERESSA]

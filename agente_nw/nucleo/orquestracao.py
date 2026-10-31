@@ -24,7 +24,7 @@ from agente_nw.nucleo import redacao as redacao_mod
 from agente_nw.nucleo.consulta import ResultadoConsulta
 from agente_nw.nucleo.llm import FalhaJsonInvalido
 from agente_nw.nucleo.localizacao import ContextoNavegacao
-from agente_nw.nucleo.modelos.configuracao import Limiares, ListasLimiares
+from agente_nw.nucleo.modelos.configuracao import Limiares, ListasLimiares, TemasUsuarioLimiares
 from agente_nw.nucleo.modelos.localizacao import Localizacao
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido, ResultadoPedido
 from agente_nw.nucleo.modelos.perfil import Perfil
@@ -88,6 +88,7 @@ def entender_pedido(
     agora: str,
     *,
     limiares_listas: ListasLimiares,
+    limiares_temas_usuario: TemasUsuarioLimiares | None = None,
     contato_id_forcado: int | None = None,
     navegacao: ContextoNavegacao | None = None,
     trocar_perfil: bool = False,
@@ -110,6 +111,7 @@ def entender_pedido(
         confirmar_contato=confirmar_contato,
         similaridade_minima_contato=limiares_listas.similaridade_contato_forcado,
         pedido_id=pedido_id,
+        limiares_temas_usuario=limiares_temas_usuario,
     )
 
 

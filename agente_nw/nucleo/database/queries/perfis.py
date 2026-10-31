@@ -170,6 +170,53 @@ def ativar(conexao: sqlite3.Connection, perfil_id: int) -> None:
     conexao.execute("UPDATE perfil SET ativo = 1 WHERE id = ?", (perfil_id,))
 
 
+def _preferencias(conexao: sqlite3.Connection, perfil_id: int) -> dict[str, object]:
+    linha = conexao.execute("SELECT preferencias_json FROM perfil WHERE id = ?", (perfil_id,)).fetchone()
+    if linha is None or not linha["preferencias_json"]:
+        return {}
+    try:
+        dados = json.loads(linha["preferencias_json"])
+    except json.JSONDecodeError:
+        return {}
+    return dados if isinstance(dados, dict) else {}
+
+
+def listar_nao_me_interessa(conexao: sqlite3.Connection, perfil_id: int) -> list[str]:
+    """O que o usuário declarou não lhe interessar (brief 040) — evitar implícito em todo pedido."""
+    lista = _preferencias(conexao, perfil_id).get("nao_me_interessa", [])
+    return list(lista) if isinstance(lista, list) else []
+
+
+def adicionar_nao_me_interessa(conexao: sqlite3.Connection, perfil_id: int, termo: str, agora: str) -> None:
+    preferencias = _preferencias(conexao, perfil_id)
+    bruta = preferencias.get("nao_me_interessa", [])
+    lista = [str(x) for x in bruta] if isinstance(bruta, list) else []
+    chave = sem_acento_e_caixa(termo)
+    if chave and chave not in (sem_acento_e_caixa(x) for x in lista):
+        lista.append(termo.strip())
+    preferencias["nao_me_interessa"] = lista
+    conexao.execute(
+        "UPDATE perfil SET preferencias_json = ?, atualizado_em = ? WHERE id = ?",
+        (json.dumps(preferencias, ensure_ascii=False), agora, perfil_id),
+    )
+
+
+def remover_nao_me_interessa(conexao: sqlite3.Connection, perfil_id: int, termo: str, agora: str) -> bool:
+    preferencias = _preferencias(conexao, perfil_id)
+    lista = preferencias.get("nao_me_interessa", [])
+    lista = list(lista) if isinstance(lista, list) else []
+    chave = sem_acento_e_caixa(termo)
+    nova_lista = [x for x in lista if sem_acento_e_caixa(str(x)) != chave]
+    if len(nova_lista) == len(lista):
+        return False
+    preferencias["nao_me_interessa"] = nova_lista
+    conexao.execute(
+        "UPDATE perfil SET preferencias_json = ?, atualizado_em = ? WHERE id = ?",
+        (json.dumps(preferencias, ensure_ascii=False), agora, perfil_id),
+    )
+    return True
+
+
 def contagem_historico_protegido(conexao: sqlite3.Connection, perfil_id: int) -> tuple[int, int]:
     """Devolve (n_fatos, n_consultas) — as duas tabelas cuja imutabilidade
     impede apagar o perfil por caminho direto."""

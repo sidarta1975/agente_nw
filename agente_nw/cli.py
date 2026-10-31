@@ -67,6 +67,8 @@ class ItemVerificacao(NamedTuple):
     ok: bool
     detalhe: str
     obrigatorio: bool
+    informativo: bool = False
+    """Nunca gera AVISO nem FALHA mesmo com `ok=False` — só informa (brief 040: 'temas.yaml existe')."""
 
 
 def _verificar_python() -> ItemVerificacao:
@@ -216,10 +218,10 @@ def _verificar_servidor_na_porta(ollama_url: str, servidor: ServidorNaPorta | No
     return ItemVerificacao(nome, True, f"{servidor.tipo} (PID {servidor.pid})", obrigatorio=False)
 
 
-def _verificar_arquivo_existe(nome: str, caminho: Path) -> ItemVerificacao:
+def _verificar_arquivo_existe(nome: str, caminho: Path, informativo: bool = False) -> ItemVerificacao:
     existe = caminho.exists()
     detalhe = str(caminho) if existe else f"{caminho} não existe"
-    return ItemVerificacao(nome, existe, detalhe, obrigatorio=False)
+    return ItemVerificacao(nome, existe, detalhe, obrigatorio=False, informativo=informativo)
 
 
 def _verificar_extensao() -> ItemVerificacao:
@@ -261,14 +263,17 @@ def verificar_ambiente() -> int:
         *_verificar_modelos(cliente, ollama_url, perfil),
         _verificar_servidor_na_porta(ollama_url, servidor),
         _verificar_extensao(),
-        _verificar_arquivo_existe("temas.yaml existe", RAIZ / "temas.yaml"),
+        _verificar_arquivo_existe("temas.yaml existe", RAIZ / "temas.yaml", informativo=True),
         _verificar_arquivo_existe("fontes.yaml existe", RAIZ / "fontes.yaml"),
     ]
 
     largura = max(len(item.nome) for item in itens)
     houve_falha_obrigatoria = False
     for item in itens:
-        rotulo = "OK" if item.ok else ("AVISO" if not item.obrigatorio else "FALHA")
+        if item.informativo:
+            rotulo = "INFO"
+        else:
+            rotulo = "OK" if item.ok else ("AVISO" if not item.obrigatorio else "FALHA")
         print(f"{item.nome:<{largura}}  {rotulo:<6}  {item.detalhe}")
         if not item.ok and item.obrigatorio:
             houve_falha_obrigatoria = True
@@ -858,6 +863,7 @@ def pedir_cmd(
                 frase,
                 agora,
                 limiares_listas=configuracao().limiares.listas,
+                limiares_temas_usuario=configuracao().limiares.temas_usuario,
                 contato_id_forcado=contato_forcado,
                 navegacao=navegacao,
                 trocar_perfil=trocar_perfil,

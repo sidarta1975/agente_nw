@@ -319,6 +319,16 @@ def cruzar_contato_por_consulta(
         perfis.gravar_centroide(conexao, perfil_id, centroide_contato)
         conexao.commit()
 
+    usuario = perfis.obter_usuario(conexao)
+    # O que o usuário já disse não lhe interessar (brief 040) vira `evitar` implícito em todo pedido,
+    # ao lado do `evitar` explícito deste pedido.
+    nao_me_interessa = (
+        perfis.listar_nao_me_interessa(conexao, usuario.id)
+        if usuario is not None and usuario.id is not None
+        else []
+    )
+    evitar_completo = [*contexto.evitar, *nao_me_interessa]
+
     restantes, evitados = candidatos.selecionar_por_consulta(
         conexao,
         perfil_id,
@@ -327,7 +337,7 @@ def cruzar_contato_por_consulta(
         limiares.qualificacao.substancial_minimo,
         limiares.qualificacao.conversavel_minimo,
         limiares.conector.candidatos_por_contato,
-        contexto.evitar,
+        evitar_completo,
         limiares.conector.consulta,
     )
     for assunto in evitados:
@@ -360,7 +370,6 @@ def cruzar_contato_por_consulta(
         )
         return resumo
 
-    usuario = perfis.obter_usuario(conexao)
     temas_usuario = (
         perfil_tema.listar_confirmados_com_embedding(conexao, usuario.id)
         if usuario is not None and usuario.id is not None

@@ -74,3 +74,11 @@ whatsapp:                        # brief 061: conversas do WhatsApp como fonte
 
 moldes:                           # brief 048: molde por contexto
   maximo: 2                       # mensagens-molde de outro contato oferecidas à redação
+
+temas_usuario:                    # brief 040: temas do usuário inferidos dos pedidos
+  similaridade_mesmo_tema: 0.85   # cosseno mínimo para o termo casar com um tema já existente
+  usos_para_interesse: 3          # usos na janela abaixo para o tema subir de curiosidade a interesse
+  usos_para_dominio: 6            # usos na janela abaixo para o tema subir a domínio
+  janela_dias_interesse: 30
+  janela_dias_dominio: 90
+  dias_para_decair: 180           # sem uso por mais que isto, perde 1 de peso por mês (nunca abaixo de 1)

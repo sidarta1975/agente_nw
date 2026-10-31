@@ -19,6 +19,7 @@ from agente_nw.coleta.whatsapp import leitor as whatsapp_leitor
 from agente_nw.nucleo import consulta as consulta_mod
 from agente_nw.nucleo import fluxo as fluxo_mod
 from agente_nw.nucleo import localizacao as localizacao_mod
+from agente_nw.nucleo import pedido as pedido_mod
 from agente_nw.nucleo import redacao as redacao_mod
 from agente_nw.nucleo.database import conexao, migracoes
 from agente_nw.nucleo.database.queries import (
@@ -47,7 +48,7 @@ from agente_nw.nucleo.modelos.tema import Tema
 from agente_nw.nucleo.relevancia import cruzamento
 from agente_nw.nucleo.saidas.markdown import _MOTIVOS
 from agente_nw.nucleo.texto import sem_acento_e_caixa
-from agente_nw.perfil import configurador, extrator
+from agente_nw.perfil import configurador, extrator, inferencia
 from agente_nw.perfil.lacunas import campos_faltando
 from agente_nw.perfil.normalizacao import telefone_e164
 
@@ -800,7 +801,61 @@ def criar_app(
             return _sem_usuario()
         assert usuario.id is not None
         redes = redes_sociais.listar_por_perfil(conn, usuario.id)
-        return render_template("eu.html", usuario=usuario, redes=redes)
+
+        temas_por_id = {tema.id: tema for tema in queries_temas.listar(conn)}
+        temas_por_nivel: dict[str, list[tuple[Tema, PerfilTema, str | None]]] = {
+            nivel: [] for nivel in _NIVEIS
+        }
+        for vinculo in perfil_tema.listar_por_perfil(conn, usuario.id):
+            tema = temas_por_id.get(vinculo.tema_id)
+            nivel = vinculo.nivel or "curiosidade"
+            if tema is None or nivel not in temas_por_nivel:
+                continue
+            ultima = perfil_tema.ultima_mencao(conn, usuario.id, vinculo.tema_id)
+            temas_por_nivel[nivel].append((tema, vinculo, ultima))
+        for lista_temas in temas_por_nivel.values():
+            lista_temas.sort(key=lambda item: item[1].peso, reverse=True)
+
+        return render_template(
+            "eu.html",
+            usuario=usuario,
+            redes=redes,
+            temas_por_nivel=temas_por_nivel,
+            niveis=_NIVEIS,
+            nao_me_interessa=perfis.listar_nao_me_interessa(conn, usuario.id),
+        )
+
+    @app.route("/eu/contar", methods=["POST"])
+    def eu_contar() -> Response:
+        conn = _conn()
+        usuario = _usuario_ou_none()
+        if usuario is None:
+            abort(400)
+        assert usuario.id is not None
+        texto = request.form.get("texto", "").strip()
+        if texto:
+            agora = datetime.now(UTC).isoformat()
+            pedido_extraido = pedido_mod.extrair(_cliente_llm(), conn, texto)
+            if pedido_extraido.sobre_o_usuario:
+                inferencia.aplicar_declaracoes(
+                    conn,
+                    _cliente_llm(),
+                    usuario.id,
+                    pedido_extraido.sobre_o_usuario,
+                    agora,
+                    limiares.temas_usuario,
+                )
+        return redirect(url_for("eu"))
+
+    @app.route("/eu/esquecer", methods=["POST"])
+    def eu_esquecer() -> Response:
+        conn = _conn()
+        usuario = _usuario_ou_none()
+        if usuario is None:
+            abort(400)
+        assert usuario.id is not None
+        inferencia.esquecer_inferidos(conn, usuario.id)
+        return redirect(url_for("eu"))
 
     @app.route("/eu/redes-sociais/adicionar", methods=["POST"])
     def adicionar_rede_social_usuario() -> Response:

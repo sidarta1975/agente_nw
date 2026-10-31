@@ -3,17 +3,20 @@ from __future__ import annotations
 import getpass
 import sqlite3
 from collections.abc import Callable, Sequence
+from datetime import datetime
 from typing import Protocol, TypeVar
 
 from pydantic import BaseModel
 
 from agente_nw.nucleo import localizacao as localizacao_mod
 from agente_nw.nucleo.database.queries import pedidos, perfis, rede_sem_perfil, redes_sociais
+from agente_nw.nucleo.modelos.configuracao import TemasUsuarioLimiares
 from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido, ResultadoPedido
 from agente_nw.nucleo.modelos.perfil import Perfil
 from agente_nw.nucleo.prompts import extrair_pedido
 from agente_nw.nucleo.texto import sem_acento_e_caixa, similaridade_nome
+from agente_nw.perfil import inferencia
 
 _EsquemaT = TypeVar("_EsquemaT", bound=BaseModel)
 _MAXIMO_CONTATOS_NO_PROMPT = 50
@@ -21,6 +24,8 @@ _MAXIMO_CONTATOS_NO_PROMPT = 50
 
 class ClientePedido(Protocol):
     def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[_EsquemaT]) -> _EsquemaT: ...
+
+    def embeddar(self, textos: list[str]) -> list[list[float]]: ...
 
 
 def extrair(cliente_llm: ClientePedido, conexao: sqlite3.Connection, frase: str) -> PedidoExtraido:
@@ -143,8 +148,12 @@ def processar(
     confirmar_contato: Callable[[str, str], bool] | None = None,
     similaridade_minima_contato: float = 0.5,
     pedido_id: int | None = None,
+    limiares_temas_usuario: TemasUsuarioLimiares | None = None,
 ) -> ResultadoPedido:
-    """`pedido_id`: o console já gravou o pedido (e responde ao usuário antes de processar)."""
+    """`pedido_id`: o console já gravou o pedido (e responde ao usuário antes de processar).
+    `limiares_temas_usuario=None` desliga a inferência do perfil do usuário (brief 040) — é o caso dos
+    testes que chamam `processar` direto com um cliente sem `embeddar`; a produção sempre passa o bloco
+    real (via `orquestracao.entender_pedido`)."""
     if pedido_id is None:
         pedido_id = registrar(conexao, frase, agora)
 
@@ -153,6 +162,15 @@ def processar(
     conexao.commit()
 
     garantir_usuario(conexao, agora)
+    if limiares_temas_usuario is not None:
+        inferencia.decair(conexao, datetime.fromisoformat(agora).date(), limiares_temas_usuario)
+        inferencia.atualizar_temas_do_usuario(conexao, cliente_llm, pedido, agora, limiares_temas_usuario)
+        if pedido.sobre_o_usuario:
+            usuario = perfis.obter_usuario(conexao)
+            assert usuario is not None and usuario.id is not None
+            inferencia.aplicar_declaracoes(
+                conexao, cliente_llm, usuario.id, pedido.sobre_o_usuario, agora, limiares_temas_usuario
+            )
     perfil, criado, ambiguo, candidatos = resolver_contato(conexao, pedido, agora, contato_id_forcado)
     pedidos.gravar_resolucao(conexao, pedido_id, perfil.id if perfil is not None else None, criado, ambiguo)
     conexao.commit()

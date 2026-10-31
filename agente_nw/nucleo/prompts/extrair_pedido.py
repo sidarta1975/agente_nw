@@ -21,7 +21,7 @@ _EXEMPLO_SAIDA = (
     '"interessa": ["negócios dele"], "evitar": ["política"], '
     '"termos_busca": ["indústria moveleira", "marcenaria Santa Catarina", "preço da madeira", '
     '"exportação de móveis"], '
-    '"continuacao": false, "confianca": 0.9}'
+    '"continuacao": false, "confianca": 0.9, "sobre_o_usuario": []}'
 )
 
 
@@ -64,6 +64,12 @@ profissão, da empresa, do assunto e do que provavelmente está em pauta.
 "continuacao" — true só se a frase indica que a conversa já começou ("ele
 respondeu que...", "de novo"); senão false.
 "confianca" — de 0 a 1, o quanto você tem certeza de ter entendido o pedido.
+"sobre_o_usuario" — frases curtas e separadas (uma por afirmação) em que o próprio
+usuário (quem escreve o pedido, nunca a pessoa de quem se fala) diz o nome dele
+("me chamo X", "sou o X"), o que ele sabe ou gosta ("sou advogado tributarista",
+"gosto de vela") ou o que não lhe interessa ("não me interessa futebol", "não
+entendo nada de economia"). Mantenha cada frase o mais parecida possível com o
+que o usuário escreveu. Lista vazia se a frase não fala do próprio usuário.
 
 Se a pessoa do pedido for um dos contatos já conhecidos, escreva o nome como está
 na lista.

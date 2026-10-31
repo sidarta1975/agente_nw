@@ -149,6 +149,10 @@ def test_limiares_carrega_e_tem_todas_as_chaves() -> None:
     assert limiares.conector.peso_nivel == {"dominio": 1.0, "interesse": 0.7, "curiosidade": 0.4}
     assert limiares.conector.candidatos_por_contato == 10
     assert limiares.conector.itens_no_menu == 5
+    assert limiares.temas_usuario.similaridade_mesmo_tema == 0.85
+    assert limiares.temas_usuario.usos_para_interesse == 3
+    assert limiares.temas_usuario.usos_para_dominio == 6
+    assert limiares.temas_usuario.dias_para_decair == 180
 
 
 def _consulta_limiares(**mudancas: float) -> ConsultaLimiares:
