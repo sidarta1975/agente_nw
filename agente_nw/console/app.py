@@ -562,6 +562,9 @@ def criar_app(
         else:
             tem_filhos = None
 
+        genero_bruto = request.form.get("genero_gramatical", "").strip()
+        genero_gramatical = genero_bruto if genero_bruto in ("masculino", "feminino") else "desconhecido"
+
         campos: dict[str, object] = {
             "nome": nome,
             "apelido": _texto_ou_none("apelido"),
@@ -577,6 +580,7 @@ def criar_app(
             "tem_filhos": tem_filhos,
             "faixa_etaria": _texto_ou_none("faixa_etaria"),
             "notas": _texto_ou_none("notas"),
+            "genero_gramatical": genero_gramatical,
         }
 
         agora = datetime.now(UTC).isoformat()

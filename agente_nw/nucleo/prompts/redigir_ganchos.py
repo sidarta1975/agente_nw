@@ -83,6 +83,8 @@ class EntradaRedacao:
     contexto_relacao: list[str] = field(default_factory=list)  # tags: família, amigos, trabalho...
     notas: list[str] = field(default_factory=list)  # notas do usuário sobre o contato (brief 050)
     trocas_whatsapp: list[str] = field(default_factory=list)  # tom da relação, "você"/nome (brief 061)
+    moldes: list[str] = field(default_factory=list)  # mensagens que funcionaram com outro contato (048)
+    genero_gramatical: str = "desconhecido"  # masculino/feminino/desconhecido — concordância (048)
 
 
 def estimar_tokens(texto: str) -> int:
@@ -102,7 +104,8 @@ def _bloco_quem_escreve(entrada: EntradaRedacao) -> str:
 def _bloco_para_quem(entrada: EntradaRedacao) -> str:
     ficha = ", ".join(entrada.contato_ficha) or "sem cargo, empresa ou cidade conhecidos"
     linhas = [
-        f"PARA QUEM: {entrada.contato_nome} — {ficha}. Vínculo: {entrada.vinculo or 'não informado'}. "
+        f"PARA QUEM: {entrada.contato_nome} — {ficha}. Gênero gramatical: {entrada.genero_gramatical}. "
+        f"Vínculo: {entrada.vinculo or 'não informado'}. "
         f"Tempo sem contato: {entrada.tempo_sem_contato or 'não informado'}."
     ]
     if entrada.contexto_relacao:
@@ -144,6 +147,20 @@ def _bloco_historico(entrada: EntradaRedacao) -> str:
         "HISTÓRICO (consultas anteriores; não repita o que já foi usado; comentário do usuário diz por que "
         "uma mensagem serviu ou não):\n" + "\n".join(entrada.historico) + extras
     )
+
+
+def _bloco_moldes(entrada: EntradaRedacao) -> str:
+    if not entrada.moldes:
+        return ""
+    linhas = [
+        "MENSAGENS QUE JÁ FUNCIONARAM NESTE TIPO DE CONTEXTO (outro contato, mesmo objetivo, mesmo "
+        "registro, profissão parecida); adapte à pessoa de agora — não copie: carregue o que serve a "
+        "quem recebe agora (o objetivo, um atributo compartilhado como a profissão), adapte nome e "
+        "gênero gramatical, e troque ou tire o detalhe que só cabia à pessoa de origem. O molde dá "
+        "estrutura e tom; nada pode ficar falso para quem recebe agora."
+    ]
+    linhas.extend(f"- {molde}" for molde in entrada.moldes)
+    return "\n".join(linhas)
 
 
 def _bloco_assuntos(entrada: EntradaRedacao) -> str:
@@ -190,6 +207,10 @@ pedir desculpa; "agradecer" \
 põe o agradecimento antes do gancho; "pedir" põe o pedido depois do gancho e o torna explícito; \
 "responder" continua o fio da conversa; "apresentar" diz em uma linha quem é o usuário antes do gancho, \
 mas só se a pessoa não o conhece bem.
+- "Gênero gramatical" de quem recebe manda a concordância ("caro"/"cara", "advogado"/"advogada", \
+pronomes). "desconhecido": use forma neutra, sem gênero marcado. Ao adaptar uma mensagem-molde (se houver, \
+acima), troque toda concordância, nome e detalhe que só cabia à pessoa de origem — nada da fonte pode \
+sobrar na mensagem final.
 - Pese a força do vínculo. Vínculo forte (família, amigo próximo, convívio frequente): a pessoa sabe quem \
 é o usuário e como vocês se ligam, então não explique o parentesco nem se apresente ("sou cunhado da sua \
 esposa"). Vínculo fraco (conhecido, contato profissional, pouco contato, tempo sem falar): lembrar de onde \
@@ -217,26 +238,27 @@ senão, trate como conversa nova. Nunca faça perguntas ao usuário.
 
 
 def _montar(entrada: EntradaRedacao) -> str:
-    return "\n\n".join(
-        [
-            "Você redige, em nome do usuário, mensagens prontas para uma pessoa específica: uma mensagem "
-            "base a partir do objetivo e da pessoa e, se houver, ganchos de notícia dos assuntos "
-            "selecionados.",
-            _bloco_quem_escreve(entrada),
-            _bloco_para_quem(entrada),
-            _bloco_pedido(entrada),
-            _bloco_historico(entrada),
-            _bloco_assuntos(entrada),
-            _regras(),
-            "EXEMPLO RESOLVIDO (outro cenário; só o formato e o tom valem):\n" + _EXEMPLO,
-            "AGORA FAÇA O MESMO PARA OS DADOS ACIMA. JSON:",
-        ]
-    )
+    blocos = [
+        "Você redige, em nome do usuário, mensagens prontas para uma pessoa específica: uma mensagem "
+        "base a partir do objetivo e da pessoa e, se houver, ganchos de notícia dos assuntos "
+        "selecionados.",
+        _bloco_quem_escreve(entrada),
+        _bloco_para_quem(entrada),
+        _bloco_pedido(entrada),
+        _bloco_moldes(entrada),
+        _bloco_historico(entrada),
+        _bloco_assuntos(entrada),
+        _regras(),
+        "EXEMPLO RESOLVIDO (outro cenário; só o formato e o tom valem):\n" + _EXEMPLO,
+        "AGORA FAÇA O MESMO PARA OS DADOS ACIMA. JSON:",
+    ]
+    return "\n\n".join(bloco for bloco in blocos if bloco)
 
 
 def cortar_por_tamanho(entrada: EntradaRedacao, limite_tokens: int = LIMITE_TOKENS_PADRAO) -> EntradaRedacao:
     """Se o prompt estimado passa de `limite_tokens`, fica com 1 consulta de histórico e 5 fatos; se
-    ainda passar, a conversa do WhatsApp sai — as notas do usuário continuam protegidas (brief 050/061)."""
+    ainda passar, saem os moldes de outro contato; se ainda passar, sai a conversa do WhatsApp — as
+    notas do usuário continuam protegidas (brief 050/061/048)."""
     if estimar_tokens(_montar(entrada)) <= limite_tokens:
         return entrada
     cortada = replace(
@@ -244,7 +266,10 @@ def cortar_por_tamanho(entrada: EntradaRedacao, limite_tokens: int = LIMITE_TOKE
     )
     if estimar_tokens(_montar(cortada)) <= limite_tokens:
         return cortada
-    return replace(cortada, trocas_whatsapp=[])
+    sem_moldes = replace(cortada, moldes=[])
+    if estimar_tokens(_montar(sem_moldes)) <= limite_tokens:
+        return sem_moldes
+    return replace(sem_moldes, trocas_whatsapp=[])
 
 
 def construir_prompt(entrada: EntradaRedacao, limite_tokens: int = LIMITE_TOKENS_PADRAO) -> str:

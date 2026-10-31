@@ -28,6 +28,12 @@
     <input id="empresa" type="text" name="empresa" value="{{ perfil.empresa or '' }}">
     <label for="cargo">Cargo</label>
     <input id="cargo" type="text" name="cargo" value="{{ perfil.cargo or '' }}">
+    <label for="genero_gramatical">Gênero gramatical (para a concordância das mensagens)</label>
+    <select id="genero_gramatical" name="genero_gramatical">
+      <option value="desconhecido" {% if perfil.genero_gramatical == "desconhecido" %}selected{% endif %}>não sei</option>
+      <option value="masculino" {% if perfil.genero_gramatical == "masculino" %}selected{% endif %}>masculino</option>
+      <option value="feminino" {% if perfil.genero_gramatical == "feminino" %}selected{% endif %}>feminino</option>
+    </select>
     <label for="setor">Setor</label>
     <input id="setor" type="text" name="setor" value="{{ perfil.setor or '' }}">
     <label for="cidade">Cidade</label>

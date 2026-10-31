@@ -208,6 +208,7 @@ def preparar_e_redigir(
             limite_tokens=limite_tokens,
             meses_fato_antigo=limiares.redacao.meses_fato_antigo,
             trocas_whatsapp_no_prompt=limiares.whatsapp.trocas_no_prompt,
+            maximo_moldes=limiares.moldes.maximo,
         )
     except FalhaJsonInvalido as erro:
         raise FalhaNaRedacao(str(erro)) from erro

@@ -254,6 +254,15 @@ class WhatsappLimiares(BaseModel):
     """Últimas mensagens trocadas que entram no HISTÓRICO da redação, para acertar o tom."""
 
 
+class MoldesLimiares(BaseModel):
+    """Mensagens que já funcionaram com outro contato, reaproveitadas por contexto (brief 048)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    maximo: int = Field(default=2, ge=0)
+    """Máximo de mensagens-molde oferecidas à redação (preferência pelas marcadas 'usado')."""
+
+
 class Limiares(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -266,6 +275,7 @@ class Limiares(BaseModel):
     extensao: ExtensaoLimiares = Field(default_factory=ExtensaoLimiares)
     redacao: RedacaoLimiares = Field(default_factory=RedacaoLimiares)
     whatsapp: WhatsappLimiares = Field(default_factory=WhatsappLimiares)
+    moldes: MoldesLimiares = Field(default_factory=MoldesLimiares)
 
 
 class TemaUsuario(BaseModel):

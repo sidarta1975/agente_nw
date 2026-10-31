@@ -25,3 +25,6 @@ class ContextoConsulta(BaseModel):
     livre: str = ""
     registro: str | None = None
     termos_busca: list[str] = Field(default_factory=list)
+    objetivo_categoria: str | None = None
+    """A categoria do objetivo (`PedidoExtraido.objetivo`: retomar/agradecer/pedir/...), ao lado do texto
+    livre em `objetivo`; usada para casar o contexto de uma mensagem-molde (brief 048)."""

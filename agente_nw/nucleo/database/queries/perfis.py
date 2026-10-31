@@ -15,9 +15,35 @@ from agente_nw.nucleo.vetores import centroide as calcular_media_ponderada
 
 _COLUNAS = (
     "id, tipo, nome, apelido, email, telefone, empresa, cargo, setor, cidade, naturalidade, "
-    "linguas, formacao, tem_filhos, faixa_etaria, notas, ativo, gerar_agora, ultima_coleta, "
-    "criado_em, atualizado_em"
+    "linguas, formacao, tem_filhos, faixa_etaria, notas, genero_gramatical, ativo, gerar_agora, "
+    "ultima_coleta, criado_em, atualizado_em"
 )
+
+# Heurística simples pelo primeiro nome (brief 048): só serve à concordância gramatical do molde
+# ("caro"/"cara", "advogado"/"advogada"), não é juízo sobre a pessoa. Sem certeza, fica "desconhecido"
+# e o usuário corrige na ficha — por isso a lista de exceções cobre só os casos mais comuns de conflito
+# entre terminação e gênero gramatical do nome em português.
+_PRIMEIRO_NOME_FEMININO_EXCECAO = frozenset(
+    {"raquel", "beatriz", "ingrid", "isis", "carmen", "noemi", "miriam", "ruth", "nair"}
+)
+_PRIMEIRO_NOME_MASCULINO_EXCECAO = frozenset({"luca", "noah", "josue", "jonas"})
+_SUFIXOS_FEMININOS = ("a", "ane")
+_SUFIXOS_MASCULINOS = ("o", "z", "el", "im", "an", "ar", "or")
+
+
+def _inferir_genero_gramatical(nome: str) -> str:
+    primeiro = sem_acento_e_caixa(nome).split()[0] if nome.strip() else ""
+    if not primeiro:
+        return "desconhecido"
+    if primeiro in _PRIMEIRO_NOME_FEMININO_EXCECAO:
+        return "feminino"
+    if primeiro in _PRIMEIRO_NOME_MASCULINO_EXCECAO:
+        return "masculino"
+    if primeiro.endswith(_SUFIXOS_FEMININOS):
+        return "feminino"
+    if primeiro.endswith(_SUFIXOS_MASCULINOS):
+        return "masculino"
+    return "desconhecido"
 
 
 def _para_perfil(linha: sqlite3.Row) -> Perfil:
@@ -38,6 +64,7 @@ def _para_perfil(linha: sqlite3.Row) -> Perfil:
         tem_filhos=bool(linha["tem_filhos"]) if linha["tem_filhos"] is not None else None,
         faixa_etaria=linha["faixa_etaria"],
         notas=linha["notas"],
+        genero_gramatical=linha["genero_gramatical"],
         ativo=bool(linha["ativo"]),
         gerar_agora=bool(linha["gerar_agora"]),
         ultima_coleta=linha["ultima_coleta"],
@@ -100,10 +127,10 @@ def inserir_ou_atualizar_contato(
     existente = obter_por_telefone_ou_email(conexao, telefone, email)
     if existente is None:
         conexao.execute(
-            "INSERT INTO perfil (tipo, nome, telefone, email, empresa, cargo, notas, linguas, "
-            "ativo, gerar_agora, criado_em, atualizado_em) "
-            "VALUES ('contato', ?, ?, ?, ?, ?, ?, '[]', 0, 0, ?, ?)",
-            (nome, telefone, email, empresa, cargo, notas, agora, agora),
+            "INSERT INTO perfil (tipo, nome, telefone, email, empresa, cargo, notas, genero_gramatical, "
+            "linguas, ativo, gerar_agora, criado_em, atualizado_em) "
+            "VALUES ('contato', ?, ?, ?, ?, ?, ?, ?, '[]', 0, 0, ?, ?)",
+            (nome, telefone, email, empresa, cargo, notas, _inferir_genero_gramatical(nome), agora, agora),
         )
         novo = obter_por_telefone_ou_email(conexao, telefone, email)
         assert novo is not None
@@ -129,9 +156,9 @@ def inserir_novo_contato(
     quando o chamador já sabe que é um contato novo (formulário do console),
     inclusive quando não há telefone nem email."""
     cursor = conexao.execute(
-        "INSERT INTO perfil (tipo, nome, telefone, email, linguas, ativo, gerar_agora, "
-        "criado_em, atualizado_em) VALUES ('contato', ?, ?, ?, '[]', 0, 0, ?, ?)",
-        (nome, telefone, email, agora, agora),
+        "INSERT INTO perfil (tipo, nome, telefone, email, genero_gramatical, linguas, ativo, gerar_agora, "
+        "criado_em, atualizado_em) VALUES ('contato', ?, ?, ?, ?, '[]', 0, 0, ?, ?)",
+        (nome, telefone, email, _inferir_genero_gramatical(nome), agora, agora),
     )
     assert cursor.lastrowid is not None
     novo = obter_por_id(conexao, cursor.lastrowid)
@@ -474,6 +501,7 @@ _CAMPOS_EDITAVEIS_MANUAL = (
     "tem_filhos",
     "faixa_etaria",
     "notas",
+    "genero_gramatical",
 )
 
 

@@ -163,6 +163,21 @@ def _trocas_whatsapp(
     return conversa_q.ultimas_trocas(conexao, perfil_id, limite, nome_contato)
 
 
+def _moldes(conexao: sqlite3.Connection, contato: Perfil, pedido: PedidoExtraido, maximo: int) -> list[str]:
+    """Mensagens que já funcionaram com outro contato de contexto parecido (brief 048), uma linha cada;
+    marca `[usei]`/`[entreguei]` e o comentário do usuário, quando houver."""
+    assert contato.id is not None
+    moldes = consulta_contato_q.moldes_por_contexto(
+        conexao, contato.id, pedido.objetivo, pedido.registro, contato.cargo, maximo
+    )
+    linhas = []
+    for molde in moldes:
+        marca = "usei" if molde.bom else "entreguei"
+        sufixo = f' — comentário do usuário: "{molde.comentario[:300]}"' if molde.comentario else ""
+        linhas.append(f'[{marca}] "{molde.mensagem}"{sufixo}')
+    return linhas
+
+
 def _texto_da_consulta(pedido: PedidoExtraido, assuntos: list[ItemMenu]) -> str:
     return ". ".join([pedido.assunto_principal, *pedido.interessa, *(item.titulo for item in assuntos)])
 
@@ -178,6 +193,7 @@ def montar_entrada(
     assuntos: list[ItemMenu],
     meses_fato_antigo: int = 12,
     trocas_whatsapp_no_prompt: int = 10,
+    maximo_moldes: int = 2,
 ) -> EntradaRedacao:
     assert contato.id is not None and usuario.id is not None
     temas_usuario = [
@@ -210,6 +226,8 @@ def montar_entrada(
         trocas_whatsapp=_trocas_whatsapp(
             conexao, contato.id, contato.apelido or contato.nome, trocas_whatsapp_no_prompt
         ),
+        moldes=_moldes(conexao, contato, pedido, maximo_moldes),
+        genero_gramatical=contato.genero_gramatical,
     )
 
 
@@ -236,6 +254,7 @@ def redigir(
     limite_tokens: int = prompt_mod.LIMITE_TOKENS_PADRAO,
     meses_fato_antigo: int = 12,
     trocas_whatsapp_no_prompt: int = 10,
+    maximo_moldes: int = 2,
 ) -> Redacao:
     """Uma chamada ao modelo: sempre devolve a mensagem base (objetivo + pessoa + uma peculiaridade) e,
     havendo assunto ligado ao pedido, também os ganchos de notícia. Sem assunto o modelo é chamado do mesmo
@@ -265,6 +284,7 @@ def redigir(
         disponiveis,
         meses_fato_antigo,
         trocas_whatsapp_no_prompt,
+        maximo_moldes,
     )
     if not entrada.fatos:
         informativos.append("Pouca informação sobre a pessoa; mensagem mais geral.")

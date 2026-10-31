@@ -71,3 +71,6 @@ whatsapp:                        # brief 061: conversas do WhatsApp como fonte
   meses_extraidos: 24             # meses mais recentes do contato extraídos em fatos
   maximo_caracteres_bloco: 6000   # tamanho de cada bloco enviado à extração (cada um é uma chamada)
   trocas_no_prompt: 10            # últimas mensagens no HISTÓRICO da redação, para o tom
+
+moldes:                           # brief 048: molde por contexto
+  maximo: 2                       # mensagens-molde de outro contato oferecidas à redação

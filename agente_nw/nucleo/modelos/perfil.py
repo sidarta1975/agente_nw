@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 TipoPerfil = Literal["usuario", "contato"]
+GeneroGramatical = Literal["masculino", "feminino", "desconhecido"]
 
 
 class Perfil(BaseModel):
@@ -26,6 +27,7 @@ class Perfil(BaseModel):
     tem_filhos: bool | None = None
     faixa_etaria: str | None = None
     notas: str | None = None
+    genero_gramatical: GeneroGramatical = "desconhecido"
     ativo: bool = False
     gerar_agora: bool = False
     ultima_coleta: str | None = None

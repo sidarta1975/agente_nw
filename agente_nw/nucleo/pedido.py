@@ -120,6 +120,7 @@ def para_contexto(pedido: PedidoExtraido, frase: str = "") -> ContextoConsulta:
         livre=frase,
         registro=pedido.registro,
         termos_busca=list(pedido.termos_busca),
+        objetivo_categoria=pedido.objetivo,
     )
 
 
