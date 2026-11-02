@@ -163,19 +163,24 @@ def _trocas_whatsapp(
     return conversa_q.ultimas_trocas(conexao, perfil_id, limite, nome_contato)
 
 
-def _moldes(conexao: sqlite3.Connection, contato: Perfil, pedido: PedidoExtraido, maximo: int) -> list[str]:
+def _moldes(
+    conexao: sqlite3.Connection, contato: Perfil, pedido: PedidoExtraido, maximo: int
+) -> tuple[list[str], int | None]:
     """Mensagens que já funcionaram com outro contato de contexto parecido (brief 048), uma linha cada;
-    marca `[usei]`/`[entreguei]` e o comentário do usuário, quando houver."""
+    marca `[usei]`/`[entreguei, ainda não confirmado se funcionou]` (brief 065) e o comentário do
+    usuário, quando houver. Devolve também o `id` do molde mais relevante (o primeiro da lista), para
+    gravar a proveniência da mensagem nova."""
     assert contato.id is not None
     moldes = consulta_contato_q.moldes_por_contexto(
         conexao, contato.id, pedido.objetivo, pedido.registro, contato.cargo, maximo
     )
     linhas = []
     for molde in moldes:
-        marca = "usei" if molde.bom else "entreguei"
+        marca = "usei" if molde.bom else "entreguei, ainda não confirmado se funcionou"
         sufixo = f' — comentário do usuário: "{molde.comentario[:300]}"' if molde.comentario else ""
         linhas.append(f'[{marca}] "{molde.mensagem}"{sufixo}')
-    return linhas
+    molde_origem_id = moldes[0].id if moldes else None
+    return linhas, molde_origem_id
 
 
 def _texto_da_consulta(pedido: PedidoExtraido, assuntos: list[ItemMenu]) -> str:
@@ -201,6 +206,7 @@ def montar_entrada(
         for nome, nivel, _vetor in perfil_tema_q.listar_confirmados_com_embedding(conexao, usuario.id)
     ]
     cabecalhos = listas_q.cabecalhos_do_perfil(conexao, contato.id)
+    linhas_moldes, molde_origem_id = _moldes(conexao, contato, pedido, maximo_moldes)
     return EntradaRedacao(
         usuario_nome=usuario.nome,
         usuario_temas=temas_usuario,
@@ -226,7 +232,8 @@ def montar_entrada(
         trocas_whatsapp=_trocas_whatsapp(
             conexao, contato.id, contato.apelido or contato.nome, trocas_whatsapp_no_prompt
         ),
-        moldes=_moldes(conexao, contato, pedido, maximo_moldes),
+        moldes=linhas_moldes,
+        molde_origem_id=molde_origem_id,
         genero_gramatical=contato.genero_gramatical,
     )
 
@@ -288,6 +295,8 @@ def redigir(
     )
     if not entrada.fatos:
         informativos.append("Pouca informação sobre a pessoa; mensagem mais geral.")
+    # Se o molde sair do prompt por corte de tamanho, a mensagem não grava proveniência dele (065).
+    molde_origem_id = prompt_mod.cortar_por_tamanho(entrada, limite_tokens).molde_origem_id
     prompt = prompt_mod.construir_prompt(entrada, limite_tokens)
     validos = {item.assunto_id for item in disponiveis}
     resposta = cliente_llm.gerar_json("redigir_ganchos", prompt, RespostaRedacao)
@@ -310,16 +319,18 @@ def redigir(
     aviso = _juntar_avisos([*informativos, resposta.aviso or "", *motivos])
     if not ganchos and aviso is None:
         aviso = "O modelo não devolveu nenhuma mensagem."
-    return Redacao(ganchos=ganchos, aviso=aviso, registro_usado=registro)
+    return Redacao(ganchos=ganchos, aviso=aviso, registro_usado=registro, molde_origem_id=molde_origem_id)
 
 
 def registrar(conexao: sqlite3.Connection, consulta_id: int, redacao: Redacao, agora: str) -> None:
-    """Grava os ganchos entregues em `gancho_uso` (status `entregue`)."""
+    """Grava os ganchos entregues em `gancho_uso` (status `entregue`), com a proveniência do molde
+    usado para a redação, quando houver (brief 065)."""
     gancho_uso_q.inserir_entregues(
         conexao,
         consulta_id,
         [(g.assunto_id, g.model_dump_json()) for g in redacao.ganchos],
         agora,
+        redacao.molde_origem_id,
     )
     conexao.commit()
 

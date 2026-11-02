@@ -84,6 +84,7 @@ class EntradaRedacao:
     notas: list[str] = field(default_factory=list)  # notas do usuário sobre o contato (brief 050)
     trocas_whatsapp: list[str] = field(default_factory=list)  # tom da relação, "você"/nome (brief 061)
     moldes: list[str] = field(default_factory=list)  # mensagens que funcionaram com outro contato (048)
+    molde_origem_id: int | None = None  # id do gancho_uso usado como molde, se houver (065)
     genero_gramatical: str = "desconhecido"  # masculino/feminino/desconhecido — concordância (048)
 
 
@@ -266,7 +267,7 @@ def cortar_por_tamanho(entrada: EntradaRedacao, limite_tokens: int = LIMITE_TOKE
     )
     if estimar_tokens(_montar(cortada)) <= limite_tokens:
         return cortada
-    sem_moldes = replace(cortada, moldes=[])
+    sem_moldes = replace(cortada, moldes=[], molde_origem_id=None)
     if estimar_tokens(_montar(sem_moldes)) <= limite_tokens:
         return sem_moldes
     return replace(sem_moldes, trocas_whatsapp=[])

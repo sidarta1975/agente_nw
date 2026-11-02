@@ -63,6 +63,7 @@ def listar_por_perfil(
 class MoldeParaRedacao:
     """Uma mensagem já redigida para outro contato, de contexto parecido (brief 048)."""
 
+    id: int
     mensagem: str
     bom: bool  # status 'usado': o usuário marcou que serviu
     comentario: str | None = None
@@ -77,13 +78,16 @@ def moldes_por_contexto(
     maximo: int,
 ) -> list[MoldeParaRedacao]:
     """Mensagens entregues a outro contato com o mesmo objetivo, o mesmo registro e cargo parecido —
-    a tríade de contexto do brief 048. `nao_serve` nunca entra; `usado` vem primeiro, depois por
-    recência. Sem cargo do contato atual não há "tipo de contato" para comparar: devolve vazio."""
+    a tríade de contexto do brief 048. `nao_serve` nunca entra. Havendo ao menos uma `usado` para a
+    tríade, só `usado` participa (até `maximo`) — nenhuma `entregue` entra, por mais espaço que reste
+    (brief 065: interrompe a realimentação de texto nunca confirmado). Sem nenhuma `usado`, no máximo
+    uma `entregue` participa — a mais recente, arranque a frio. Sem cargo do contato atual não há "tipo
+    de contato" para comparar: devolve vazio."""
     if not cargo_atual or not registro or maximo <= 0:
         return []
     cargo_normalizado = sem_acento_e_caixa(cargo_atual)
     linhas = conexao.execute(
-        "SELECT g.gancho_json AS gancho_json, g.status AS status, g.comentario AS comentario, "
+        "SELECT g.id AS id, g.gancho_json AS gancho_json, g.status AS status, g.comentario AS comentario, "
         "p.cargo AS cargo_fonte "
         "FROM gancho_uso g "
         "JOIN consulta_contato c ON c.id = g.consulta_id "
@@ -94,7 +98,7 @@ def moldes_por_contexto(
         "ORDER BY (g.status = 'usado') DESC, c.criado_em DESC",
         (perfil_id_atual, objetivo_categoria, registro),
     ).fetchall()
-    moldes: list[MoldeParaRedacao] = []
+    candidatos: list[MoldeParaRedacao] = []
     for linha in linhas:
         if linha["cargo_fonte"] is None or sem_acento_e_caixa(linha["cargo_fonte"]) != cargo_normalizado:
             continue
@@ -105,11 +109,16 @@ def moldes_por_contexto(
         mensagem = dados.get("mensagem") if isinstance(dados, dict) else None
         if not isinstance(mensagem, str) or not mensagem.strip():
             continue
-        moldes.append(
+        candidatos.append(
             MoldeParaRedacao(
-                mensagem=mensagem, bom=linha["status"] == "usado", comentario=linha["comentario"]
+                id=linha["id"],
+                mensagem=mensagem,
+                bom=linha["status"] == "usado",
+                comentario=linha["comentario"],
             )
         )
-        if len(moldes) >= maximo:
-            break
-    return moldes
+
+    usados = [molde for molde in candidatos if molde.bom]
+    if usados:
+        return usados[:maximo]
+    return candidatos[:1]

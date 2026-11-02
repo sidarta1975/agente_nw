@@ -7,31 +7,39 @@ StatusGancho = Literal["entregue", "usado", "nao_serve"]
 
 
 def inserir_entregues(
-    conexao: sqlite3.Connection, consulta_id: int, ganchos: list[tuple[int | None, str]], agora: str
+    conexao: sqlite3.Connection,
+    consulta_id: int,
+    ganchos: list[tuple[int | None, str]],
+    agora: str,
+    molde_origem_id: int | None = None,
 ) -> None:
     """Grava os ganchos entregues numa consulta. `ganchos` = [(assunto_id, gancho_json)]; assunto_id
     nulo é a mensagem base (brief 047). Repetir a gravação da mesma consulta e assunto substitui o
-    texto e volta o status para `entregue`."""
+    texto e volta o status para `entregue`. `molde_origem_id`: `id` do `gancho_uso` usado como molde
+    para esta redação, quando houver (brief 065) — grava em todas as linhas desta chamada."""
     for assunto_id, gancho_json in ganchos:
         if assunto_id is None:
             atualizada = conexao.execute(
-                "UPDATE gancho_uso SET status = 'entregue', gancho_json = ?, atualizado_em = ? "
-                "WHERE consulta_id = ? AND assunto_id IS NULL",
-                (gancho_json, agora, consulta_id),
+                "UPDATE gancho_uso SET status = 'entregue', gancho_json = ?, atualizado_em = ?, "
+                "molde_origem_id = ? WHERE consulta_id = ? AND assunto_id IS NULL",
+                (gancho_json, agora, molde_origem_id, consulta_id),
             )
             if atualizada.rowcount == 0:
                 conexao.execute(
-                    "INSERT INTO gancho_uso (consulta_id, assunto_id, status, gancho_json, atualizado_em) "
-                    "VALUES (?, NULL, 'entregue', ?, ?)",
-                    (consulta_id, gancho_json, agora),
+                    "INSERT INTO gancho_uso "
+                    "(consulta_id, assunto_id, status, gancho_json, atualizado_em, molde_origem_id) "
+                    "VALUES (?, NULL, 'entregue', ?, ?, ?)",
+                    (consulta_id, gancho_json, agora, molde_origem_id),
                 )
             continue
         conexao.execute(
-            "INSERT INTO gancho_uso (consulta_id, assunto_id, status, gancho_json, atualizado_em) "
-            "VALUES (?, ?, 'entregue', ?, ?) "
+            "INSERT INTO gancho_uso "
+            "(consulta_id, assunto_id, status, gancho_json, atualizado_em, molde_origem_id) "
+            "VALUES (?, ?, 'entregue', ?, ?, ?) "
             "ON CONFLICT(consulta_id, assunto_id) DO UPDATE SET "
-            "status = 'entregue', gancho_json = excluded.gancho_json, atualizado_em = excluded.atualizado_em",
-            (consulta_id, assunto_id, gancho_json, agora),
+            "status = 'entregue', gancho_json = excluded.gancho_json, "
+            "atualizado_em = excluded.atualizado_em, molde_origem_id = excluded.molde_origem_id",
+            (consulta_id, assunto_id, gancho_json, agora, molde_origem_id),
         )
 
 

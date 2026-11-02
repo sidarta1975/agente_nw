@@ -78,6 +78,7 @@ class Redacao(BaseModel):
     ganchos: list[Gancho] = Field(default_factory=list)
     aviso: str | None = None
     registro_usado: RegistroPedido
+    molde_origem_id: int | None = None  # id do gancho_uso usado como molde para esta redação (065)
 
 
 def _palavras(texto: str) -> int:
