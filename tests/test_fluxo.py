@@ -27,19 +27,27 @@ from agente_nw.nucleo.modelos.assunto import Assunto
 from agente_nw.nucleo.modelos.localizacao import Localizacao, Opcao
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.redacao import Gancho, Redacao
+from tests.llm_falso import ProvenienciaFalsa
 from tests.test_console_novo_contato import _limiares
 
 AGORA = "2026-10-14T10:00:00+00:00"
 REDES = ("linkedin", "instagram", "facebook", "x")
 
 
-class ClienteLLMFalso:
+class ClienteLLMFalso(ProvenienciaFalsa):
     def __init__(self, nome: str = "Marta Quintela", falha: bool = False) -> None:
         self.nome = nome
         self.falha = falha
         self.frases: list[str] = []
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: Any, imagens: Any = None) -> Any:
+    def gerar_json(
+        self,
+        tarefa_nome: str,
+        prompt: str,
+        esquema: Any,
+        imagens: Any = None,
+        versao_prompt: str | None = None,
+    ) -> Any:
         assert tarefa_nome == "extrair_pedido"
         self.frases.append(prompt)
         if self.falha:

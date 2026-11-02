@@ -15,6 +15,7 @@ from agente_nw.nucleo.modelos.configuracao import TemasUsuarioLimiares
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.tema import RespostaDescreverTema
 from agente_nw.perfil import inferencia
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-10-31T10:00:00+00:00"
 
@@ -23,8 +24,10 @@ def _vetor(*valores: float) -> list[float]:
     return list(valores) + [0.0] * (1024 - len(valores))
 
 
-class _ClienteFalso:
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+class _ClienteFalso(ProvenienciaFalsa):
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         assert tarefa_nome == "descrever_tema"
         return RespostaDescreverTema(descricao="descrição qualquer de teste", sinonimos=[])
 
@@ -97,7 +100,7 @@ def test_termo_que_casa_sinonimo_soma_peso_em_vez_de_criar(tmp_path: Path) -> No
     perfis.upsert_usuario(conn, "Rafael", AGORA)
     tema = temas.obter_ou_criar(conn, "velejar", "praticar vela em barco a vela", ["vela"], AGORA)
     assert tema.id is not None
-    temas.gravar_embedding(conn, tema.id, _vetor(1.0, 0.0))
+    temas.gravar_embedding(conn, tema.id, _vetor(1.0, 0.0), modelo_embedding="bge-m3")
     conn.commit()
 
     inferencia.atualizar_temas_do_usuario(

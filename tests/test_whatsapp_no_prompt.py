@@ -17,6 +17,7 @@ from agente_nw.nucleo.database.queries import perfis
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.prompts import redigir_ganchos as prompt_mod
 from agente_nw.nucleo.prompts.redigir_ganchos import EntradaRedacao
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-10-25T10:00:00+00:00"
 
@@ -43,7 +44,7 @@ def _pedido() -> PedidoExtraido:
     )
 
 
-class _SemEmbeddings:
+class _SemEmbeddings(ProvenienciaFalsa):
     pass
 
 

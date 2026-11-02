@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from agente_nw.nucleo.modelos.extracao import RespostaExtracaoTexto
 
+VERSAO = "2026-10-14-1"
 ESQUEMA = RespostaExtracaoTexto
 
 _GUIA_CAMPOS = """\

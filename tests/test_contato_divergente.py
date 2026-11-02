@@ -11,6 +11,7 @@ from agente_nw.nucleo import fluxo as fluxo_mod
 from agente_nw.nucleo import orquestracao
 from agente_nw.nucleo.database.queries import pedidos, perfis
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
+from tests.llm_falso import ProvenienciaFalsa
 from tests.test_fluxo import AGORA, Cenario
 
 
@@ -116,8 +117,10 @@ def test_resposta_repetida_a_divergencia_e_ignorada(cenario: Cenario) -> None:
 # ---- terminal ------------------------------------------------------------------------------------------
 
 
-class _LLM:
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: Any) -> Any:
+class _LLM(ProvenienciaFalsa):
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: Any, versao_prompt: str | None = None
+    ) -> Any:
         return PedidoExtraido(
             pessoa_nome="Marta Quintela",
             objetivo="retomar",

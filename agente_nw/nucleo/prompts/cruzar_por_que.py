@@ -3,6 +3,7 @@ from __future__ import annotations
 from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
 from agente_nw.nucleo.modelos.cruzamento import RespostaCruzarPorQue
 
+VERSAO = "2026-10-14-1"
 ESQUEMA = RespostaCruzarPorQue
 
 # Cenário do exemplo deliberadamente distante de qualquer entrada real de teste

@@ -20,6 +20,7 @@ from agente_nw.nucleo.modelos.assunto import Assunto
 from agente_nw.nucleo.modelos.item import Item
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.redacao import Gancho, RespostaRedacao
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-10-12T10:00:00+00:00"
 ESTADO: dict[str, Any] = {}
@@ -41,8 +42,10 @@ def _pedido(meio: str) -> PedidoExtraido:
     )
 
 
-class _LLMFalso:
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+class _LLMFalso(ProvenienciaFalsa):
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         if tarefa_nome == "extrair_pedido":
             return _pedido(ESTADO["meio"])
         gancho = Gancho(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from agente_nw.nucleo.modelos.cruzamento import RespostaAvaliarRelacaoObjetivo
 
+VERSAO = "2026-10-30-1"
 ESQUEMA = RespostaAvaliarRelacaoObjetivo
 
 # Cenário do exemplo deliberadamente distante de qualquer entrada real de teste (armadilha 24,

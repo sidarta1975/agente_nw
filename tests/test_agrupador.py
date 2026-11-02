@@ -22,6 +22,7 @@ from agente_nw.nucleo.modelos.configuracao import (
 )
 from agente_nw.nucleo.modelos.item import Item
 from agente_nw.nucleo.vetores import centroide
+from tests.llm_falso import ProvenienciaFalsa
 
 
 @pytest.fixture
@@ -73,7 +74,7 @@ def limiares() -> Limiares:
     )
 
 
-class _ClienteFake:
+class _ClienteFake(ProvenienciaFalsa):
     def __init__(self, vetores: dict[str, list[float]]) -> None:
         self._vetores = vetores
 
@@ -191,7 +192,7 @@ def test_assunto_encerrado_reabre_com_item_compativel_dentro_do_prazo(
         temas=[],
     )
     assunto_id = assuntos.inserir(conn, assunto_antigo)
-    assuntos.gravar_centroide(conn, assunto_id, _vetor(0))
+    assuntos.gravar_centroide(conn, assunto_id, _vetor(0), modelo_embedding="bge-m3")
     item_original = Item(
         fonte_id=fonte_id,
         url_canonica="https://exemplo.com/item-original-encerrado",
@@ -242,7 +243,7 @@ def test_assunto_disperso_com_mais_de_12_itens_divide_em_dois(
         temas=[],
     )
     assunto_id = assuntos.inserir(conn, assunto)
-    assuntos.gravar_centroide(conn, assunto_id, centroide(todos_vetores))
+    assuntos.gravar_centroide(conn, assunto_id, centroide(todos_vetores), modelo_embedding="bge-m3")
 
     for i, vetor in enumerate(todos_vetores):
         item = Item(

@@ -20,6 +20,7 @@ from agente_nw.nucleo.modelos.item import Item
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.perfil import Perfil
 from agente_nw.nucleo.modelos.redacao import Gancho, RespostaRedacao
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-10-12T10:00:00+00:00"
 
@@ -41,7 +42,7 @@ def _com_base(resposta: RespostaRedacao) -> RespostaRedacao:
     return resposta.model_copy(update={"ganchos": [_base(), *resposta.ganchos]})
 
 
-class _LLMFalso:
+class _LLMFalso(ProvenienciaFalsa):
     """Devolve respostas prontas, uma por chamada, e guarda os prompts recebidos. Por padrão acrescenta a
     mensagem base às respostas que vieram só com ganchos de notícia."""
 
@@ -49,7 +50,9 @@ class _LLMFalso:
         self._respostas = [_com_base(r) if com_base else r for r in respostas]
         self.prompts: list[str] = []
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         assert tarefa_nome == "redigir_ganchos"
         self.prompts.append(prompt)
         return self._respostas.pop(0)

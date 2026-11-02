@@ -21,6 +21,7 @@ from agente_nw.nucleo.modelos.localizacao import Localizacao, Opcao
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido, ResultadoPedido
 from agente_nw.nucleo.modelos.redacao import Redacao
 from agente_nw.nucleo.orquestracao import Desfecho, Encaminhamento
+from tests.llm_falso import ProvenienciaFalsa
 from tests.test_console_novo_contato import _limiares
 
 AGORA = "2026-10-25T10:00:00+00:00"
@@ -407,11 +408,13 @@ def test_opcao_do_link_usa_o_cabecalho_da_lista_quando_o_link_esta_nela(
 # ---- brief 059: homônimos no terminal, falha em preparar e texto único ----------------------------------
 
 
-class _LLMDoTerminal:
+class _LLMDoTerminal(ProvenienciaFalsa):
     def __init__(self, nome: str = "Otávio") -> None:
         self.nome = nome
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: Any) -> Any:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: Any, versao_prompt: str | None = None
+    ) -> Any:
         return PedidoExtraido(
             pessoa_nome=self.nome,
             objetivo="retomar",

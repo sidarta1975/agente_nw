@@ -18,6 +18,7 @@ from agente_nw.nucleo.modelos.configuracao import ListasLimiares, TemasUsuarioLi
 from agente_nw.nucleo.modelos.lista_rede_social import EntradaLista
 from agente_nw.nucleo.modelos.localizacao import RespostaDesempate
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
+from tests.llm_falso import ProvenienciaFalsa
 
 URL = "https://www.linkedin.com/in/"
 
@@ -37,11 +38,13 @@ def _pedido(nome: str = "Marcos", pistas: dict[str, str] | None = None) -> Pedid
     )
 
 
-class _LLM:
+class _LLM(ProvenienciaFalsa):
     def __init__(self, pedido: PedidoExtraido) -> None:
         self._pedido = pedido
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         if tarefa_nome == "desempatar_perfil":
             return RespostaDesempate(indice_escolhido=None, confianca=0.1, motivo="sem certeza")
         return self._pedido

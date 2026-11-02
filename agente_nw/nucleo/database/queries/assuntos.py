@@ -7,6 +7,7 @@ import struct
 import sqlite_vec
 
 from agente_nw.nucleo.modelos.assunto import Assunto, StatusAssunto
+from agente_nw.nucleo.modelos.proveniencia import Proveniencia, colunas_gerado_por
 from agente_nw.nucleo.vetores import cosseno
 
 _COLUNAS = (
@@ -119,27 +120,41 @@ def listar_maiores_que(conexao: sqlite3.Connection, n: int) -> list[Assunto]:
     return [_para_assunto(linha) for linha in linhas]
 
 
-def gravar_centroide(conexao: sqlite3.Connection, assunto_id: int, centroide: list[float]) -> None:
+def gravar_centroide(
+    conexao: sqlite3.Connection, assunto_id: int, centroide: list[float], modelo_embedding: str
+) -> None:
+    """`modelo_embedding`: o modelo que gerou o vetor (brief 066), conferido na leitura."""
     vetor = sqlite_vec.serialize_float32(centroide)
     conexao.execute("DELETE FROM vetor_assunto WHERE assunto_id = ?", (assunto_id,))
-    conexao.execute("INSERT INTO vetor_assunto (assunto_id, centroide) VALUES (?, ?)", (assunto_id, vetor))
+    conexao.execute(
+        "INSERT INTO vetor_assunto (assunto_id, centroide, modelo_embedding) VALUES (?, ?, ?)",
+        (assunto_id, vetor, modelo_embedding),
+    )
 
 
-def obter_centroide(conexao: sqlite3.Connection, assunto_id: int) -> list[float] | None:
+def obter_centroide(
+    conexao: sqlite3.Connection, assunto_id: int, modelo_embedding: str
+) -> list[float] | None:
+    """Centróide gravado por outro modelo de embedding é ausente (brief 066); a linha fica."""
     linha = conexao.execute(
-        "SELECT centroide FROM vetor_assunto WHERE assunto_id = ?", (assunto_id,)
+        "SELECT centroide FROM vetor_assunto WHERE assunto_id = ? AND modelo_embedding = ?",
+        (assunto_id, modelo_embedding),
     ).fetchone()
     return _desserializar(linha["centroide"]) if linha is not None else None
 
 
 def listar_candidatos_qualificacao(
-    conexao: sqlite3.Connection, limite: int, vetores_extras: list[list[float]] | None = None
+    conexao: sqlite3.Connection,
+    limite: int,
+    modelo_embedding: str,
+    vetores_extras: list[list[float]] | None = None,
 ) -> list[Assunto]:
     linhas_temas = conexao.execute(
         "SELECT DISTINCT vt.embedding FROM perfil_tema pt "
         "JOIN perfil p ON p.id = pt.perfil_id "
         "JOIN vetor_tema vt ON vt.tema_id = pt.tema_id "
-        "WHERE p.tipo = 'usuario' OR p.ativo = 1"
+        "WHERE (p.tipo = 'usuario' OR p.ativo = 1) AND vt.modelo_embedding = ?",
+        (modelo_embedding,),
     ).fetchall()
     embeddings_temas = [_desserializar(linha["embedding"]) for linha in linhas_temas]
     embeddings_temas.extend(vetores_extras or [])
@@ -150,7 +165,8 @@ def listar_candidatos_qualificacao(
     linhas_assuntos = conexao.execute(
         f"SELECT {colunas_assunto}, va.centroide AS centroide FROM assunto a "
         "JOIN vetor_assunto va ON va.assunto_id = a.id "
-        "WHERE a.substancial IS NULL ORDER BY a.id"
+        "WHERE a.substancial IS NULL AND va.modelo_embedding = ? ORDER BY a.id",
+        (modelo_embedding,),
     ).fetchall()
 
     candidatos: list[tuple[float, Assunto]] = []
@@ -174,15 +190,37 @@ def gravar_qualificacao(
     conversavel: float,
     justificativa: str,
     temas_ids: list[int],
+    proveniencia: Proveniencia | None = None,
 ) -> None:
+    """`proveniencia` (brief 066) vai para `gerado_por_*` da linha; o cartão, gravado depois, a substitui
+    pela dele — vale a do último gravador."""
     conexao.execute(
-        "UPDATE assunto SET substancial = ?, conversavel = ?, justificativa = ?, temas = ? WHERE id = ?",
-        (substancial, conversavel, justificativa, json.dumps(temas_ids), assunto_id),
+        "UPDATE assunto SET substancial = ?, conversavel = ?, justificativa = ?, temas = ?, "
+        "gerado_por_modelo = ?, gerado_por_perfil = ?, gerado_por_prompt_versao = ? WHERE id = ?",
+        (
+            substancial,
+            conversavel,
+            justificativa,
+            json.dumps(temas_ids),
+            *colunas_gerado_por(proveniencia),
+            assunto_id,
+        ),
     )
 
 
-def gravar_cartao(conexao: sqlite3.Connection, assunto_id: int, resumo_cartao: str) -> None:
-    conexao.execute("UPDATE assunto SET resumo_cartao = ? WHERE id = ?", (resumo_cartao, assunto_id))
+def gravar_cartao(
+    conexao: sqlite3.Connection, assunto_id: int, resumo_cartao: str, proveniencia: Proveniencia | None = None
+) -> None:
+    """`proveniencia` (brief 066) substitui a da qualificação na mesma linha."""
+    conexao.execute(
+        "UPDATE assunto SET resumo_cartao = ?, "
+        "gerado_por_modelo = ?, gerado_por_perfil = ?, gerado_por_prompt_versao = ? WHERE id = ?",
+        (
+            resumo_cartao,
+            *colunas_gerado_por(proveniencia),
+            assunto_id,
+        ),
+    )
 
 
 def listar_qualificados_nao_vistos(
@@ -190,13 +228,14 @@ def listar_qualificados_nao_vistos(
     substancial_minimo: float,
     conversavel_minimo: float,
     ids_vistos: set[int],
+    modelo_embedding: str,
 ) -> list[tuple[Assunto, list[float]]]:
     colunas_assunto = ", ".join(f"a.{coluna}" for coluna in _COLUNAS.split(", "))
     linhas = conexao.execute(
         f"SELECT {colunas_assunto}, va.centroide AS centroide FROM assunto a "
         "JOIN vetor_assunto va ON va.assunto_id = a.id "
-        "WHERE a.substancial >= ? AND a.conversavel >= ? ORDER BY a.id",
-        (substancial_minimo, conversavel_minimo),
+        "WHERE a.substancial >= ? AND a.conversavel >= ? AND va.modelo_embedding = ? ORDER BY a.id",
+        (substancial_minimo, conversavel_minimo, modelo_embedding),
     ).fetchall()
 
     resultado: list[tuple[Assunto, list[float]]] = []

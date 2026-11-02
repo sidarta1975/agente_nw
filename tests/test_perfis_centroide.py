@@ -31,16 +31,16 @@ def test_calcular_centroide_com_dois_temas_confirmados_bate_a_conta(conn: sqlite
 
     tema_dominio = temas.obter_ou_criar(conn, "tema-dominio", "descrição", [], AGORA)
     assert tema_dominio.id is not None
-    temas.gravar_embedding(conn, tema_dominio.id, _vetor(1.0, 0.0))
+    temas.gravar_embedding(conn, tema_dominio.id, _vetor(1.0, 0.0), modelo_embedding="bge-m3")
     perfil_tema.vincular(conn, contato.id, tema_dominio.id, 5, "declarada", "dominio", True, AGORA)
 
     tema_sem_nivel = temas.obter_ou_criar(conn, "tema-sem-nivel", "descrição", [], AGORA)
     assert tema_sem_nivel.id is not None
-    temas.gravar_embedding(conn, tema_sem_nivel.id, _vetor(0.0, 1.0))
+    temas.gravar_embedding(conn, tema_sem_nivel.id, _vetor(0.0, 1.0), modelo_embedding="bge-m3")
     perfil_tema.vincular(conn, contato.id, tema_sem_nivel.id, 1, "declarada", None, True, AGORA)
     conn.commit()
 
-    resultado = perfis.calcular_centroide(conn, contato.id, _PESO_NIVEL)
+    resultado = perfis.calcular_centroide(conn, contato.id, _PESO_NIVEL, modelo_embedding="bge-m3")
 
     assert resultado is not None
     # peso efetivo: tema_dominio = 5 * 1.0 = 5; tema_sem_nivel = 1 * 1.0 (sem nível) = 1
@@ -57,16 +57,16 @@ def test_calcular_centroide_ignora_tema_nao_confirmado(conn: sqlite3.Connection)
 
     tema_confirmado = temas.obter_ou_criar(conn, "tema-confirmado", "descrição", [], AGORA)
     assert tema_confirmado.id is not None
-    temas.gravar_embedding(conn, tema_confirmado.id, _vetor(1.0, 0.0))
+    temas.gravar_embedding(conn, tema_confirmado.id, _vetor(1.0, 0.0), modelo_embedding="bge-m3")
     perfil_tema.vincular(conn, contato.id, tema_confirmado.id, 3, "declarada", "dominio", True, AGORA)
 
     tema_nao_confirmado = temas.obter_ou_criar(conn, "tema-nao-confirmado", "descrição", [], AGORA)
     assert tema_nao_confirmado.id is not None
-    temas.gravar_embedding(conn, tema_nao_confirmado.id, _vetor(0.0, 1.0))
+    temas.gravar_embedding(conn, tema_nao_confirmado.id, _vetor(0.0, 1.0), modelo_embedding="bge-m3")
     perfil_tema.vincular(conn, contato.id, tema_nao_confirmado.id, 5, "declarada", "dominio", False, AGORA)
     conn.commit()
 
-    resultado = perfis.calcular_centroide(conn, contato.id, _PESO_NIVEL)
+    resultado = perfis.calcular_centroide(conn, contato.id, _PESO_NIVEL, modelo_embedding="bge-m3")
 
     assert resultado is not None
     assert round(resultado[0], 6) == 1.0
@@ -79,7 +79,7 @@ def test_calcular_centroide_sem_tema_confirmado_devolve_none(conn: sqlite3.Conne
     )
     assert contato.id is not None
 
-    assert perfis.calcular_centroide(conn, contato.id, _PESO_NIVEL) is None
+    assert perfis.calcular_centroide(conn, contato.id, _PESO_NIVEL, modelo_embedding="bge-m3") is None
 
 
 def test_gravar_e_obter_centroide_de_perfil_faz_ida_e_volta(conn: sqlite3.Connection) -> None:
@@ -89,10 +89,10 @@ def test_gravar_e_obter_centroide_de_perfil_faz_ida_e_volta(conn: sqlite3.Connec
     assert contato.id is not None
 
     centroide = _vetor(0.3, 0.4)
-    perfis.gravar_centroide(conn, contato.id, centroide)
+    perfis.gravar_centroide(conn, contato.id, centroide, modelo_embedding="bge-m3")
     conn.commit()
 
-    resultado = perfis.obter_centroide(conn, contato.id)
+    resultado = perfis.obter_centroide(conn, contato.id, modelo_embedding="bge-m3")
     assert resultado is not None
     assert [round(v, 6) for v in resultado] == centroide
 
@@ -103,4 +103,4 @@ def test_obter_centroide_de_perfil_devolve_none_quando_nao_gravado(conn: sqlite3
     )
     assert contato.id is not None
 
-    assert perfis.obter_centroide(conn, contato.id) is None
+    assert perfis.obter_centroide(conn, contato.id, modelo_embedding="bge-m3") is None

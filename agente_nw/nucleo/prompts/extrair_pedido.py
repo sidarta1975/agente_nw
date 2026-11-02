@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 
+VERSAO = "2026-10-31-1"
 ESQUEMA = PedidoExtraido
 
 # Cenário do exemplo resolvido deliberadamente distante de qualquer entrada real de

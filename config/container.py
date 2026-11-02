@@ -8,6 +8,7 @@ from typing import NamedTuple
 import httpx
 import yaml
 
+from agente_nw.nucleo import prompts
 from agente_nw.nucleo.database import conexao, migracoes
 from agente_nw.nucleo.llm import ClienteOllama
 from agente_nw.nucleo.modelos.configuracao import Configuracao, Limiares, Roteamento
@@ -38,6 +39,7 @@ def configuracao() -> ConfiguracaoCarregada:
         dados_roteamento["perfil_ativo"] = local.perfil_llm
     roteamento = Roteamento.model_validate(dados_roteamento)
     limiares = Limiares.model_validate(_carregar_yaml(RAIZ / "config" / "limiares.yaml"))
+    prompts.verificar_versoes()
     return ConfiguracaoCarregada(local=local, roteamento=roteamento, limiares=limiares)
 
 

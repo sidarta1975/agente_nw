@@ -26,6 +26,7 @@ from agente_nw.nucleo.modelos.configuracao import (
 )
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.tema import RespostaDescreverTema
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-10-31T00:00:00+00:00"
 
@@ -71,11 +72,13 @@ def _limiares() -> Limiares:
     )
 
 
-class _ClienteLLMFake:
+class _ClienteLLMFake(ProvenienciaFalsa):
     def __init__(self, *args: object, **kwargs: object) -> None:
         pass
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         if tarefa_nome == "extrair_pedido":
             return PedidoExtraido.model_validate(
                 {

@@ -27,7 +27,12 @@ _TRUNCAMENTO_TRECHO = 2000
 
 class ClientePrerrotulagem(Protocol):
     def gerar_json(
-        self, tarefa_nome: str, prompt: str, esquema: type[RespostaComparacaoPar]
+        self,
+        tarefa_nome: str,
+        prompt: str,
+        esquema: type[RespostaComparacaoPar],
+        *,
+        versao_prompt: str | None = None,
     ) -> RespostaComparacaoPar: ...
 
 
@@ -110,7 +115,12 @@ def _rotular_pares(cliente_llm: ClientePrerrotulagem, pares: list[_Par]) -> list
             par.item_a.titulo, _trecho(par.item_a), par.item_b.titulo, _trecho(par.item_b)
         )
         try:
-            resposta = cliente_llm.gerar_json("prerotular_calibracao", prompt, RespostaComparacaoPar)
+            resposta = cliente_llm.gerar_json(
+                "prerotular_calibracao",
+                prompt,
+                RespostaComparacaoPar,
+                versao_prompt=prerotular_calibracao.VERSAO,
+            )
         except FalhaJsonInvalido:
             continue
         par.rotulo_llm = resposta.mesmo_assunto

@@ -29,6 +29,7 @@ from agente_nw.nucleo.modelos.cruzamento import (
     RespostaCruzarPorQue,
 )
 from agente_nw.nucleo.relevancia.cruzamento import cruzar_contato_por_consulta
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-10-31T10:00:00+00:00"
 DATA = "2026-10-31"
@@ -42,11 +43,13 @@ CENTROIDE_CONSULTA = _vetor(1.0, 0.0)
 CENTROIDE_ASSUNTO = _vetor(1.0, 0.0)
 
 
-class _ClienteFalso:
+class _ClienteFalso(ProvenienciaFalsa):
     def embeddar(self, textos: list[str]) -> list[list[float]]:
         return [CENTROIDE_CONSULTA for _ in textos]
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         if tarefa_nome == "avaliar_relacao_objetivo":
             linhas = prompt.rsplit("Candidatos:\n", 1)[1].splitlines()
             quantidade = len([linha for linha in linhas if linha.strip()])
@@ -131,7 +134,7 @@ def _assunto(conn: sqlite3.Connection, titulo: str) -> int:
             conversavel=0.8,
         ),
     )
-    assuntos.gravar_centroide(conn, assunto_id, CENTROIDE_ASSUNTO)
+    assuntos.gravar_centroide(conn, assunto_id, CENTROIDE_ASSUNTO, modelo_embedding="bge-m3")
     conn.commit()
     return assunto_id
 

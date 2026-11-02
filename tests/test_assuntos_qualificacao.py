@@ -26,7 +26,7 @@ def _vetor(*valores: float) -> list[float]:
 def _criar_assunto(conn: sqlite3.Connection, centroide: list[float]) -> int:
     assunto = Assunto(primeiro_visto=AGORA, ultimo_visto=AGORA, n_itens=1, status="novo")
     assunto_id = assuntos.inserir(conn, assunto)
-    assuntos.gravar_centroide(conn, assunto_id, centroide)
+    assuntos.gravar_centroide(conn, assunto_id, centroide, modelo_embedding="bge-m3")
     return assunto_id
 
 
@@ -35,7 +35,7 @@ def test_listar_candidatos_qualificacao_ordena_por_proximidade(conn: sqlite3.Con
     assert usuario.id is not None
     tema_usuario = temas.obter_ou_criar(conn, "tema-usuario", "descrição", [], AGORA)
     assert tema_usuario.id is not None
-    temas.gravar_embedding(conn, tema_usuario.id, _vetor(1.0, 0.0))
+    temas.gravar_embedding(conn, tema_usuario.id, _vetor(1.0, 0.0), modelo_embedding="bge-m3")
     perfil_tema.vincular(conn, usuario.id, tema_usuario.id, 3, "declarada", "dominio", True, AGORA)
     conn.commit()
 
@@ -43,7 +43,7 @@ def test_listar_candidatos_qualificacao_ordena_por_proximidade(conn: sqlite3.Con
     longe = _criar_assunto(conn, _vetor(0.0, 1.0))
     conn.commit()
 
-    resultado = assuntos.listar_candidatos_qualificacao(conn, 10)
+    resultado = assuntos.listar_candidatos_qualificacao(conn, 10, modelo_embedding="bge-m3")
 
     assert [a.id for a in resultado] == [perto, longe]
 
@@ -55,7 +55,7 @@ def test_listar_candidatos_qualificacao_inclui_assunto_proximo_so_de_tema_de_con
     assert usuario.id is not None
     tema_usuario = temas.obter_ou_criar(conn, "tema-usuario", "descrição", [], AGORA)
     assert tema_usuario.id is not None
-    temas.gravar_embedding(conn, tema_usuario.id, _vetor(1.0, 0.0))
+    temas.gravar_embedding(conn, tema_usuario.id, _vetor(1.0, 0.0), modelo_embedding="bge-m3")
     perfil_tema.vincular(conn, usuario.id, tema_usuario.id, 3, "declarada", "dominio", True, AGORA)
 
     contato = perfis.inserir_ou_atualizar_contato(
@@ -65,7 +65,7 @@ def test_listar_candidatos_qualificacao_inclui_assunto_proximo_so_de_tema_de_con
     perfis.ativar(conn, contato.id)
     tema_contato = temas.obter_ou_criar(conn, "tema-contato", "descrição", [], AGORA)
     assert tema_contato.id is not None
-    temas.gravar_embedding(conn, tema_contato.id, _vetor(0.0, 1.0))
+    temas.gravar_embedding(conn, tema_contato.id, _vetor(0.0, 1.0), modelo_embedding="bge-m3")
     perfil_tema.vincular(conn, contato.id, tema_contato.id, 3, "declarada", "dominio", True, AGORA)
     conn.commit()
 
@@ -73,7 +73,7 @@ def test_listar_candidatos_qualificacao_inclui_assunto_proximo_so_de_tema_de_con
     so_contato = _criar_assunto(conn, _vetor(0.0, 0.99))
     conn.commit()
 
-    resultado = assuntos.listar_candidatos_qualificacao(conn, 10)
+    resultado = assuntos.listar_candidatos_qualificacao(conn, 10, modelo_embedding="bge-m3")
 
     assert so_contato in [a.id for a in resultado]
 
@@ -85,11 +85,11 @@ def test_listar_candidatos_qualificacao_ignora_perfil_inativo(conn: sqlite3.Conn
     assert contato_inativo.id is not None
     tema_inativo = temas.obter_ou_criar(conn, "tema-inativo", "descrição", [], AGORA)
     assert tema_inativo.id is not None
-    temas.gravar_embedding(conn, tema_inativo.id, _vetor(1.0, 0.0))
+    temas.gravar_embedding(conn, tema_inativo.id, _vetor(1.0, 0.0), modelo_embedding="bge-m3")
     perfil_tema.vincular(conn, contato_inativo.id, tema_inativo.id, 3, "declarada", "dominio", True, AGORA)
     conn.commit()
 
-    assert assuntos.listar_candidatos_qualificacao(conn, 10) == []
+    assert assuntos.listar_candidatos_qualificacao(conn, 10, modelo_embedding="bge-m3") == []
 
 
 def test_listar_candidatos_qualificacao_respeita_limite(conn: sqlite3.Connection) -> None:
@@ -97,7 +97,7 @@ def test_listar_candidatos_qualificacao_respeita_limite(conn: sqlite3.Connection
     assert usuario.id is not None
     tema_usuario = temas.obter_ou_criar(conn, "tema-usuario", "descrição", [], AGORA)
     assert tema_usuario.id is not None
-    temas.gravar_embedding(conn, tema_usuario.id, _vetor(1.0, 0.0))
+    temas.gravar_embedding(conn, tema_usuario.id, _vetor(1.0, 0.0), modelo_embedding="bge-m3")
     perfil_tema.vincular(conn, usuario.id, tema_usuario.id, 3, "declarada", "dominio", True, AGORA)
     conn.commit()
 
@@ -105,7 +105,7 @@ def test_listar_candidatos_qualificacao_respeita_limite(conn: sqlite3.Connection
         _criar_assunto(conn, _vetor(1.0, 0.0))
     conn.commit()
 
-    resultado = assuntos.listar_candidatos_qualificacao(conn, 2)
+    resultado = assuntos.listar_candidatos_qualificacao(conn, 2, modelo_embedding="bge-m3")
     assert len(resultado) == 2
 
 
@@ -114,7 +114,7 @@ def test_listar_candidatos_qualificacao_ignora_ja_qualificado(conn: sqlite3.Conn
     assert usuario.id is not None
     tema_usuario = temas.obter_ou_criar(conn, "tema-usuario", "descrição", [], AGORA)
     assert tema_usuario.id is not None
-    temas.gravar_embedding(conn, tema_usuario.id, _vetor(1.0, 0.0))
+    temas.gravar_embedding(conn, tema_usuario.id, _vetor(1.0, 0.0), modelo_embedding="bge-m3")
     perfil_tema.vincular(conn, usuario.id, tema_usuario.id, 3, "declarada", "dominio", True, AGORA)
     conn.commit()
 
@@ -122,7 +122,7 @@ def test_listar_candidatos_qualificacao_ignora_ja_qualificado(conn: sqlite3.Conn
     assuntos.gravar_qualificacao(conn, ja_qualificado, 0.8, 0.7, "justificativa", [])
     conn.commit()
 
-    assert assuntos.listar_candidatos_qualificacao(conn, 10) == []
+    assert assuntos.listar_candidatos_qualificacao(conn, 10, modelo_embedding="bge-m3") == []
 
 
 def test_gravar_titulo_faz_ida_e_volta(conn: sqlite3.Connection) -> None:

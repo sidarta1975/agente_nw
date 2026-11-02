@@ -122,10 +122,10 @@ def test_gravar_e_obter_centroide_faz_ida_e_volta(conn: sqlite3.Connection) -> N
     conn.commit()
 
     centroide = _vetor(0.1, 0.2, 0.3, 0.4)
-    assuntos.gravar_centroide(conn, assunto_id, centroide)
+    assuntos.gravar_centroide(conn, assunto_id, centroide, modelo_embedding="bge-m3")
     conn.commit()
 
-    resultado = assuntos.obter_centroide(conn, assunto_id)
+    resultado = assuntos.obter_centroide(conn, assunto_id, modelo_embedding="bge-m3")
 
     assert resultado is not None
     assert [round(v, 6) for v in resultado] == centroide
@@ -135,4 +135,4 @@ def test_obter_centroide_devolve_none_quando_nao_gravado(conn: sqlite3.Connectio
     assunto_id = _criar_assunto(conn, "2026-09-10", "novo")
     conn.commit()
 
-    assert assuntos.obter_centroide(conn, assunto_id) is None
+    assert assuntos.obter_centroide(conn, assunto_id, modelo_embedding="bge-m3") is None

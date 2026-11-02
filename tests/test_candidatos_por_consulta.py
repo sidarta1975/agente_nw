@@ -47,7 +47,7 @@ def _assunto(conn: sqlite3.Connection, titulo: str, centroide: list[float]) -> i
             conversavel=0.8,
         ),
     )
-    assuntos.gravar_centroide(conn, assunto_id, centroide)
+    assuntos.gravar_centroide(conn, assunto_id, centroide, modelo_embedding="bge-m3")
     return assunto_id
 
 
@@ -60,7 +60,9 @@ def test_ordenacao_usa_so_a_consulta_sem_centroide_do_contato(conn: sqlite3.Conn
     b = _assunto(conn, "B", _vetor(0.8, 0.6))
     conn.commit()
 
-    ordem, _ = selecionar_por_consulta(conn, contato.id, _vetor(1.0, 0.0), None, 0.6, 0.6, 10, [], _LIMIARES)
+    ordem, _ = selecionar_por_consulta(
+        conn, contato.id, _vetor(1.0, 0.0), None, 0.6, 0.6, 10, [], _LIMIARES, modelo_embedding="bge-m3"
+    )
 
     assert [x.id for x in ordem] == [a, b]
 
@@ -75,7 +77,16 @@ def test_centroide_do_contato_entra_com_peso_03(conn: sqlite3.Connection) -> Non
     conn.commit()
 
     ordem, _ = selecionar_por_consulta(
-        conn, contato.id, _vetor(1.0, 0.0), _vetor(0.0, 1.0), 0.6, 0.6, 10, [], _LIMIARES
+        conn,
+        contato.id,
+        _vetor(1.0, 0.0),
+        _vetor(0.0, 1.0),
+        0.6,
+        0.6,
+        10,
+        [],
+        _LIMIARES,
+        modelo_embedding="bge-m3",
     )
 
     assert [x.id for x in ordem] == [b, a]
@@ -91,7 +102,16 @@ def test_evitados_saem_antes_do_corte_e_nao_ocupam_vaga(conn: sqlite3.Connection
     conn.commit()
 
     selecionados, descartados = selecionar_por_consulta(
-        conn, contato.id, _vetor(1.0, 0.0), None, 0.6, 0.6, 10, ["politica"], _LIMIARES
+        conn,
+        contato.id,
+        _vetor(1.0, 0.0),
+        None,
+        0.6,
+        0.6,
+        10,
+        ["politica"],
+        _LIMIARES,
+        modelo_embedding="bge-m3",
     )
 
     assert len(selecionados) == 10  # 12 não evitados, corte em 10; nenhum evitado tomou vaga

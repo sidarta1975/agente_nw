@@ -11,6 +11,7 @@ from agente_nw.nucleo.modelos.assunto import Assunto
 from agente_nw.nucleo.modelos.cartao import RespostaCartao
 from agente_nw.nucleo.modelos.item import Item
 from agente_nw.nucleo.relevancia.cartoes import gerar_pendentes
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-01-01T00:00:00+00:00"
 
@@ -22,12 +23,14 @@ def conn(tmp_path: Path) -> sqlite3.Connection:
     return conexao_aberta
 
 
-class _ClienteFake:
+class _ClienteFake(ProvenienciaFalsa):
     def __init__(self, respostas: list[RespostaCartao]) -> None:
         self._respostas = list(respostas)
         self.chamadas = 0
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[RespostaCartao]) -> RespostaCartao:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[RespostaCartao], versao_prompt: str | None = None
+    ) -> RespostaCartao:
         self.chamadas += 1
         return self._respostas.pop(0)
 

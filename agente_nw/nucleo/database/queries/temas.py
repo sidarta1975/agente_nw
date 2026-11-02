@@ -73,10 +73,16 @@ def atualizar(conexao: sqlite3.Connection, tema_id: int, descricao: str, sinonim
     )
 
 
-def gravar_embedding(conexao: sqlite3.Connection, tema_id: int, embedding: list[float]) -> None:
+def gravar_embedding(
+    conexao: sqlite3.Connection, tema_id: int, embedding: list[float], modelo_embedding: str
+) -> None:
+    """`modelo_embedding`: o modelo que gerou o vetor (brief 066), conferido na leitura."""
     vetor = sqlite_vec.serialize_float32(embedding)
     conexao.execute("DELETE FROM vetor_tema WHERE tema_id = ?", (tema_id,))
-    conexao.execute("INSERT INTO vetor_tema (tema_id, embedding) VALUES (?, ?)", (tema_id, vetor))
+    conexao.execute(
+        "INSERT INTO vetor_tema (tema_id, embedding, modelo_embedding) VALUES (?, ?, ?)",
+        (tema_id, vetor, modelo_embedding),
+    )
 
 
 def _desserializar(blob: bytes) -> list[float]:
@@ -84,12 +90,16 @@ def _desserializar(blob: bytes) -> list[float]:
     return list(struct.unpack(f"<{quantidade}f", blob))
 
 
-def listar_com_embedding(conexao: sqlite3.Connection) -> list[tuple[Tema, list[float]]]:
-    """Todos os temas que já têm embedding gravado — para casar um termo novo por similaridade
-    (brief 040), além do nome e dos sinônimos."""
+def listar_com_embedding(
+    conexao: sqlite3.Connection, modelo_embedding: str
+) -> list[tuple[Tema, list[float]]]:
+    """Todos os temas que já têm embedding gravado pelo `modelo_embedding` atual — para casar um termo
+    novo por similaridade (brief 040), além do nome e dos sinônimos. Vetor de outro modelo é ausente
+    (brief 066)."""
     linhas = conexao.execute(
         "SELECT t.id AS id, t.nome AS nome, t.descricao AS descricao, t.sinonimos AS sinonimos, "
         "t.criado_em AS criado_em, vt.embedding AS embedding "
-        "FROM tema t JOIN vetor_tema vt ON vt.tema_id = t.id"
+        "FROM tema t JOIN vetor_tema vt ON vt.tema_id = t.id WHERE vt.modelo_embedding = ?",
+        (modelo_embedding,),
     ).fetchall()
     return [(_para_tema(linha), _desserializar(linha["embedding"])) for linha in linhas]

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from agente_nw.nucleo.modelos.rotulo import RespostaRotulo
 
+VERSAO = "2026-09-19-1"
 ESQUEMA = RespostaRotulo
 
 # Cenário do exemplo deliberadamente distante de qualquer entrada real de teste

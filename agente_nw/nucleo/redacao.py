@@ -22,6 +22,7 @@ from agente_nw.nucleo.database.queries import perfil_tema as perfil_tema_q
 from agente_nw.nucleo.modelos.fato import Fato
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.perfil import Perfil
+from agente_nw.nucleo.modelos.proveniencia import Proveniencia
 from agente_nw.nucleo.modelos.redacao import (
     Gancho,
     LinkNoticia,
@@ -51,7 +52,14 @@ _LEMBRANCA = re.compile(r"\bh[aá]\s+\d+\s+anos?\b|\blembran[cç]as\b", re.IGNOR
 
 
 class ClienteRedacao(Protocol):
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[_EsquemaT]) -> _EsquemaT: ...
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[_EsquemaT], *, versao_prompt: str | None = None
+    ) -> _EsquemaT: ...
+
+    def proveniencia(self, tarefa_nome: str, versao_prompt: str | None = None) -> Proveniencia: ...
+
+    @property
+    def modelo_embedding(self) -> str: ...
 
 
 def _assunto_para_redacao(conexao: sqlite3.Connection, item: ItemMenu) -> AssuntoParaRedacao:
@@ -203,7 +211,9 @@ def montar_entrada(
     assert contato.id is not None and usuario.id is not None
     temas_usuario = [
         (nome, nivel)
-        for nome, nivel, _vetor in perfil_tema_q.listar_confirmados_com_embedding(conexao, usuario.id)
+        for nome, nivel, _vetor in perfil_tema_q.listar_confirmados_com_embedding(
+            conexao, usuario.id, cliente_llm.modelo_embedding
+        )
     ]
     cabecalhos = listas_q.cabecalhos_do_perfil(conexao, contato.id)
     linhas_moldes, molde_origem_id = _moldes(conexao, contato, pedido, maximo_moldes)
@@ -299,7 +309,9 @@ def redigir(
     molde_origem_id = prompt_mod.cortar_por_tamanho(entrada, limite_tokens).molde_origem_id
     prompt = prompt_mod.construir_prompt(entrada, limite_tokens)
     validos = {item.assunto_id for item in disponiveis}
-    resposta = cliente_llm.gerar_json("redigir_ganchos", prompt, RespostaRedacao)
+    resposta = cliente_llm.gerar_json(
+        "redigir_ganchos", prompt, RespostaRedacao, versao_prompt=prompt_mod.VERSAO
+    )
     ganchos, motivos = _validar(resposta, pedido, validos, usados)
     if not any(g.e_base for g in ganchos):
         motivos.append('faltou a mensagem base ("assunto_id": null), que é obrigatória')
@@ -307,7 +319,9 @@ def redigir(
         # mensagem deixaria a pessoa sem a mensagem base.
         recusas = "\n".join(f"- {motivo}" for motivo in motivos)
         retorno = f"{prompt}\n\nA resposta anterior foi recusada. Refaça respeitando as regras:\n{recusas}\n"
-        resposta = cliente_llm.gerar_json("redigir_ganchos", retorno, RespostaRedacao)
+        resposta = cliente_llm.gerar_json(
+            "redigir_ganchos", retorno, RespostaRedacao, versao_prompt=prompt_mod.VERSAO
+        )
         ganchos, motivos = _validar(resposta, pedido, validos, usados)
         if not any(g.e_base for g in ganchos):
             motivos.append("o modelo não devolveu a mensagem base")
@@ -319,18 +333,25 @@ def redigir(
     aviso = _juntar_avisos([*informativos, resposta.aviso or "", *motivos])
     if not ganchos and aviso is None:
         aviso = "O modelo não devolveu nenhuma mensagem."
-    return Redacao(ganchos=ganchos, aviso=aviso, registro_usado=registro, molde_origem_id=molde_origem_id)
+    return Redacao(
+        ganchos=ganchos,
+        aviso=aviso,
+        registro_usado=registro,
+        molde_origem_id=molde_origem_id,
+        proveniencia=cliente_llm.proveniencia("redigir_ganchos", prompt_mod.VERSAO),
+    )
 
 
 def registrar(conexao: sqlite3.Connection, consulta_id: int, redacao: Redacao, agora: str) -> None:
     """Grava os ganchos entregues em `gancho_uso` (status `entregue`), com a proveniência do molde
-    usado para a redação, quando houver (brief 065)."""
+    usado para a redação, quando houver (brief 065), e a de quem redigiu (brief 066)."""
     gancho_uso_q.inserir_entregues(
         conexao,
         consulta_id,
         [(g.assunto_id, g.model_dump_json()) for g in redacao.ganchos],
         agora,
         redacao.molde_origem_id,
+        redacao.proveniencia,
     )
     conexao.commit()
 

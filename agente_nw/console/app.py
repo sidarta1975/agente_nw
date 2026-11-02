@@ -907,8 +907,9 @@ def criar_app(
         descricao = request.form.get("descricao", "").strip()
         sinonimos = [s.strip() for s in request.form.get("sinonimos", "").split(",") if s.strip()]
         queries_temas.atualizar(conn, tema_id, descricao, sinonimos)
-        vetor = _cliente_llm().embeddar([f"{tema.nome}: {descricao}"])[0]
-        queries_temas.gravar_embedding(conn, tema_id, vetor)
+        cliente = _cliente_llm()
+        vetor = cliente.embeddar([f"{tema.nome}: {descricao}"])[0]
+        queries_temas.gravar_embedding(conn, tema_id, vetor, cliente.modelo_embedding)
         conn.commit()
         return redirect(url_for("temas_lista"))
 

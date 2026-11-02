@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 from agente_nw.nucleo.modelos.assunto_contato import AssuntoContato
+from agente_nw.nucleo.modelos.proveniencia import Proveniencia, colunas_gerado_por
 
 _COLUNAS = (
     "id, assunto_id, perfil_id, gerado_em, tipo, aderencia_contato, aderencia_usuario, "
@@ -28,12 +29,18 @@ def _para_assunto_contato(linha: sqlite3.Row) -> AssuntoContato:
     )
 
 
-def inserir(conexao: sqlite3.Connection, assunto_contato: AssuntoContato) -> bool:
+def inserir(
+    conexao: sqlite3.Connection, assunto_contato: AssuntoContato, proveniencia: Proveniencia | None = None
+) -> bool:
+    """`proveniencia` (brief 066): a tarefa de modelo que decidiu ou escreveu a linha — o "por quê"
+    (`cruzar_por_que`) ou o descarte pelo juízo do objetivo (`avaliar_relacao_objetivo`). Linha decidida
+    só por embedding fica com `None`."""
     cursor = conexao.execute(
         "INSERT INTO assunto_contato "
         "(assunto_id, perfil_id, gerado_em, tipo, aderencia_contato, aderencia_usuario, "
-        "conversavel, score, por_que, status, motivo, aderencia_consulta) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+        "conversavel, score, por_que, status, motivo, aderencia_consulta, "
+        "gerado_por_modelo, gerado_por_perfil, gerado_por_prompt_versao) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
         "ON CONFLICT (assunto_id, perfil_id, gerado_em) DO NOTHING",
         (
             assunto_contato.assunto_id,
@@ -48,6 +55,7 @@ def inserir(conexao: sqlite3.Connection, assunto_contato: AssuntoContato) -> boo
             assunto_contato.status,
             assunto_contato.motivo,
             assunto_contato.aderencia_consulta,
+            *colunas_gerado_por(proveniencia),
         ),
     )
     return cursor.rowcount > 0

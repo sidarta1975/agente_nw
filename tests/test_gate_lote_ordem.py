@@ -29,6 +29,7 @@ from agente_nw.nucleo.modelos.cruzamento import (
     RespostaCruzarPorQue,
 )
 from agente_nw.nucleo.relevancia.cruzamento import cruzar_contato_por_consulta
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-10-15T10:00:00+00:00"
 DATA = "2026-10-15"
@@ -47,7 +48,7 @@ def _quantidade_candidatos(prompt: str) -> int:
     return len([linha for linha in linhas if linha.strip()])
 
 
-class _ClienteGatePosicional:
+class _ClienteGatePosicional(ProvenienciaFalsa):
     """Devolve exatamente `respostas`, na ordem recebida — testa que o casamento é por posição."""
 
     def __init__(self, respostas: list[bool]) -> None:
@@ -56,7 +57,9 @@ class _ClienteGatePosicional:
     def embeddar(self, textos: list[str]) -> list[list[float]]:
         return [CENTROIDE_CONSULTA for _ in textos]
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         if tarefa_nome == "avaliar_relacao_objetivo":
             return RespostaAvaliarRelacaoObjetivo(
                 avaliacoes=[AvaliacaoRelacaoObjetivo(relaciona=r, motivo="") for r in self._respostas]
@@ -65,7 +68,7 @@ class _ClienteGatePosicional:
         return RespostaCruzarPorQue(por_que=[f"motivo {i}" for i in range(quantidade)])
 
 
-class _ClienteGateTamanhoErrado:
+class _ClienteGateTamanhoErrado(ProvenienciaFalsa):
     """O gate sempre devolve uma avaliação de menos — nunca bate com a quantidade esperada."""
 
     def __init__(self) -> None:
@@ -74,7 +77,9 @@ class _ClienteGateTamanhoErrado:
     def embeddar(self, textos: list[str]) -> list[list[float]]:
         return [CENTROIDE_CONSULTA for _ in textos]
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         if tarefa_nome == "avaliar_relacao_objetivo":
             self.chamadas_gate += 1
             quantidade = _quantidade_candidatos(prompt)
@@ -161,7 +166,7 @@ def _assunto(conn: sqlite3.Connection, titulo: str) -> int:
             conversavel=0.8,
         ),
     )
-    assuntos.gravar_centroide(conn, assunto_id, CENTROIDE_ASSUNTO)
+    assuntos.gravar_centroide(conn, assunto_id, CENTROIDE_ASSUNTO, modelo_embedding="bge-m3")
     conn.commit()
     return assunto_id
 

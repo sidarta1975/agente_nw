@@ -23,9 +23,14 @@ _MAXIMO_CONTATOS_NO_PROMPT = 50
 
 
 class ClientePedido(Protocol):
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[_EsquemaT]) -> _EsquemaT: ...
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[_EsquemaT], *, versao_prompt: str | None = None
+    ) -> _EsquemaT: ...
 
     def embeddar(self, textos: list[str]) -> list[list[float]]: ...
+
+    @property
+    def modelo_embedding(self) -> str: ...
 
 
 def extrair(cliente_llm: ClientePedido, conexao: sqlite3.Connection, frase: str) -> PedidoExtraido:
@@ -34,7 +39,9 @@ def extrair(cliente_llm: ClientePedido, conexao: sqlite3.Connection, frase: str)
         for contato in perfis.listar_contatos_recentes(conexao, _MAXIMO_CONTATOS_NO_PROMPT)
     ]
     prompt = extrair_pedido.construir_prompt(frase, conhecidos)
-    return cliente_llm.gerar_json("extrair_pedido", prompt, PedidoExtraido)
+    return cliente_llm.gerar_json(
+        "extrair_pedido", prompt, PedidoExtraido, versao_prompt=extrair_pedido.VERSAO
+    )
 
 
 def _casa(pista: str | None, valor: str | None) -> bool:

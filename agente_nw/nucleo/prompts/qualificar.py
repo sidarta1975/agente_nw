@@ -6,6 +6,7 @@ import yaml
 
 from agente_nw.nucleo.modelos.qualificacao import RespostaQualificar
 
+VERSAO = "2026-09-19-1"
 ESQUEMA = RespostaQualificar
 
 _CAMINHO_EXEMPLOS_CONVERSAVEL = Path(__file__).resolve().parent / "exemplos_conversavel.yaml"

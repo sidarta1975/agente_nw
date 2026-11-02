@@ -14,6 +14,7 @@ from agente_nw.nucleo.database.queries import consulta_contato, gancho_uso, perf
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.prompts import redigir_ganchos as prompt_mod
 from agente_nw.nucleo.prompts.redigir_ganchos import EntradaRedacao
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-10-30T10:00:00+00:00"
 
@@ -72,7 +73,7 @@ def _abrir(tmp_path: Path) -> sqlite3.Connection:
     return conexao_aberta
 
 
-class _SemEmbeddings:
+class _SemEmbeddings(ProvenienciaFalsa):
     pass
 
 

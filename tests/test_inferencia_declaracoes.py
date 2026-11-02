@@ -13,6 +13,7 @@ from agente_nw.nucleo.database.queries import perfil_tema, perfis, temas
 from agente_nw.nucleo.modelos.configuracao import TemasUsuarioLimiares
 from agente_nw.nucleo.modelos.tema import RespostaDescreverTema
 from agente_nw.perfil import inferencia
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-10-31T10:00:00+00:00"
 
@@ -21,8 +22,10 @@ def _vetor(*valores: float) -> list[float]:
     return list(valores) + [0.0] * (1024 - len(valores))
 
 
-class _ClienteFalso:
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+class _ClienteFalso(ProvenienciaFalsa):
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         assert tarefa_nome == "descrever_tema"
         return RespostaDescreverTema(descricao="descrição qualquer de teste", sinonimos=[])
 

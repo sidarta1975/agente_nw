@@ -14,6 +14,7 @@ from agente_nw.nucleo.database.queries import fontes, itens
 from agente_nw.nucleo.modelos.calibracao import RespostaComparacaoPar
 from agente_nw.nucleo.modelos.item import Item
 from agente_nw.nucleo.vetores import cosseno
+from tests.llm_falso import ProvenienciaFalsa
 
 _ITEM_DUMMY = Item(
     id=1,
@@ -75,12 +76,16 @@ def test_rotular_pares_define_rotulo_final_direto_do_qwen_sem_revisao() -> None:
     par_mesmo_assunto = _par(0.90)
     par_diferentes = _par(0.20)
 
-    class _ClienteAlternado:
+    class _ClienteAlternado(ProvenienciaFalsa):
         def __init__(self) -> None:
             self._respostas = iter([True, False])
 
         def gerar_json(
-            self, tarefa_nome: str, prompt: str, esquema: type[RespostaComparacaoPar]
+            self,
+            tarefa_nome: str,
+            prompt: str,
+            esquema: type[RespostaComparacaoPar],
+            versao_prompt: str | None = None,
         ) -> RespostaComparacaoPar:
             return RespostaComparacaoPar(mesmo_assunto=next(self._respostas))
 
@@ -145,9 +150,13 @@ def conn(tmp_path: Path) -> sqlite3.Connection:
     return conexao_aberta
 
 
-class _ClienteFakeSempreMesmoAssunto:
+class _ClienteFakeSempreMesmoAssunto(ProvenienciaFalsa):
     def gerar_json(
-        self, tarefa_nome: str, prompt: str, esquema: type[RespostaComparacaoPar]
+        self,
+        tarefa_nome: str,
+        prompt: str,
+        esquema: type[RespostaComparacaoPar],
+        versao_prompt: str | None = None,
     ) -> RespostaComparacaoPar:
         return RespostaComparacaoPar(mesmo_assunto=True)
 

@@ -11,6 +11,7 @@ import agente_nw.cli as cli
 from agente_nw.nucleo.database import conexao, migracoes
 from agente_nw.nucleo.database.queries import perfis
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-10-11T10:00:00+00:00"
 
@@ -31,8 +32,10 @@ def _dados(**mudancas: Any) -> dict[str, Any]:
     return dados
 
 
-class _ClienteFalso:
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+class _ClienteFalso(ProvenienciaFalsa):
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         return PedidoExtraido.model_validate(_dados())
 
 

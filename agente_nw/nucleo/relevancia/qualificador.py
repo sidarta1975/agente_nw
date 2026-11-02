@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from agente_nw.nucleo.database.queries import assuntos, itens
 from agente_nw.nucleo.database.queries import temas as queries_temas
 from agente_nw.nucleo.llm import FalhaJsonInvalido
+from agente_nw.nucleo.modelos.proveniencia import Proveniencia
 from agente_nw.nucleo.modelos.qualificacao import RespostaQualificar
 from agente_nw.nucleo.modelos.rotulo import RespostaRotulo
 from agente_nw.nucleo.prompts import qualificar, rotular
@@ -19,7 +20,14 @@ _MAX_ITENS_RESUMO = 5
 
 
 class ClienteQualificacao(Protocol):
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[_EsquemaT]) -> _EsquemaT: ...
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[_EsquemaT], *, versao_prompt: str | None = None
+    ) -> _EsquemaT: ...
+
+    def proveniencia(self, tarefa_nome: str, versao_prompt: str | None = None) -> Proveniencia: ...
+
+    @property
+    def modelo_embedding(self) -> str: ...
 
 
 @dataclass
@@ -43,7 +51,9 @@ def qualificar_pendentes(
     vetores_extras: list[list[float]] | None = None,
 ) -> ResumoQualificacao:
     resumo = ResumoQualificacao()
-    candidatos = assuntos.listar_candidatos_qualificacao(conexao, limite, vetores_extras)
+    candidatos = assuntos.listar_candidatos_qualificacao(
+        conexao, limite, cliente_llm.modelo_embedding, vetores_extras
+    )
     resumo.candidatos = len(candidatos)
 
     nomes_temas_conhecidos = [tema.nome for tema in queries_temas.listar(conexao)]
@@ -55,7 +65,9 @@ def qualificar_pendentes(
         if candidato.titulo_gerado is None:
             prompt_rotulo = rotular.construir_prompt(itens_resumidos)
             try:
-                resposta_rotulo = cliente_llm.gerar_json("rotular", prompt_rotulo, RespostaRotulo)
+                resposta_rotulo = cliente_llm.gerar_json(
+                    "rotular", prompt_rotulo, RespostaRotulo, versao_prompt=rotular.VERSAO
+                )
             except FalhaJsonInvalido:
                 resumo.erros += 1
                 continue
@@ -68,7 +80,9 @@ def qualificar_pendentes(
 
         prompt_qualificar = qualificar.construir_prompt(titulo, itens_resumidos, nomes_temas_conhecidos)
         try:
-            resposta = cliente_llm.gerar_json("qualificar", prompt_qualificar, RespostaQualificar)
+            resposta = cliente_llm.gerar_json(
+                "qualificar", prompt_qualificar, RespostaQualificar, versao_prompt=qualificar.VERSAO
+            )
         except FalhaJsonInvalido:
             resumo.erros += 1
             continue
@@ -87,6 +101,7 @@ def qualificar_pendentes(
             resposta.conversavel,
             resposta.justificativa,
             temas_ids,
+            cliente_llm.proveniencia("qualificar", qualificar.VERSAO),
         )
         conexao.commit()
         resumo.qualificados += 1

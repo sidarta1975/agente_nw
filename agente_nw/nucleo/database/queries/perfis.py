@@ -589,13 +589,13 @@ def _desserializar(blob: bytes) -> list[float]:
 
 
 def calcular_centroide(
-    conexao: sqlite3.Connection, perfil_id: int, peso_nivel: dict[str, float]
+    conexao: sqlite3.Connection, perfil_id: int, peso_nivel: dict[str, float], modelo_embedding: str
 ) -> list[float] | None:
     linhas = conexao.execute(
         "SELECT pt.peso, pt.nivel, vt.embedding AS embedding FROM perfil_tema pt "
         "JOIN vetor_tema vt ON vt.tema_id = pt.tema_id "
-        "WHERE pt.perfil_id = ? AND pt.confirmado = 1",
-        (perfil_id,),
+        "WHERE pt.perfil_id = ? AND pt.confirmado = 1 AND vt.modelo_embedding = ?",
+        (perfil_id, modelo_embedding),
     ).fetchall()
     if not linhas:
         return None
@@ -636,12 +636,22 @@ def calcular_centroide_do_contato(
     return cliente_llm.embeddar([texto])[0] if texto else None
 
 
-def gravar_centroide(conexao: sqlite3.Connection, perfil_id: int, centroide: list[float]) -> None:
+def gravar_centroide(
+    conexao: sqlite3.Connection, perfil_id: int, centroide: list[float], modelo_embedding: str
+) -> None:
+    """`modelo_embedding`: o modelo que gerou o vetor (brief 066), conferido na leitura."""
     vetor = sqlite_vec.serialize_float32(centroide)
     conexao.execute("DELETE FROM vetor_perfil WHERE perfil_id = ?", (perfil_id,))
-    conexao.execute("INSERT INTO vetor_perfil (perfil_id, centroide) VALUES (?, ?)", (perfil_id, vetor))
+    conexao.execute(
+        "INSERT INTO vetor_perfil (perfil_id, centroide, modelo_embedding) VALUES (?, ?, ?)",
+        (perfil_id, vetor, modelo_embedding),
+    )
 
 
-def obter_centroide(conexao: sqlite3.Connection, perfil_id: int) -> list[float] | None:
-    linha = conexao.execute("SELECT centroide FROM vetor_perfil WHERE perfil_id = ?", (perfil_id,)).fetchone()
+def obter_centroide(conexao: sqlite3.Connection, perfil_id: int, modelo_embedding: str) -> list[float] | None:
+    """Centróide gravado por outro modelo de embedding é ausente (brief 066); a linha fica."""
+    linha = conexao.execute(
+        "SELECT centroide FROM vetor_perfil WHERE perfil_id = ? AND modelo_embedding = ?",
+        (perfil_id, modelo_embedding),
+    ).fetchone()
     return _desserializar(linha["centroide"]) if linha is not None else None

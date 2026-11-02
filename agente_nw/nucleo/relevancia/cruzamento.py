@@ -19,6 +19,7 @@ from agente_nw.nucleo.modelos.cruzamento import (
     RespostaCruzarPorQue,
 )
 from agente_nw.nucleo.modelos.perfil import Perfil
+from agente_nw.nucleo.modelos.proveniencia import Proveniencia
 from agente_nw.nucleo.prompts import avaliar_relacao_objetivo, cruzar_por_que
 from agente_nw.nucleo.relevancia import candidatos
 from agente_nw.nucleo.relevancia.pontuacao import Avaliacao, avaliar, avaliar_por_consulta
@@ -31,7 +32,14 @@ _MAX_TENTATIVAS = 2
 
 
 class ClienteCruzamento(Protocol):
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[_EsquemaT]) -> _EsquemaT: ...
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[_EsquemaT], *, versao_prompt: str | None = None
+    ) -> _EsquemaT: ...
+
+    def proveniencia(self, tarefa_nome: str, versao_prompt: str | None = None) -> Proveniencia: ...
+
+    @property
+    def modelo_embedding(self) -> str: ...
 
 
 class ClienteCruzamentoConsulta(ClienteCruzamento, Protocol):
@@ -79,7 +87,9 @@ def _chamar_cruzar_por_que(
     ultimo_erro = ""
     for _tentativa in range(_MAX_TENTATIVAS):
         try:
-            resposta = cliente_llm.gerar_json("cruzar_por_que", prompt, RespostaCruzarPorQue)
+            resposta = cliente_llm.gerar_json(
+                "cruzar_por_que", prompt, RespostaCruzarPorQue, versao_prompt=cruzar_por_que.VERSAO
+            )
         except FalhaJsonInvalido as erro:
             ultimo_erro = str(erro)
             continue
@@ -110,7 +120,10 @@ def _chamar_gate_objetivo(
     for _tentativa in range(_MAX_TENTATIVAS):
         try:
             resposta = cliente_llm.gerar_json(
-                "avaliar_relacao_objetivo", prompt, RespostaAvaliarRelacaoObjetivo
+                "avaliar_relacao_objetivo",
+                prompt,
+                RespostaAvaliarRelacaoObjetivo,
+                versao_prompt=avaliar_relacao_objetivo.VERSAO,
             )
         except FalhaJsonInvalido as erro:
             ultimo_erro = str(erro)
@@ -148,6 +161,7 @@ def _aplicar_gate_objetivo(
         resumo.erros += 1
         return demais
 
+    proveniencia_gate = cliente_llm.proveniencia("avaliar_relacao_objetivo", avaliar_relacao_objetivo.VERSAO)
     mantidos: list[tuple[Assunto, Avaliacao]] = []
     for (assunto, avaliacao), avaliacao_gate in zip(demais, avaliacoes_gate, strict=True):
         if avaliacao_gate.relaciona:
@@ -169,6 +183,7 @@ def _aplicar_gate_objetivo(
                 motivo=_MOTIVO_GATE,
                 aderencia_consulta=avaliacao.aderencia_consulta,
             ),
+            proveniencia_gate,
         )
         resumo.descartados += 1
     conexao.commit()
@@ -185,12 +200,15 @@ def cruzar_contato(
     resumo = ResumoContato(perfil_id=perfil_id)
     data = agora[:10]
 
-    centroide_contato = perfis.calcular_centroide(conexao, perfil_id, limiares.conector.peso_nivel)
+    modelo_embedding = cliente_llm.modelo_embedding
+    centroide_contato = perfis.calcular_centroide(
+        conexao, perfil_id, limiares.conector.peso_nivel, modelo_embedding
+    )
     if centroide_contato is None:
         resumo.sem_assunto = True
         resumo.motivo = "contato sem tema confirmado"
         return resumo
-    perfis.gravar_centroide(conexao, perfil_id, centroide_contato)
+    perfis.gravar_centroide(conexao, perfil_id, centroide_contato, modelo_embedding)
     conexao.commit()
 
     selecionados = candidatos.selecionar(
@@ -200,6 +218,7 @@ def cruzar_contato(
         limiares.qualificacao.substancial_minimo,
         limiares.qualificacao.conversavel_minimo,
         limiares.conector.candidatos_por_contato,
+        modelo_embedding,
     )
     resumo.candidatos = len(selecionados)
     if not selecionados:
@@ -209,12 +228,12 @@ def cruzar_contato(
 
     usuario = perfis.obter_usuario(conexao)
     assert usuario is not None and usuario.id is not None
-    temas_usuario = perfil_tema.listar_confirmados_com_embedding(conexao, usuario.id)
+    temas_usuario = perfil_tema.listar_confirmados_com_embedding(conexao, usuario.id, modelo_embedding)
 
     avaliacoes: list[tuple[Assunto, Avaliacao]] = []
     for assunto in selecionados:
         assert assunto.id is not None
-        centroide_assunto = assuntos.obter_centroide(conexao, assunto.id)
+        centroide_assunto = assuntos.obter_centroide(conexao, assunto.id, modelo_embedding)
         assert centroide_assunto is not None
         assert assunto.conversavel is not None
         avaliacao = avaliar(
@@ -255,7 +274,10 @@ def cruzar_contato(
     contato = perfis.obter_por_id(conexao, perfil_id)
     assert contato is not None
     apelido_ou_nome = contato.apelido or contato.nome
-    temas_contato = [nome for nome, _, _ in perfil_tema.listar_confirmados_com_embedding(conexao, perfil_id)]
+    temas_contato = [
+        nome
+        for nome, _, _ in perfil_tema.listar_confirmados_com_embedding(conexao, perfil_id, modelo_embedding)
+    ]
     temas_usuario_com_nivel = [(nome, nivel) for nome, nivel, _ in temas_usuario]
     assuntos_para_prompt: list[tuple[str, str, str | None]] = [
         (assunto.titulo_gerado or "", avaliacao.tipo, avaliacao.ponto_de_apoio)
@@ -270,6 +292,9 @@ def cruzar_contato(
     )
     if por_ques is None:
         resumo.erros += 1
+    proveniencia_por_que = (
+        cliente_llm.proveniencia("cruzar_por_que", cruzar_por_que.VERSAO) if por_ques is not None else None
+    )
 
     for indice, (assunto, avaliacao) in enumerate(selecionados_para_menu):
         assert assunto.id is not None
@@ -285,7 +310,7 @@ def cruzar_contato(
             por_que=por_ques[indice] if por_ques is not None else None,
             status="novo",
         )
-        assunto_contato.inserir(conexao, registro)
+        assunto_contato.inserir(conexao, registro, proveniencia_por_que)
         if avaliacao.tipo == "conector":
             resumo.conectores += 1
         else:
@@ -314,9 +339,10 @@ def cruzar_contato_por_consulta(
     assunto_contato.apagar_nao_decididos_do_dia(conexao, perfil_id, data)
     conexao.commit()
 
+    modelo_embedding = cliente_llm.modelo_embedding
     centroide_contato = perfis.calcular_centroide_do_contato(conexao, perfil_id, cliente_llm)
     if centroide_contato is not None:
-        perfis.gravar_centroide(conexao, perfil_id, centroide_contato)
+        perfis.gravar_centroide(conexao, perfil_id, centroide_contato, modelo_embedding)
         conexao.commit()
 
     usuario = perfis.obter_usuario(conexao)
@@ -339,6 +365,7 @@ def cruzar_contato_por_consulta(
         limiares.conector.candidatos_por_contato,
         evitar_completo,
         limiares.conector.consulta,
+        modelo_embedding,
     )
     for assunto in evitados:
         assert assunto.id is not None
@@ -371,7 +398,7 @@ def cruzar_contato_por_consulta(
         return resumo
 
     temas_usuario = (
-        perfil_tema.listar_confirmados_com_embedding(conexao, usuario.id)
+        perfil_tema.listar_confirmados_com_embedding(conexao, usuario.id, modelo_embedding)
         if usuario is not None and usuario.id is not None
         else []
     )
@@ -385,7 +412,7 @@ def cruzar_contato_por_consulta(
     avaliacoes: list[tuple[Assunto, Avaliacao]] = []
     for assunto in restantes:
         assert assunto.id is not None
-        centroide_assunto = assuntos.obter_centroide(conexao, assunto.id)
+        centroide_assunto = assuntos.obter_centroide(conexao, assunto.id, modelo_embedding)
         assert centroide_assunto is not None
         assert assunto.conversavel is not None
         avaliacoes.append(
@@ -471,6 +498,9 @@ def cruzar_contato_por_consulta(
     )
     if por_ques is None:
         resumo.erros += 1
+    proveniencia_por_que = (
+        cliente_llm.proveniencia("cruzar_por_que", cruzar_por_que.VERSAO) if por_ques is not None else None
+    )
 
     for indice, (assunto, avaliacao) in enumerate(selecionados_para_menu):
         assert assunto.id is not None
@@ -489,6 +519,7 @@ def cruzar_contato_por_consulta(
                 status="novo",
                 aderencia_consulta=avaliacao.aderencia_consulta,
             ),
+            proveniencia_por_que,
         )
         if avaliacao.tipo == "conector":
             resumo.conectores += 1

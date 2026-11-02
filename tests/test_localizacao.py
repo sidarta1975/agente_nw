@@ -18,6 +18,7 @@ from agente_nw.nucleo.modelos.configuracao import ListasLimiares
 from agente_nw.nucleo.modelos.lista_rede_social import EntradaLista
 from agente_nw.nucleo.modelos.localizacao import Localizacao, RespostaDesempate
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-10-11T10:00:00+00:00"
 LIMIARES = ListasLimiares(maximo_entradas=2000, pausa_rolagem_s=0, validade_dias=30)
@@ -103,7 +104,7 @@ def _pedido(nome: str = "Marcos", pistas: dict[str, str] | None = None, **mudanc
     return PedidoExtraido.model_validate(dados)
 
 
-class _LLM:
+class _LLM(ProvenienciaFalsa):
     def __init__(
         self,
         indice: int | None = None,
@@ -115,7 +116,9 @@ class _LLM:
         self.pedido = pedido
         self.chamadas: list[str] = []
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         self.chamadas.append(tarefa_nome)
         if tarefa_nome == "desempatar_perfil":
             return RespostaDesempate(indice_escolhido=self.indice, confianca=self.confianca, motivo="teste")

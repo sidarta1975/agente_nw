@@ -21,6 +21,7 @@ from agente_nw.nucleo.modelos.configuracao import (
     QualificacaoLimiares,
 )
 from agente_nw.nucleo.modelos.item import Item
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-01-01T00:00:00+00:00"
 
@@ -78,11 +79,13 @@ class _ConfigFake:
         self.limiares = limiares
 
 
-class _ClienteCartaoFake:
+class _ClienteCartaoFake(ProvenienciaFalsa):
     def __init__(self, resposta: RespostaCartao) -> None:
         self._resposta = resposta
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[RespostaCartao]) -> RespostaCartao:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[RespostaCartao], versao_prompt: str | None = None
+    ) -> RespostaCartao:
         return self._resposta
 
 
@@ -91,7 +94,7 @@ def test_qualificar_sem_candidatos_nao_erra(
 ) -> None:
     monkeypatch.setattr(cli, "banco", lambda: conn)
     monkeypatch.setattr(cli, "configuracao", lambda: _ConfigFake(_limiares()))
-    monkeypatch.setattr(cli, "llm", lambda: object())
+    monkeypatch.setattr(cli, "llm", lambda: ProvenienciaFalsa())
 
     resultado = cli.qualificar_cmd(None)
 
@@ -145,7 +148,7 @@ def test_cartao_de_assunto_inexistente_da_erro_claro(
     monkeypatch: pytest.MonkeyPatch, conn: sqlite3.Connection, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(cli, "banco", lambda: conn)
-    monkeypatch.setattr(cli, "llm", lambda: object())
+    monkeypatch.setattr(cli, "llm", lambda: ProvenienciaFalsa())
 
     resultado = cli.cartao_cmd(999)
 

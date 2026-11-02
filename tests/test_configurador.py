@@ -10,11 +10,12 @@ from agente_nw.nucleo.database.queries import perfil_tema, perfis
 from agente_nw.nucleo.database.queries import temas as queries_temas
 from agente_nw.nucleo.modelos.configuracao import TemaUsuario
 from agente_nw.perfil import configurador
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-09-21T10:00:00+00:00"
 
 
-class _ClienteEmbeddagemFake:
+class _ClienteEmbeddagemFake(ProvenienciaFalsa):
     def __init__(self) -> None:
         self.chamadas: list[list[str]] = []
 

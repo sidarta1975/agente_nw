@@ -17,6 +17,9 @@ from agente_nw.nucleo.vetores import centroide, cosseno
 class ClienteEmbeddagem(Protocol):
     def embeddar(self, textos: list[str]) -> list[list[float]]: ...
 
+    @property
+    def modelo_embedding(self) -> str: ...
+
 
 @dataclass
 class ResumoAgrupamento:
@@ -96,8 +99,9 @@ def agrupar(
         melhor_cosseno_centroide = -1.0
         for candidato in candidatos:
             assert candidato.id is not None
-            centro = assuntos.obter_centroide(conexao, candidato.id)
-            assert centro is not None
+            centro = assuntos.obter_centroide(conexao, candidato.id, cliente_llm.modelo_embedding)
+            if centro is None:
+                continue  # centróide de outro modelo de embedding é ausente (brief 066)
             c = cosseno(vetor, centro)
             if c > melhor_cosseno_centroide:
                 melhor_cosseno_centroide = c
@@ -113,7 +117,7 @@ def agrupar(
                 temas=[],
             )
             assunto_id = assuntos.inserir(conexao, novo_assunto)
-            assuntos.gravar_centroide(conexao, assunto_id, vetor)
+            assuntos.gravar_centroide(conexao, assunto_id, vetor, cliente_llm.modelo_embedding)
             itens.vincular_assunto(conexao, item.id, assunto_id)
             resumo.assuntos_criados += 1
             resumo.itens_vinculados += 1
@@ -164,7 +168,7 @@ def agrupar(
         elif melhor_candidato.status == "novo" and n_itens_novo >= 2:
             status_novo = "em_curso"
 
-        assuntos.gravar_centroide(conexao, melhor_candidato.id, centroide_novo)
+        assuntos.gravar_centroide(conexao, melhor_candidato.id, centroide_novo, cliente_llm.modelo_embedding)
         assuntos.atualizar_apos_item(
             conexao,
             melhor_candidato.id,
@@ -188,8 +192,9 @@ def agrupar(
         assert assunto.id is not None
         itens_do_assunto = itens.listar_por_assunto(conexao, assunto.id)
         embeddings_por_id = _embeddings_por_item(conexao, itens_do_assunto)
-        centro_atual = assuntos.obter_centroide(conexao, assunto.id)
-        assert centro_atual is not None
+        centro_atual = assuntos.obter_centroide(conexao, assunto.id, cliente_llm.modelo_embedding)
+        if centro_atual is None:
+            continue  # centróide de outro modelo de embedding é ausente (brief 066)
         media_similaridade = sum(cosseno(v, centro_atual) for v in embeddings_por_id.values()) / len(
             embeddings_por_id
         )
@@ -214,7 +219,7 @@ def agrupar(
         estatisticas_a = _estatisticas_particao(grupo_a, itens_por_id, embeddings_por_id, limiar_divergencia)
         estatisticas_b = _estatisticas_particao(grupo_b, itens_por_id, embeddings_por_id, limiar_divergencia)
 
-        assuntos.gravar_centroide(conexao, assunto.id, estatisticas_a.centroide)
+        assuntos.gravar_centroide(conexao, assunto.id, estatisticas_a.centroide, cliente_llm.modelo_embedding)
         assuntos.atualizar_apos_item(
             conexao,
             assunto.id,
@@ -235,7 +240,9 @@ def agrupar(
             temas=[],
         )
         novo_assunto_id = assuntos.inserir(conexao, novo_assunto)
-        assuntos.gravar_centroide(conexao, novo_assunto_id, estatisticas_b.centroide)
+        assuntos.gravar_centroide(
+            conexao, novo_assunto_id, estatisticas_b.centroide, cliente_llm.modelo_embedding
+        )
         for item_id in grupo_b:
             itens.vincular_assunto(conexao, item_id, novo_assunto_id)
 

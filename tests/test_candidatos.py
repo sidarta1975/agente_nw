@@ -37,7 +37,7 @@ def _criar_assunto_qualificado(
         conversavel=conversavel,
     )
     assunto_id = assuntos.inserir(conn, assunto)
-    assuntos.gravar_centroide(conn, assunto_id, centroide)
+    assuntos.gravar_centroide(conn, assunto_id, centroide, modelo_embedding="bge-m3")
     return assunto_id
 
 
@@ -67,7 +67,7 @@ def test_assunto_ja_decidido_pelo_usuario_nao_volta_a_ser_candidato(conn: sqlite
     assunto_contato.inserir(conn, registro)
     conn.commit()
 
-    resultado = selecionar(conn, perfil_id, _vetor(1.0, 0.0), 0.6, 0.6, 10)
+    resultado = selecionar(conn, perfil_id, _vetor(1.0, 0.0), 0.6, 0.6, 10, modelo_embedding="bge-m3")
 
     ids = [a.id for a in resultado]
     assert novo in ids
@@ -81,7 +81,7 @@ def test_corte_de_qualificacao_e_respeitado(conn: sqlite3.Connection) -> None:
     passa = _criar_assunto_qualificado(conn, _vetor(1.0, 0.0), substancial=0.8, conversavel=0.8)
     conn.commit()
 
-    resultado = selecionar(conn, perfil_id, _vetor(1.0, 0.0), 0.6, 0.6, 10)
+    resultado = selecionar(conn, perfil_id, _vetor(1.0, 0.0), 0.6, 0.6, 10, modelo_embedding="bge-m3")
 
     ids = [a.id for a in resultado]
     assert ids == [passa]
@@ -95,7 +95,7 @@ def test_ordenacao_por_aderencia_ao_contato(conn: sqlite3.Connection) -> None:
     perto = _criar_assunto_qualificado(conn, _vetor(0.99, 0.14))
     conn.commit()
 
-    resultado = selecionar(conn, perfil_id, _vetor(1.0, 0.0), 0.6, 0.6, 10)
+    resultado = selecionar(conn, perfil_id, _vetor(1.0, 0.0), 0.6, 0.6, 10, modelo_embedding="bge-m3")
 
     assert [a.id for a in resultado] == [perto, longe]
 
@@ -106,6 +106,6 @@ def test_respeita_limite(conn: sqlite3.Connection) -> None:
         _criar_assunto_qualificado(conn, _vetor(1.0, 0.0))
     conn.commit()
 
-    resultado = selecionar(conn, perfil_id, _vetor(1.0, 0.0), 0.6, 0.6, 3)
+    resultado = selecionar(conn, perfil_id, _vetor(1.0, 0.0), 0.6, 0.6, 3, modelo_embedding="bge-m3")
 
     assert len(resultado) == 3

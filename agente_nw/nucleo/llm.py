@@ -12,6 +12,7 @@ from pydantic import BaseModel, ValidationError
 
 from agente_nw.nucleo.database.queries import fila_revisao
 from agente_nw.nucleo.modelos.configuracao import Roteamento, TarefaRoteamento
+from agente_nw.nucleo.modelos.proveniencia import Proveniencia
 
 EsquemaT = TypeVar("EsquemaT", bound=BaseModel)
 
@@ -54,8 +55,29 @@ class ClienteOllama:
         self._ollama_url = ollama_url
         self._caminho_log = caminho_log
 
+    @property
+    def modelo_embedding(self) -> str:
+        """Modelo de embedding do perfil ativo — gravado com cada centróide e conferido na leitura
+        (brief 066): vetor de outro modelo é tratado como ausente."""
+        return self._roteamento.perfis[self._roteamento.perfil_ativo].embeddings.modelo
+
+    def proveniencia(self, tarefa_nome: str, versao_prompt: str | None = None) -> Proveniencia:
+        """Perfil ativo, modelo da tarefa e versão do prompt — o que `gerar_json` usa e registra no log,
+        para quem grava o resultado da geração (brief 066)."""
+        return Proveniencia(
+            modelo=self._tarefa(tarefa_nome).modelo,
+            perfil=self._roteamento.perfil_ativo,
+            prompt_versao=versao_prompt,
+        )
+
     def _registrar_log_chamada(
-        self, tarefa_nome: str, tentativas_usadas: int, sucesso: bool, falhas_transporte: int
+        self,
+        tarefa_nome: str,
+        tentativas_usadas: int,
+        sucesso: bool,
+        falhas_transporte: int,
+        proveniencia: Proveniencia,
+        inicio: float,
     ) -> None:
         try:
             self._caminho_log.parent.mkdir(parents=True, exist_ok=True)
@@ -66,6 +88,10 @@ class ClienteOllama:
                     "sucesso": sucesso,
                     "falhas_transporte": falhas_transporte,
                     "quando": datetime.now(UTC).isoformat(),
+                    "perfil": proveniencia.perfil,
+                    "modelo": proveniencia.modelo,
+                    "versao_prompt": proveniencia.prompt_versao,
+                    "latencia_ms": round((time.monotonic() - inicio) * 1000),
                 },
                 ensure_ascii=False,
             )
@@ -156,9 +182,14 @@ class ClienteOllama:
         prompt: str,
         esquema: type[EsquemaT],
         imagens: list[str] | None = None,
+        versao_prompt: str | None = None,
     ) -> EsquemaT:
-        """`imagens`: imagens em base64 para modelos com visão (tarefa `descrever_imagem`)."""
+        """`imagens`: imagens em base64 para modelos com visão (tarefa `descrever_imagem`).
+        `versao_prompt`: `VERSAO` do módulo de prompt (brief 066); só vai para o log. A latência
+        registrada é a da chamada inteira, com novas tentativas e esperas do backoff."""
+        inicio = time.monotonic()
         tarefa = self._tarefa(tarefa_nome)
+        proveniencia = self.proveniencia(tarefa_nome, versao_prompt)
         nova_tentativa = self._roteamento.perfis[self._roteamento.perfil_ativo].nova_tentativa
 
         ultimo_erro = ""
@@ -171,19 +202,25 @@ class ClienteOllama:
                 )
             except (httpx.HTTPStatusError, httpx.RequestError) as erro:
                 falhas_transporte_total += len(_INTERVALOS_BACKOFF_TRANSPORTE) + 1
-                self._registrar_log_chamada(tarefa_nome, indice, False, falhas_transporte_total)
+                self._registrar_log_chamada(
+                    tarefa_nome, indice, False, falhas_transporte_total, proveniencia, inicio
+                )
                 raise self._ir_para_fila_revisao(tarefa_nome, prompt, str(erro)) from erro
 
             falhas_transporte_total += falhas_transporte
             try:
                 bruto = json.loads(texto)
                 resultado = esquema.model_validate(bruto)
-                self._registrar_log_chamada(tarefa_nome, indice, True, falhas_transporte_total)
+                self._registrar_log_chamada(
+                    tarefa_nome, indice, True, falhas_transporte_total, proveniencia, inicio
+                )
                 return resultado
             except (json.JSONDecodeError, ValidationError, _GeracaoDegenerada) as erro:
                 ultimo_erro = str(erro)
 
-        self._registrar_log_chamada(tarefa_nome, len(tentativas), False, falhas_transporte_total)
+        self._registrar_log_chamada(
+            tarefa_nome, len(tentativas), False, falhas_transporte_total, proveniencia, inicio
+        )
         raise self._ir_para_fila_revisao(tarefa_nome, prompt, ultimo_erro)
 
     def embeddar(self, textos: list[str]) -> list[list[float]]:

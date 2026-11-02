@@ -15,6 +15,7 @@ from agente_nw.nucleo.modelos.item import Item
 from agente_nw.nucleo.modelos.qualificacao import RespostaQualificar
 from agente_nw.nucleo.modelos.rotulo import RespostaRotulo
 from agente_nw.nucleo.relevancia.qualificador import qualificar_pendentes
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-01-01T00:00:00+00:00"
 
@@ -30,13 +31,15 @@ def _vetor(*valores: float) -> list[float]:
     return list(valores) + [0.0] * (1024 - len(valores))
 
 
-class _ClienteFake:
+class _ClienteFake(ProvenienciaFalsa):
     def __init__(self) -> None:
         self.chamadas: list[str] = []
         self.respostas_rotular: list[RespostaRotulo | Exception] = []
         self.respostas_qualificar: list[RespostaQualificar | Exception] = []
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         self.chamadas.append(tarefa_nome)
         if tarefa_nome == "rotular":
             resposta = self.respostas_rotular.pop(0)
@@ -54,7 +57,7 @@ def _preparar_tema_usuario(conn: sqlite3.Connection) -> None:
     assert usuario.id is not None
     tema_usuario = queries_temas.obter_ou_criar(conn, "tema-usuario", "descrição", [], AGORA)
     assert tema_usuario.id is not None
-    queries_temas.gravar_embedding(conn, tema_usuario.id, _vetor(1.0, 0.0))
+    queries_temas.gravar_embedding(conn, tema_usuario.id, _vetor(1.0, 0.0), modelo_embedding="bge-m3")
     perfil_tema.vincular(conn, usuario.id, tema_usuario.id, 3, "declarada", "dominio", True, AGORA)
     conn.commit()
 
@@ -66,7 +69,7 @@ def _criar_assunto_com_item(conn: sqlite3.Connection, titulo_gerado: str | None)
         titulo_gerado=titulo_gerado, primeiro_visto=AGORA, ultimo_visto=AGORA, n_itens=1, status="novo"
     )
     assunto_id = assuntos.inserir(conn, assunto)
-    assuntos.gravar_centroide(conn, assunto_id, _vetor(1.0, 0.0))
+    assuntos.gravar_centroide(conn, assunto_id, _vetor(1.0, 0.0), modelo_embedding="bge-m3")
     item = Item(
         fonte_id=fonte.id,
         url_canonica=f"https://exemplo.com/{assunto_id}",

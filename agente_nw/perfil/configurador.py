@@ -13,6 +13,9 @@ from agente_nw.nucleo.modelos.perfil import Perfil
 class ClienteEmbeddagem(Protocol):
     def embeddar(self, textos: list[str]) -> list[list[float]]: ...
 
+    @property
+    def modelo_embedding(self) -> str: ...
+
 
 def _gravar_tema_do_usuario(
     conexao: sqlite3.Connection,
@@ -24,7 +27,7 @@ def _gravar_tema_do_usuario(
     tema_gravado = queries_temas.obter_ou_criar(conexao, tema.nome, tema.descricao, tema.sinonimos, agora)
     assert tema_gravado.id is not None
     vetor = cliente_llm.embeddar([f"{tema.nome}: {tema.descricao}"])[0]
-    queries_temas.gravar_embedding(conexao, tema_gravado.id, vetor)
+    queries_temas.gravar_embedding(conexao, tema_gravado.id, vetor, cliente_llm.modelo_embedding)
     perfil_tema.vincular(
         conexao, usuario_id, tema_gravado.id, tema.peso, "declarada", tema.nivel, True, agora
     )

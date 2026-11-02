@@ -21,6 +21,7 @@ from agente_nw.nucleo.modelos.configuracao import (
     QualificacaoLimiares,
 )
 from agente_nw.nucleo.modelos.extracao import RespostaExtracaoTexto
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-09-19T00:00:00+00:00"
 
@@ -66,11 +67,17 @@ def _limiares() -> Limiares:
     )
 
 
-class _ClienteLLMFake:
+class _ClienteLLMFake(ProvenienciaFalsa):
     def __init__(self, *args: object, **kwargs: object) -> None:
         pass
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[RespostaExtracaoTexto]) -> object:
+    def gerar_json(
+        self,
+        tarefa_nome: str,
+        prompt: str,
+        esquema: type[RespostaExtracaoTexto],
+        versao_prompt: str | None = None,
+    ) -> object:
         return esquema()
 
 

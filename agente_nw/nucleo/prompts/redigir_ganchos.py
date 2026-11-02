@@ -11,6 +11,7 @@ from agente_nw.nucleo.modelos.redacao import (
     RespostaRedacao,
 )
 
+VERSAO = "2026-11-02-1"
 ESQUEMA = RespostaRedacao
 
 LIMITE_TOKENS_PADRAO = 6000

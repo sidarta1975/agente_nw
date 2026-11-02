@@ -15,15 +15,18 @@ from agente_nw.nucleo.database import conexao, migracoes
 from agente_nw.nucleo.database.queries import consulta_contato, gancho_uso, perfis
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.redacao import Gancho, RespostaRedacao
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-10-30T10:00:00+00:00"
 
 
-class _ClienteAdaptaGenero:
+class _ClienteAdaptaGenero(ProvenienciaFalsa):
     """Lê o gênero gramatical escrito no prompt e concorda a mensagem — proxy do que o modelo real
     faz; a adaptação semântica de verdade é o critério de aceite 2 do brief, testado por Sidarta."""
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         assert tarefa_nome == "redigir_ganchos"
         if "Gênero gramatical: feminino" in prompt:
             mensagem = "Oi, Maria, tudo bem? Que bom ter você, cara colega advogada, na nossa chapa."

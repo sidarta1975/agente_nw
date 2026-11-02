@@ -5,6 +5,7 @@ from pathlib import Path
 
 from agente_nw.cli import importar_temas
 from agente_nw.nucleo.database import conexao, migracoes
+from tests.llm_falso import ProvenienciaFalsa
 
 RAIZ = Path(__file__).resolve().parent.parent
 
@@ -15,7 +16,7 @@ def _banco_temporario(tmp_path: Path) -> sqlite3.Connection:
     return conn
 
 
-class _ClienteEmbeddagemFake:
+class _ClienteEmbeddagemFake(ProvenienciaFalsa):
     def embeddar(self, textos: list[str]) -> list[list[float]]:
         return [[0.1, 0.2] + [0.0] * 1022 for _ in textos]
 

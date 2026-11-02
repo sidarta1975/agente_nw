@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 
 from agente_nw.nucleo.modelos.fila import FilaExtracao
+from agente_nw.nucleo.modelos.proveniencia import Proveniencia, colunas_gerado_por
 
 _COLUNAS = "id, perfil_id, texto, origem, criado_em, processado, erro"
 
@@ -36,8 +37,15 @@ def listar_pendentes(conexao: sqlite3.Connection, limite: int) -> list[FilaExtra
     return [_para_fila_extracao(linha) for linha in linhas]
 
 
-def marcar_processado(conexao: sqlite3.Connection, item_id: int) -> None:
-    conexao.execute("UPDATE fila_extracao SET processado = 1, erro = NULL WHERE id = ?", (item_id,))
+def marcar_processado(
+    conexao: sqlite3.Connection, item_id: int, proveniencia: Proveniencia | None = None
+) -> None:
+    """`proveniencia`: perfil, modelo e versão do prompt que extraíram o item (brief 066)."""
+    conexao.execute(
+        "UPDATE fila_extracao SET processado = 1, erro = NULL, "
+        "gerado_por_modelo = ?, gerado_por_perfil = ?, gerado_por_prompt_versao = ? WHERE id = ?",
+        (*colunas_gerado_por(proveniencia), item_id),
+    )
 
 
 def marcar_erro(conexao: sqlite3.Connection, item_id: int, erro: str) -> None:

@@ -22,6 +22,7 @@ from agente_nw.nucleo.llm import ClienteOllama
 from agente_nw.nucleo.modelos.configuracao import WhatsappLimiares
 from agente_nw.nucleo.modelos.extracao import FatoDatado, RespostaExtracaoTexto
 from agente_nw.perfil.extrator import processar_fila
+from tests.llm_falso import ProvenienciaFalsa
 from tests.test_console_novo_contato import _limiares
 
 AGORA = "2026-10-25T10:00:00+00:00"
@@ -30,11 +31,13 @@ JOANA = "Joana Prado"
 _LIMIARES = WhatsappLimiares(meses_extraidos=24, maximo_caracteres_bloco=6000, trocas_no_prompt=10)
 
 
-class _ClienteOllamaFalso(ClienteOllama):
+class _ClienteOllamaFalso(ProvenienciaFalsa, ClienteOllama):
     def __init__(self, resposta: RespostaExtracaoTexto) -> None:
         self._resposta = resposta
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[BaseModel]) -> Any:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[BaseModel], versao_prompt: str | None = None
+    ) -> Any:
         return self._resposta
 
 

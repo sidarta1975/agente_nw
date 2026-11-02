@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from agente_nw.nucleo.modelos.contexto_consulta import MeioContato
 from agente_nw.nucleo.modelos.pedido import RegistroPedido
+from agente_nw.nucleo.modelos.proveniencia import Proveniencia
 from agente_nw.nucleo.texto import sem_acento_e_caixa
 
 LIMITE_PALAVRAS_MENSAGEM: dict[str, int] = {"proximo": 60, "cordial": 80, "formal": 110}
@@ -79,6 +80,7 @@ class Redacao(BaseModel):
     aviso: str | None = None
     registro_usado: RegistroPedido
     molde_origem_id: int | None = None  # id do gancho_uso usado como molde para esta redação (065)
+    proveniencia: Proveniencia | None = None  # perfil, modelo e versão do prompt que redigiram (066)
 
 
 def _palavras(texto: str) -> int:

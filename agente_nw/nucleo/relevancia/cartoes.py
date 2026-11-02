@@ -8,6 +8,7 @@ from typing import Protocol
 from agente_nw.nucleo.database.queries import assuntos, fila_revisao, itens
 from agente_nw.nucleo.llm import FalhaJsonInvalido
 from agente_nw.nucleo.modelos.cartao import RespostaCartao
+from agente_nw.nucleo.modelos.proveniencia import Proveniencia
 from agente_nw.nucleo.prompts import cartao as prompt_cartao
 
 _MAX_ITENS_CARTAO = 5
@@ -16,7 +17,16 @@ _TRUNCAMENTO_TRECHO = 300
 
 
 class ClienteCartao(Protocol):
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[RespostaCartao]) -> RespostaCartao: ...
+    def gerar_json(
+        self,
+        tarefa_nome: str,
+        prompt: str,
+        esquema: type[RespostaCartao],
+        *,
+        versao_prompt: str | None = None,
+    ) -> RespostaCartao: ...
+
+    def proveniencia(self, tarefa_nome: str, versao_prompt: str | None = None) -> Proveniencia: ...
 
 
 def _linha_tem_numero_sem_fonte(linha: str) -> bool:
@@ -45,11 +55,15 @@ def gerar_cartao(cliente_llm: ClienteCartao, conexao: sqlite3.Connection, assunt
 
     for _tentativa in range(_MAX_TENTATIVAS):
         try:
-            resposta = cliente_llm.gerar_json("cartao", prompt, RespostaCartao)
+            resposta = cliente_llm.gerar_json(
+                "cartao", prompt, RespostaCartao, versao_prompt=prompt_cartao.VERSAO
+            )
         except FalhaJsonInvalido:
             continue
         if _cartao_valido(resposta.resumo):
-            assuntos.gravar_cartao(conexao, assunto_id, resposta.resumo)
+            assuntos.gravar_cartao(
+                conexao, assunto_id, resposta.resumo, cliente_llm.proveniencia("cartao", prompt_cartao.VERSAO)
+            )
             conexao.commit()
             return resposta.resumo
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from agente_nw.nucleo.modelos.tema import RespostaDescreverTema
 
+VERSAO = "2026-10-31-1"
 ESQUEMA = RespostaDescreverTema
 
 # Cenário do exemplo deliberadamente distante de qualquer termo real de teste (armadilha 24,

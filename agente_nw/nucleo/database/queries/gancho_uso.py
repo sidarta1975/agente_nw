@@ -3,6 +3,8 @@ from __future__ import annotations
 import sqlite3
 from typing import Literal
 
+from agente_nw.nucleo.modelos.proveniencia import Proveniencia, colunas_gerado_por
+
 StatusGancho = Literal["entregue", "usado", "nao_serve"]
 
 
@@ -12,34 +14,42 @@ def inserir_entregues(
     ganchos: list[tuple[int | None, str]],
     agora: str,
     molde_origem_id: int | None = None,
+    proveniencia: Proveniencia | None = None,
 ) -> None:
     """Grava os ganchos entregues numa consulta. `ganchos` = [(assunto_id, gancho_json)]; assunto_id
     nulo é a mensagem base (brief 047). Repetir a gravação da mesma consulta e assunto substitui o
     texto e volta o status para `entregue`. `molde_origem_id`: `id` do `gancho_uso` usado como molde
-    para esta redação, quando houver (brief 065) — grava em todas as linhas desta chamada."""
+    para esta redação, quando houver (brief 065) — grava em todas as linhas desta chamada.
+    `proveniencia`: perfil, modelo e versão do prompt que redigiram (brief 066), idem."""
+    gerado_por = colunas_gerado_por(proveniencia)
     for assunto_id, gancho_json in ganchos:
         if assunto_id is None:
             atualizada = conexao.execute(
                 "UPDATE gancho_uso SET status = 'entregue', gancho_json = ?, atualizado_em = ?, "
-                "molde_origem_id = ? WHERE consulta_id = ? AND assunto_id IS NULL",
-                (gancho_json, agora, molde_origem_id, consulta_id),
+                "molde_origem_id = ?, gerado_por_modelo = ?, gerado_por_perfil = ?, "
+                "gerado_por_prompt_versao = ? WHERE consulta_id = ? AND assunto_id IS NULL",
+                (gancho_json, agora, molde_origem_id, *gerado_por, consulta_id),
             )
             if atualizada.rowcount == 0:
                 conexao.execute(
                     "INSERT INTO gancho_uso "
-                    "(consulta_id, assunto_id, status, gancho_json, atualizado_em, molde_origem_id) "
-                    "VALUES (?, NULL, 'entregue', ?, ?, ?)",
-                    (consulta_id, gancho_json, agora, molde_origem_id),
+                    "(consulta_id, assunto_id, status, gancho_json, atualizado_em, molde_origem_id, "
+                    "gerado_por_modelo, gerado_por_perfil, gerado_por_prompt_versao) "
+                    "VALUES (?, NULL, 'entregue', ?, ?, ?, ?, ?, ?)",
+                    (consulta_id, gancho_json, agora, molde_origem_id, *gerado_por),
                 )
             continue
         conexao.execute(
             "INSERT INTO gancho_uso "
-            "(consulta_id, assunto_id, status, gancho_json, atualizado_em, molde_origem_id) "
-            "VALUES (?, ?, 'entregue', ?, ?, ?) "
+            "(consulta_id, assunto_id, status, gancho_json, atualizado_em, molde_origem_id, "
+            "gerado_por_modelo, gerado_por_perfil, gerado_por_prompt_versao) "
+            "VALUES (?, ?, 'entregue', ?, ?, ?, ?, ?, ?) "
             "ON CONFLICT(consulta_id, assunto_id) DO UPDATE SET "
             "status = 'entregue', gancho_json = excluded.gancho_json, "
-            "atualizado_em = excluded.atualizado_em, molde_origem_id = excluded.molde_origem_id",
-            (consulta_id, assunto_id, gancho_json, agora, molde_origem_id),
+            "atualizado_em = excluded.atualizado_em, molde_origem_id = excluded.molde_origem_id, "
+            "gerado_por_modelo = excluded.gerado_por_modelo, gerado_por_perfil = excluded.gerado_por_perfil, "
+            "gerado_por_prompt_versao = excluded.gerado_por_prompt_versao",
+            (consulta_id, assunto_id, gancho_json, agora, molde_origem_id, *gerado_por),
         )
 
 

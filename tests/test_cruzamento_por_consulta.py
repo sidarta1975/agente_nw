@@ -28,6 +28,7 @@ from agente_nw.nucleo.modelos.cruzamento import (
 from agente_nw.nucleo.modelos.fato import Fato
 from agente_nw.nucleo.relevancia.cruzamento import cruzar_contato_por_consulta
 from agente_nw.nucleo.relevancia.pontuacao import avaliar, avaliar_por_consulta
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-10-08T10:00:00+00:00"
 DATA = "2026-10-08"
@@ -42,7 +43,7 @@ CENTROIDE_CONSULTA = _vetor(1.0, 0.0)
 CENTROIDE_ASSUNTO = _vetor(1.0, 1.2)
 
 
-class _ClienteFalso:
+class _ClienteFalso(ProvenienciaFalsa):
     """Embeddings controlados: texto de fato vira (0, 1); o resto (termos da consulta) vira (1, 0)."""
 
     def __init__(self) -> None:
@@ -51,7 +52,9 @@ class _ClienteFalso:
     def embeddar(self, textos: list[str]) -> list[list[float]]:
         return [_vetor(0.0, 1.0) if "fato" in texto else _vetor(1.0, 0.0) for texto in textos]
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         self.prompts.append(prompt)
         if tarefa_nome == "avaliar_relacao_objetivo":
             quantidade = prompt.rsplit("Candidatos:\n", 1)[1].count('" — ')
@@ -142,7 +145,7 @@ def _assunto(conn: sqlite3.Connection, titulo: str, centroide: list[float] = CEN
             conversavel=0.8,
         ),
     )
-    assuntos.gravar_centroide(conn, assunto_id, centroide)
+    assuntos.gravar_centroide(conn, assunto_id, centroide, modelo_embedding="bge-m3")
     conn.commit()
     return assunto_id
 
@@ -150,7 +153,7 @@ def _assunto(conn: sqlite3.Connection, titulo: str, centroide: list[float] = CEN
 def _tag(conn: sqlite3.Connection, perfil_id: int, nome: str, confirmado: bool) -> None:
     tema = temas.obter_ou_criar(conn, nome, "descrição da tag do contato", [], AGORA)
     assert tema.id is not None
-    temas.gravar_embedding(conn, tema.id, _vetor(0.0, 1.0))
+    temas.gravar_embedding(conn, tema.id, _vetor(0.0, 1.0), modelo_embedding="bge-m3")
     perfil_tema.vincular(conn, perfil_id, tema.id, 3, "declarada", None, confirmado, AGORA)
     conn.commit()
 
@@ -245,7 +248,7 @@ def test_fatos_sem_tag_formam_o_centroide_do_contato(tmp_path: Path, limiares: L
         _ClienteFalso(), conn, perfil_id, _contexto(), CENTROIDE_CONSULTA, limiares, AGORA
     )
 
-    assert perfis.obter_centroide(conn, perfil_id) is not None
+    assert perfis.obter_centroide(conn, perfil_id, modelo_embedding="bge-m3") is not None
     registro = assunto_contato.listar_do_dia(conn, perfil_id, DATA)[0]
     assert registro.aderencia_contato > 0
 

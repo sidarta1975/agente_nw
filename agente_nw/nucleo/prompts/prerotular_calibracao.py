@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from agente_nw.nucleo.modelos.calibracao import RespostaComparacaoPar
 
+VERSAO = "2026-09-19-1"
 ESQUEMA = RespostaComparacaoPar
 
 # Dois exemplos, de propósito — um par que é o mesmo assunto e um que não é: um

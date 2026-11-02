@@ -12,7 +12,7 @@ from agente_nw.nucleo.llm import ClienteOllama, FalhaJsonInvalido
 from agente_nw.nucleo.modelos.extracao import RespostaExtracaoTexto, TagSugerida
 from agente_nw.nucleo.modelos.fato import Fato
 from agente_nw.nucleo.modelos.fila import FilaExtracao
-from agente_nw.nucleo.prompts.extrair_de_texto import construir_prompt
+from agente_nw.nucleo.prompts.extrair_de_texto import VERSAO, construir_prompt
 
 
 @dataclass
@@ -55,7 +55,7 @@ def processar_fila(
 
         try:
             resposta = cliente_llm.gerar_json(
-                "extrair_de_texto", construir_prompt(item.texto), RespostaExtracaoTexto
+                "extrair_de_texto", construir_prompt(item.texto), RespostaExtracaoTexto, versao_prompt=VERSAO
             )
         except FalhaJsonInvalido as erro:
             assert item.id is not None
@@ -64,6 +64,7 @@ def processar_fila(
             resumo.erros += 1
             continue
 
+        proveniencia = cliente_llm.proveniencia("extrair_de_texto", VERSAO)
         campos = resposta.campos.model_dump(exclude_none=True)
         if campos:
             queries_perfis.atualizar_campos_guiados(conexao, item.perfil_id, campos, agora)
@@ -89,11 +90,12 @@ def processar_fila(
                     fonte=fato_extraido.fonte,
                     registrado_em=agora,
                 ),
+                proveniencia,
             )
             resumo.fatos_gravados += 1
 
         assert item.id is not None
-        fila_extracao.marcar_processado(conexao, item.id)
+        fila_extracao.marcar_processado(conexao, item.id, proveniencia)
         conexao.commit()
         resumo.itens_processados += 1
 

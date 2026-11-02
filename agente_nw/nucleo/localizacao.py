@@ -37,7 +37,9 @@ _HOSTS_POR_REDE: dict[str, str] = {
 
 
 class ClienteDesempate(Protocol):
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[_EsquemaT]) -> _EsquemaT: ...
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[_EsquemaT], *, versao_prompt: str | None = None
+    ) -> _EsquemaT: ...
 
 
 @dataclass
@@ -101,7 +103,9 @@ def _desempatar(
 ) -> Opcao | None:
     prompt = desempatar_perfil.construir_prompt(nome, pistas, [o.cabecalho for o in empatadas])
     try:
-        resposta = cliente_llm.gerar_json("desempatar_perfil", prompt, RespostaDesempate)
+        resposta = cliente_llm.gerar_json(
+            "desempatar_perfil", prompt, RespostaDesempate, versao_prompt=desempatar_perfil.VERSAO
+        )
     except FalhaJsonInvalido:
         return None
     indice = resposta.indice_escolhido

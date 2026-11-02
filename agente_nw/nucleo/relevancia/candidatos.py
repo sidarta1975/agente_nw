@@ -16,10 +16,11 @@ def selecionar(
     substancial_minimo: float,
     conversavel_minimo: float,
     limite: int,
+    modelo_embedding: str,
 ) -> list[Assunto]:
     ids_vistos = assunto_contato.listar_assunto_ids_ja_vistos(conexao, perfil_id)
     candidatos_com_centroide = assuntos.listar_qualificados_nao_vistos(
-        conexao, substancial_minimo, conversavel_minimo, ids_vistos
+        conexao, substancial_minimo, conversavel_minimo, ids_vistos, modelo_embedding
     )
 
     ranqueados = sorted(
@@ -55,6 +56,7 @@ def selecionar_por_consulta(
     limite: int,
     evitar: list[str],
     limiares_consulta: ConsultaLimiares,
+    modelo_embedding: str,
 ) -> tuple[list[Assunto], list[Assunto]]:
     """Devolve (selecionados, evitados).
 
@@ -62,7 +64,7 @@ def selecionar_por_consulta(
     à consulta; com centroide do contato, pesos `selecao_peso_*` de `limiares.conector.consulta`."""
     ids_vistos = assunto_contato.listar_assunto_ids_ja_vistos(conexao, perfil_id)
     candidatos_com_centroide = assuntos.listar_qualificados_nao_vistos(
-        conexao, substancial_minimo, conversavel_minimo, ids_vistos
+        conexao, substancial_minimo, conversavel_minimo, ids_vistos, modelo_embedding
     )
 
     evitados = [assunto for assunto, _ in candidatos_com_centroide if termo_evitado(assunto, evitar)]

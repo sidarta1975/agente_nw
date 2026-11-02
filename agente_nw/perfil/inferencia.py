@@ -42,10 +42,18 @@ _PADRAO_POSITIVO = re.compile(r"^(?:sou\s+|gosto\s+de\s+|curto\s+|pratico\s+)(.+
 
 class ClienteInferencia(Protocol):
     def gerar_json(
-        self, tarefa_nome: str, prompt: str, esquema: type[RespostaDescreverTema]
+        self,
+        tarefa_nome: str,
+        prompt: str,
+        esquema: type[RespostaDescreverTema],
+        *,
+        versao_prompt: str | None = None,
     ) -> RespostaDescreverTema: ...
 
     def embeddar(self, textos: list[str]) -> list[list[float]]: ...
+
+    @property
+    def modelo_embedding(self) -> str: ...
 
 
 def _termos_do_pedido(pedido: PedidoExtraido) -> list[str]:
@@ -79,7 +87,7 @@ def _tema_parecido(
     por_nome = _tema_por_nome_ou_sinonimo(temas_q.listar(conexao), termo)
     if por_nome is not None:
         return por_nome
-    candidatos = temas_q.listar_com_embedding(conexao)
+    candidatos = temas_q.listar_com_embedding(conexao, cliente_llm.modelo_embedding)
     if not candidatos:
         return None
     vetor_termo = cliente_llm.embeddar([termo])[0]
@@ -96,7 +104,10 @@ def _tema_parecido(
 def _criar_tema(conexao: sqlite3.Connection, cliente_llm: ClienteInferencia, termo: str, agora: str) -> Tema:
     try:
         resposta = cliente_llm.gerar_json(
-            "descrever_tema", descrever_tema.construir_prompt(termo), RespostaDescreverTema
+            "descrever_tema",
+            descrever_tema.construir_prompt(termo),
+            RespostaDescreverTema,
+            versao_prompt=descrever_tema.VERSAO,
         )
         descricao, sinonimos = resposta.descricao, resposta.sinonimos
     except FalhaJsonInvalido:
@@ -107,7 +118,7 @@ def _criar_tema(conexao: sqlite3.Connection, cliente_llm: ClienteInferencia, ter
     assert tema.id is not None
     try:
         vetor = cliente_llm.embeddar([f"{termo}: {descricao}"])[0]
-        temas_q.gravar_embedding(conexao, tema.id, vetor)
+        temas_q.gravar_embedding(conexao, tema.id, vetor, cliente_llm.modelo_embedding)
     except Exception:
         pass
     return tema

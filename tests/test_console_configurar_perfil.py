@@ -21,6 +21,7 @@ from agente_nw.nucleo.modelos.configuracao import (
     ListasLimiares,
     QualificacaoLimiares,
 )
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-09-21T10:00:00+00:00"
 
@@ -68,7 +69,7 @@ def _limiares() -> Limiares:
     )
 
 
-class _ClienteLLMFake:
+class _ClienteLLMFake(ProvenienciaFalsa):
     def __init__(self, *args: object, **kwargs: object) -> None:
         pass
 

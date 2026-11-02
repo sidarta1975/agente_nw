@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from agente_nw.nucleo import pedido as pedido_mod
 from agente_nw.nucleo.database import conexao, migracoes
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
+from tests.llm_falso import ProvenienciaFalsa
 
 
 def base(**mudancas: Any) -> dict[str, Any]:
@@ -31,12 +32,14 @@ def base(**mudancas: Any) -> dict[str, Any]:
     return dados
 
 
-class _ClienteFalso:
+class _ClienteFalso(ProvenienciaFalsa):
     def __init__(self, dados: dict[str, Any]) -> None:
         self._dados = dados
         self.prompts: list[str] = []
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         assert tarefa_nome == "extrair_pedido"
         self.prompts.append(prompt)
         return esquema.model_validate(self._dados)

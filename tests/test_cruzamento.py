@@ -22,6 +22,7 @@ from agente_nw.nucleo.modelos.configuracao import (
 )
 from agente_nw.nucleo.modelos.cruzamento import RespostaCruzarPorQue
 from agente_nw.nucleo.relevancia.cruzamento import cruzar_contato
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-09-19T00:00:00+00:00"
 
@@ -79,12 +80,14 @@ def _vetor(*valores: float) -> list[float]:
     return list(valores) + [0.0] * (1024 - len(valores))
 
 
-class _ClienteFake:
+class _ClienteFake(ProvenienciaFalsa):
     def __init__(self, respostas: list[RespostaCruzarPorQue | Exception]) -> None:
         self._respostas = list(respostas)
         self.chamadas = 0
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         self.chamadas += 1
         resposta = self._respostas.pop(0)
         if isinstance(resposta, Exception):
@@ -97,7 +100,7 @@ def _preparar_usuario_com_tema(conn: sqlite3.Connection) -> None:
     assert usuario.id is not None
     tema_usuario = temas.obter_ou_criar(conn, "tema-usuario", "descrição do tema", [], AGORA)
     assert tema_usuario.id is not None
-    temas.gravar_embedding(conn, tema_usuario.id, _vetor(1.0, 0.0))
+    temas.gravar_embedding(conn, tema_usuario.id, _vetor(1.0, 0.0), modelo_embedding="bge-m3")
     perfil_tema.vincular(conn, usuario.id, tema_usuario.id, 5, "declarada", "dominio", True, AGORA)
     conn.commit()
 
@@ -107,7 +110,7 @@ def _criar_contato_com_tema(conn: sqlite3.Connection, telefone: str, vetor_tema:
     assert contato.id is not None
     tema_contato = temas.obter_ou_criar(conn, f"tema-contato-{telefone}", "descrição do tema", [], AGORA)
     assert tema_contato.id is not None
-    temas.gravar_embedding(conn, tema_contato.id, vetor_tema)
+    temas.gravar_embedding(conn, tema_contato.id, vetor_tema, modelo_embedding="bge-m3")
     perfil_tema.vincular(conn, contato.id, tema_contato.id, 3, "declarada", "dominio", True, AGORA)
     conn.commit()
     return contato.id
@@ -126,7 +129,7 @@ def _criar_assunto_qualificado(
         conversavel=conversavel,
     )
     assunto_id = assuntos.inserir(conn, assunto)
-    assuntos.gravar_centroide(conn, assunto_id, centroide)
+    assuntos.gravar_centroide(conn, assunto_id, centroide, modelo_embedding="bge-m3")
     return assunto_id
 
 

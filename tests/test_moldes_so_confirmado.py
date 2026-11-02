@@ -15,12 +15,15 @@ from agente_nw.nucleo.database import conexao, migracoes
 from agente_nw.nucleo.database.queries import consulta_contato, gancho_uso, perfis
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.redacao import Gancho, RespostaRedacao
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-11-02T10:00:00+00:00"
 
 
-class _ClienteFalso:
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+class _ClienteFalso(ProvenienciaFalsa):
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         assert tarefa_nome == "redigir_ganchos"
         return RespostaRedacao(ganchos=[Gancho(mensagem="Mensagem nova para o contato.")])
 

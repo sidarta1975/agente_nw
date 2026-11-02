@@ -11,15 +11,18 @@ from agente_nw.nucleo.database import conexao, migracoes
 from agente_nw.nucleo.llm import ClienteOllama
 from agente_nw.nucleo.modelos.extracao import FatoDatado, RespostaExtracaoTexto, TagSugerida
 from agente_nw.perfil.extrator import processar_fila
+from tests.llm_falso import ProvenienciaFalsa
 
 
-class _ClienteOllamaFalso(ClienteOllama):
+class _ClienteOllamaFalso(ProvenienciaFalsa, ClienteOllama):
     """Resposta fabricada: sem rede, sem Ollama."""
 
     def __init__(self, resposta: RespostaExtracaoTexto) -> None:
         self._resposta = resposta
 
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[BaseModel]) -> Any:
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[BaseModel], versao_prompt: str | None = None
+    ) -> Any:
         self._prompt = prompt
         return self._resposta
 

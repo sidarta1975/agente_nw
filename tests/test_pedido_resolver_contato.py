@@ -10,6 +10,7 @@ from agente_nw.nucleo import pedido as pedido_mod
 from agente_nw.nucleo.database import conexao, migracoes
 from agente_nw.nucleo.database.queries import pedidos, perfis
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
+from tests.llm_falso import ProvenienciaFalsa
 
 AGORA = "2026-10-11T10:00:00+00:00"
 DEPOIS = "2026-10-12T10:00:00+00:00"
@@ -109,8 +110,10 @@ def test_sem_nome_nao_ha_perfil_e_nao_ha_erro(conn: sqlite3.Connection) -> None:
     assert perfil is None and criado is False and ambiguo is False and candidatos == []
 
 
-class _ClienteFalso:
-    def gerar_json(self, tarefa_nome: str, prompt: str, esquema: type[Any]) -> Any:
+class _ClienteFalso(ProvenienciaFalsa):
+    def gerar_json(
+        self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
+    ) -> Any:
         return _pedido()
 
 
