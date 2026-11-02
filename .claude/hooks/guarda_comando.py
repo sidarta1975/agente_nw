@@ -165,6 +165,12 @@ def _subcomando_git(argumentos: list[str]) -> tuple[str, list[str]]:
     return "", []
 
 
+def _acao_da_lista(argumentos: list[str]) -> str:
+    """A ação de `agente_nw listas <ação> ...`: a primeira palavra sem `-` depois de `listas`."""
+    depois = argumentos[argumentos.index("listas") + 1 :] if "listas" in argumentos else []
+    return next((a for a in depois if not a.startswith("-")), "")
+
+
 def _na_pasta_principal(cwd: str) -> bool:
     """A pasta principal tem `.git` como diretório; num worktree `.git` é um arquivo."""
     pasta = Path(cwd or ".").resolve()
@@ -238,6 +244,8 @@ def _decidir_segmento(palavras: list[str], cwd: str, profundidade: int) -> Decis
         if "--help" in argumentos or "-h" in argumentos:
             return PASSAR, ""
         subcomando = next((a for a in argumentos if not a.startswith("-")), "")
+        if subcomando == "listas" and _acao_da_lista(argumentos) == "ver":
+            return PASSAR, ""  # `listas ver` só lê o cache local; `listas atualizar` acessa a rede
         if subcomando in REDE_SOCIAL:
             return BLOQUEAR, MOTIVO_REDE
         if not subcomando or subcomando in PASSA_NA_PASTA_PRINCIPAL:
