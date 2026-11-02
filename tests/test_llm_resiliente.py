@@ -146,6 +146,59 @@ def test_corpo_tem_seed_fixo_e_num_predict_da_tarefa(tmp_path: Path) -> None:
     assert corpo["options"]["num_predict"] == tarefa_qualificar.num_predict
 
 
+def test_geracao_degenerada_depois_sucesso_na_nova_tentativa_sem_subir_excecao(
+    tmp_path: Path, _sem_sono: list[float]
+) -> None:
+    chamadas = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        chamadas["n"] += 1
+        if chamadas["n"] == 1:
+            return httpx.Response(500, json={"error": "prediction aborted, token repeat limit reached"})
+        return httpx.Response(200, json={"response": json.dumps({"ok": True})})
+
+    caminho_log = tmp_path / "chamadas_llm.jsonl"
+    cliente = _cliente(tmp_path, handler, caminho_log)
+
+    resultado = cliente.gerar_json("qualificar", "prompt", _EsquemaTeste)
+
+    assert resultado.ok is True
+    assert chamadas["n"] == 2
+    assert _sem_sono == []
+
+    linhas = _ler_log(caminho_log)
+    assert len(linhas) == 1
+    assert linhas[0]["tentativas_usadas"] == 2
+    assert linhas[0]["sucesso"] is True
+    assert linhas[0]["falhas_transporte"] == 0
+
+
+def test_geracao_degenerada_nas_duas_tentativas_vai_para_fila_revisao_sem_excecao_subir(
+    tmp_path: Path, _sem_sono: list[float]
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, json={"error": "prediction aborted, token repeat limit reached"})
+
+    caminho_log = tmp_path / "chamadas_llm.jsonl"
+    conexao_bd = conexao.abrir(tmp_path / "teste.db")
+    migracoes.aplicar(conexao_bd)
+    cliente_http = httpx.Client(transport=httpx.MockTransport(handler))
+    cliente = ClienteOllama(cliente_http, conexao_bd, _roteamento(), "http://ollama.invalido", caminho_log)
+
+    with pytest.raises(FalhaJsonInvalido):
+        cliente.gerar_json("qualificar", "prompt", _EsquemaTeste)
+
+    assert _sem_sono == []
+
+    linhas = _ler_log(caminho_log)
+    assert len(linhas) == 1
+    assert linhas[0]["sucesso"] is False
+    assert linhas[0]["falhas_transporte"] == 0
+
+    (n_fila,) = conexao_bd.execute("SELECT COUNT(*) FROM fila_revisao").fetchone()
+    assert n_fila == 1
+
+
 def test_falha_de_conteudo_so_aciona_a_nova_tentativa_por_temperatura_sem_backoff(
     tmp_path: Path, _sem_sono: list[float]
 ) -> None:

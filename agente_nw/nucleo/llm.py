@@ -206,6 +206,9 @@ class ClienteOllama:
                     tarefa_nome, indice, False, falhas_transporte_total, proveniencia, inicio
                 )
                 raise self._ir_para_fila_revisao(tarefa_nome, prompt, str(erro)) from erro
+            except _GeracaoDegenerada as erro:
+                ultimo_erro = str(erro)
+                continue
 
             falhas_transporte_total += falhas_transporte
             try:
@@ -215,7 +218,7 @@ class ClienteOllama:
                     tarefa_nome, indice, True, falhas_transporte_total, proveniencia, inicio
                 )
                 return resultado
-            except (json.JSONDecodeError, ValidationError, _GeracaoDegenerada) as erro:
+            except (json.JSONDecodeError, ValidationError) as erro:
                 ultimo_erro = str(erro)
 
         self._registrar_log_chamada(
