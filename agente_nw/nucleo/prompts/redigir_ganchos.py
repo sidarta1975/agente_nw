@@ -12,7 +12,7 @@ from agente_nw.nucleo.modelos.redacao import (
 )
 from agente_nw.nucleo.prompts.seguranca import INSTRUCAO_DADO_EXTERNO, MARCADOR_INICIO, cercar_dado_externo
 
-VERSAO = "2026-11-02-2"
+VERSAO = "2026-11-02-3"
 ESQUEMA = RespostaRedacao
 
 LIMITE_TOKENS_PADRAO = 6000
@@ -113,11 +113,14 @@ def _bloco_para_quem(entrada: EntradaRedacao) -> str:
     ]
     if entrada.contexto_relacao:
         linhas.append(f"Contexto da relação: {', '.join(entrada.contexto_relacao)}.")
+    # Cabeçalho e fatos vêm de rede social e de conversa do WhatsApp: entram cercados, como dado (brief 069).
     if entrada.cabecalho_rede:
-        linhas.append(f"Na rede social: {entrada.cabecalho_rede}")
+        linhas.append("Na rede social:\n" + cercar_dado_externo(entrada.cabecalho_rede))
     if entrada.fatos:
-        linhas.append("Fatos recentes sobre a pessoa:")
-        linhas.extend(f"- {fato}" for fato in entrada.fatos)
+        linhas.append(
+            "Fatos recentes sobre a pessoa:\n"
+            + cercar_dado_externo("\n".join(f"- {fato}" for fato in entrada.fatos))
+        )
     else:
         linhas.append("Fatos recentes sobre a pessoa: (nenhum)")
     return "\n".join(linhas)
@@ -150,7 +153,9 @@ def _bloco_historico(entrada: EntradaRedacao) -> str:
         return "HISTÓRICO: (nenhuma consulta anterior)" + extras
     return (
         "HISTÓRICO (consultas anteriores; não repita o que já foi usado; comentário do usuário diz por que "
-        "uma mensagem serviu ou não):\n" + "\n".join(entrada.historico) + extras
+        "uma mensagem serviu ou não):\n" + cercar_dado_externo("\n".join(entrada.historico)) + extras
+        # Cada linha junta o pedido antigo, a leitura de rede social e os títulos de notícia: bloco cercado
+        # inteiro, com o rótulo fora (brief 069).
     )
 
 
@@ -174,7 +179,8 @@ def _bloco_assuntos(entrada: EntradaRedacao) -> str:
         linhas.append("(nenhum — escreva só a mensagem base)")
     for assunto in entrada.assuntos:
         linhas.append(f"[assunto {assunto.assunto_id}] {cercar_dado_externo(assunto.titulo)}")
-        linhas.append(f"  Por que serve: {assunto.por_que or '(sem justificativa)'}")
+        por_que = cercar_dado_externo(assunto.por_que) if assunto.por_que else "(sem justificativa)"
+        linhas.append(f"  Por que serve: {por_que}")
         resumo = cercar_dado_externo(assunto.resumo) if assunto.resumo else "(sem resumo)"
         linhas.append(f"  Resumo: {resumo}")
         manchetes = (
@@ -248,18 +254,20 @@ senão, trate como conversa nova. Nunca faça perguntas ao usuário.
 def _montar(entrada: EntradaRedacao) -> str:
     # Cerco aplicado na montagem, nunca guardado em `EntradaRedacao`: `cortar_por_tamanho` corta as listas
     # cruas e mede o prompt já com os marcadores, o mesmo texto que vai ao modelo (brief 068).
+    para_quem = _bloco_para_quem(entrada)
     historico = _bloco_historico(entrada)
     assuntos = _bloco_assuntos(entrada)
-    tem_dado_externo = MARCADOR_INICIO in historico or MARCADOR_INICIO in assuntos
+    tem_dado_externo = any(MARCADOR_INICIO in bloco for bloco in (para_quem, historico, assuntos))
     blocos = [
         "Você redige, em nome do usuário, mensagens prontas para uma pessoa específica: uma mensagem "
         "base a partir do objetivo e da pessoa e, se houver, ganchos de notícia dos assuntos "
         "selecionados.",
         _bloco_quem_escreve(entrada),
-        _bloco_para_quem(entrada),
+        # A instrução vem antes do primeiro bloco cercado, que agora pode estar em "PARA QUEM" (brief 069).
+        INSTRUCAO_DADO_EXTERNO if tem_dado_externo else "",
+        para_quem,
         _bloco_pedido(entrada),
         _bloco_moldes(entrada),
-        INSTRUCAO_DADO_EXTERNO if tem_dado_externo else "",
         historico,
         assuntos,
         _regras(),
