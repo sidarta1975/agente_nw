@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from agente_nw.nucleo.modelos.cartao import RespostaCartao
+from agente_nw.nucleo.prompts.seguranca import INSTRUCAO_DADO_EXTERNO, cercar_dado_externo
 
-VERSAO = "2026-09-19-1"
+VERSAO = "2026-11-02-1"
 ESQUEMA = RespostaCartao
 
 # Cenário do exemplo deliberadamente distante de qualquer entrada real de teste
@@ -32,7 +33,8 @@ _EXEMPLO_SAIDA = (
 
 def construir_prompt(titulo: str, itens: list[tuple[str, str, str]]) -> str:
     lista_itens = "\n".join(
-        f'- "{item_titulo}" ({dominio}): "{trecho}"' for item_titulo, dominio, trecho in itens
+        f"- {cercar_dado_externo(item_titulo)} ({dominio}): {cercar_dado_externo(trecho)}"
+        for item_titulo, dominio, trecho in itens
     )
     lista_exemplo_itens = "\n".join(f'- "{t}" ({d}): "{trecho}"' for t, d, trecho in _EXEMPLO_ITENS)
 
@@ -57,8 +59,10 @@ Itens:
 {lista_exemplo_itens}
 JSON: {_EXEMPLO_SAIDA}
 
+{INSTRUCAO_DADO_EXTERNO}
+
 Assunto a resumir:
-Título: "{titulo}"
+Título: {cercar_dado_externo(titulo)}
 Itens:
 {lista_itens}
 """

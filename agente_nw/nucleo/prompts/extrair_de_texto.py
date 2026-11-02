@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from agente_nw.nucleo.modelos.extracao import RespostaExtracaoTexto
+from agente_nw.nucleo.prompts.seguranca import INSTRUCAO_DADO_EXTERNO, cercar_dado_externo
 
-VERSAO = "2026-10-14-1"
+VERSAO = "2026-11-02-1"
 ESQUEMA = RespostaExtracaoTexto
 
 _GUIA_CAMPOS = """\
@@ -77,6 +78,8 @@ Exemplo resolvido:
 Texto: "{_EXEMPLO_ENTRADA}"
 JSON: {_EXEMPLO_SAIDA}
 
+{INSTRUCAO_DADO_EXTERNO}
+
 Texto a processar:
-"{texto}"
+{cercar_dado_externo(texto)}
 """

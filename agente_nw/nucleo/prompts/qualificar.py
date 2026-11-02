@@ -5,8 +5,9 @@ from pathlib import Path
 import yaml
 
 from agente_nw.nucleo.modelos.qualificacao import RespostaQualificar
+from agente_nw.nucleo.prompts.seguranca import INSTRUCAO_DADO_EXTERNO, cercar_dado_externo
 
-VERSAO = "2026-09-19-1"
+VERSAO = "2026-11-02-1"
 ESQUEMA = RespostaQualificar
 
 _CAMINHO_EXEMPLOS_CONVERSAVEL = Path(__file__).resolve().parent / "exemplos_conversavel.yaml"
@@ -31,7 +32,9 @@ _EXEMPLO_SAIDA = (
 
 
 def construir_prompt(titulo: str, itens: list[tuple[str, str]], temas_conhecidos: list[str]) -> str:
-    lista_itens = "\n".join(f'- "{item_titulo}" ({dominio})' for item_titulo, dominio in itens)
+    lista_itens = "\n".join(
+        f"- {cercar_dado_externo(item_titulo)} ({dominio})" for item_titulo, dominio in itens
+    )
     lista_exemplo_itens = "\n".join(f'- "{t}" ({d})' for t, d in _EXEMPLO_ITENS)
     lista_temas = ", ".join(temas_conhecidos) if temas_conhecidos else "(nenhum tema conhecido)"
     lista_exemplo_temas = ", ".join(_EXEMPLO_TEMAS_CONHECIDOS)
@@ -68,8 +71,10 @@ Itens:
 Temas conhecidos: {lista_exemplo_temas}
 JSON: {_EXEMPLO_SAIDA}
 
+{INSTRUCAO_DADO_EXTERNO}
+
 Assunto a avaliar:
-Título: "{titulo}"
+Título: {cercar_dado_externo(titulo)}
 Itens:
 {lista_itens}
 Temas conhecidos: {lista_temas}

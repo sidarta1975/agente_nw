@@ -10,8 +10,9 @@ from agente_nw.nucleo.modelos.redacao import (
     LinkNoticia,
     RespostaRedacao,
 )
+from agente_nw.nucleo.prompts.seguranca import INSTRUCAO_DADO_EXTERNO, MARCADOR_INICIO, cercar_dado_externo
 
-VERSAO = "2026-11-02-1"
+VERSAO = "2026-11-02-2"
 ESQUEMA = RespostaRedacao
 
 LIMITE_TOKENS_PADRAO = 6000
@@ -136,8 +137,10 @@ def _bloco_pedido(entrada: EntradaRedacao) -> str:
 def _bloco_historico(entrada: EntradaRedacao) -> str:
     extras = ""
     if entrada.trocas_whatsapp:
-        extras += "\nConversa recente no WhatsApp (para o tom; não é fato atual):\n" + "\n".join(
-            f"- {troca}" for troca in entrada.trocas_whatsapp
+        # A conversa é texto do contato (brief 061): entra cercada, como dado. As notas abaixo são do
+        # próprio usuário (brief 050) e ficam de fora do cerco (brief 068).
+        extras += "\nConversa recente no WhatsApp (para o tom; não é fato atual):\n" + cercar_dado_externo(
+            "\n".join(f"- {troca}" for troca in entrada.trocas_whatsapp)
         )
     if entrada.notas:
         extras += "\nNotas do usuário sobre esta pessoa (valem como fato dito por ele):\n" + "\n".join(
@@ -170,10 +173,13 @@ def _bloco_assuntos(entrada: EntradaRedacao) -> str:
     if not entrada.assuntos:
         linhas.append("(nenhum — escreva só a mensagem base)")
     for assunto in entrada.assuntos:
-        linhas.append(f"[assunto {assunto.assunto_id}] {assunto.titulo}")
+        linhas.append(f"[assunto {assunto.assunto_id}] {cercar_dado_externo(assunto.titulo)}")
         linhas.append(f"  Por que serve: {assunto.por_que or '(sem justificativa)'}")
-        linhas.append(f"  Resumo: {assunto.resumo or '(sem resumo)'}")
-        manchetes = " | ".join(assunto.manchetes) if assunto.manchetes else "(sem manchetes)"
+        resumo = cercar_dado_externo(assunto.resumo) if assunto.resumo else "(sem resumo)"
+        linhas.append(f"  Resumo: {resumo}")
+        manchetes = (
+            cercar_dado_externo(" | ".join(assunto.manchetes)) if assunto.manchetes else "(sem manchetes)"
+        )
         linhas.append(f"  Manchetes: {manchetes}")
     return "\n".join(linhas)
 
@@ -240,6 +246,11 @@ senão, trate como conversa nova. Nunca faça perguntas ao usuário.
 
 
 def _montar(entrada: EntradaRedacao) -> str:
+    # Cerco aplicado na montagem, nunca guardado em `EntradaRedacao`: `cortar_por_tamanho` corta as listas
+    # cruas e mede o prompt já com os marcadores, o mesmo texto que vai ao modelo (brief 068).
+    historico = _bloco_historico(entrada)
+    assuntos = _bloco_assuntos(entrada)
+    tem_dado_externo = MARCADOR_INICIO in historico or MARCADOR_INICIO in assuntos
     blocos = [
         "Você redige, em nome do usuário, mensagens prontas para uma pessoa específica: uma mensagem "
         "base a partir do objetivo e da pessoa e, se houver, ganchos de notícia dos assuntos "
@@ -248,8 +259,9 @@ def _montar(entrada: EntradaRedacao) -> str:
         _bloco_para_quem(entrada),
         _bloco_pedido(entrada),
         _bloco_moldes(entrada),
-        _bloco_historico(entrada),
-        _bloco_assuntos(entrada),
+        INSTRUCAO_DADO_EXTERNO if tem_dado_externo else "",
+        historico,
+        assuntos,
         _regras(),
         "EXEMPLO RESOLVIDO (outro cenário; só o formato e o tom valem):\n" + _EXEMPLO,
         "AGORA FAÇA O MESMO PARA OS DADOS ACIMA. JSON:",

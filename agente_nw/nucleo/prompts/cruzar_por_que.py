@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
 from agente_nw.nucleo.modelos.cruzamento import RespostaCruzarPorQue
+from agente_nw.nucleo.prompts.seguranca import INSTRUCAO_DADO_EXTERNO, cercar_dado_externo
 
-VERSAO = "2026-10-14-1"
+VERSAO = "2026-11-02-1"
 ESQUEMA = RespostaCruzarPorQue
 
 # Cenário do exemplo deliberadamente distante de qualquer entrada real de teste
@@ -41,7 +42,7 @@ def construir_prompt(
         else "(nenhum)"
     )
     lista_assuntos = "\n".join(
-        f'{indice}. "{titulo}" — tipo: {tipo}, '
+        f"{indice}. {cercar_dado_externo(titulo)} — tipo: {tipo}, "
         f"ponto de apoio do usuário: {ponto_de_apoio or 'nenhum (só conversabilidade)'}"
         for indice, (titulo, tipo, ponto_de_apoio) in enumerate(assuntos, start=1)
     )
@@ -93,6 +94,7 @@ JSON: {_EXEMPLO_SAIDA}
 {bloco_contexto}Contato: {apelido_ou_nome}
 Temas do contato: {lista_temas_contato}
 Temas do usuário: {lista_temas_usuario}
+{INSTRUCAO_DADO_EXTERNO}
 Assuntos:
 {lista_assuntos}
 """

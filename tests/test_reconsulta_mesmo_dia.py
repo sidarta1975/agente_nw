@@ -27,7 +27,7 @@ from agente_nw.nucleo.modelos.cruzamento import (
     RespostaCruzarPorQue,
 )
 from agente_nw.nucleo.relevancia.cruzamento import cruzar_contato_por_consulta
-from tests.llm_falso import ProvenienciaFalsa
+from tests.llm_falso import ProvenienciaFalsa, candidatos_do_prompt, quantidade_assuntos_do_prompt
 
 AGORA = "2026-10-08T10:00:00+00:00"
 DATA = "2026-10-08"
@@ -49,11 +49,11 @@ class _ClienteFalso(ProvenienciaFalsa):
         self, tarefa_nome: str, prompt: str, esquema: type[Any], versao_prompt: str | None = None
     ) -> Any:
         if tarefa_nome == "avaliar_relacao_objetivo":
-            quantidade = prompt.rsplit("Candidatos:\n", 1)[1].count('" — ')
+            quantidade = len(candidatos_do_prompt(prompt))
             return RespostaAvaliarRelacaoObjetivo(
                 avaliacoes=[AvaliacaoRelacaoObjetivo(relaciona=True, motivo="")] * quantidade
             )
-        quantidade = prompt.rsplit("Assuntos:\n", 1)[1].count('" — tipo:')
+        quantidade = quantidade_assuntos_do_prompt(prompt)
         return RespostaCruzarPorQue(por_que=["serve para a consulta"] * quantidade)
 
 

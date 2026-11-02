@@ -3,6 +3,7 @@ from __future__ import annotations
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.prompts import redigir_ganchos as prompt
 from agente_nw.nucleo.prompts.redigir_ganchos import AssuntoParaRedacao, EntradaRedacao
+from agente_nw.nucleo.prompts.seguranca import cercar_dado_externo
 
 # Nomes que aparecem nos testes e nas frases de teste do projeto: o exemplo do prompt não pode usá-los.
 NOMES_DOS_TESTES = ("Marina", "Joaquim", "Zuleica", "Renato", "Carla", "Marcos", "Leonardo")
@@ -66,7 +67,7 @@ def test_o_prompt_traz_os_blocos_na_ordem() -> None:
     ]
     posicoes = [texto.index(marca) for marca in ordem]
     assert posicoes == sorted(posicoes)
-    assert "[assunto 7] Companhia regional compra seis aviões" in texto
+    assert "[assunto 7] " + cercar_dado_externo("Companhia regional compra seis aviões") in texto
     assert "Evitar: futebol" in texto
     assert "Davi Pires" in texto and "aviação (interesse)" in texto
 

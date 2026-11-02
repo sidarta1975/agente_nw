@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from agente_nw.nucleo.modelos.cruzamento import RespostaAvaliarRelacaoObjetivo
+from agente_nw.nucleo.prompts.seguranca import INSTRUCAO_DADO_EXTERNO, cercar_dado_externo
 
-VERSAO = "2026-10-30-1"
+VERSAO = "2026-11-02-1"
 ESQUEMA = RespostaAvaliarRelacaoObjetivo
 
 # Cenário do exemplo deliberadamente distante de qualquer entrada real de teste (armadilha 24,
@@ -30,7 +31,8 @@ def construir_prompt(
     objetivo: str, frase: str, ficha_contato: str, candidatos: list[tuple[str, str | None]]
 ) -> str:
     lista_candidatos = "\n".join(
-        f'{indice}. "{titulo}" — {resumo or "(sem resumo)"}'
+        f"{indice}. {cercar_dado_externo(titulo)} — "
+        f"{cercar_dado_externo(resumo) if resumo else '(sem resumo)'}"
         for indice, (titulo, resumo) in enumerate(candidatos, start=1)
     )
     lista_exemplo = "\n".join(
@@ -58,6 +60,7 @@ JSON: {_EXEMPLO_SAIDA}
 Objetivo: {objetivo}
 Frase do pedido: "{frase}"
 Ficha do contato: {ficha_contato or "(nada informado)"}
+{INSTRUCAO_DADO_EXTERNO}
 Candidatos:
 {lista_candidatos}
 """

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from agente_nw.nucleo.modelos.localizacao import RespostaDesempate
+from agente_nw.nucleo.prompts.seguranca import INSTRUCAO_DADO_EXTERNO, cercar_dado_externo
 
-VERSAO = "2026-10-11-1"
+VERSAO = "2026-11-02-1"
 ESQUEMA = RespostaDesempate
 
 # Cenário do exemplo deliberadamente distante de qualquer entrada real de teste (armadilha 24).
@@ -21,6 +22,14 @@ _EXEMPLO_SAIDA = (
 
 def _linhas(cabecalhos: list[str]) -> str:
     return "\n".join(f'{i}. "{c or "(sem cabeçalho)"}"' for i, c in enumerate(cabecalhos, start=1))
+
+
+def _linhas_cercadas(cabecalhos: list[str]) -> str:
+    """Os candidatos reais: o cabeçalho vem da rede social, escrito pelo dono do perfil (brief 068)."""
+    return "\n".join(
+        f"{i}. {cercar_dado_externo(c) if c else '(sem cabeçalho)'}"
+        for i, c in enumerate(cabecalhos, start=1)
+    )
 
 
 def _pistas(pistas: dict[str, str]) -> str:
@@ -46,7 +55,8 @@ JSON: {_EXEMPLO_SAIDA}
 
 Nome: {nome}
 Pistas: {_pistas(pistas)}
+{INSTRUCAO_DADO_EXTERNO}
 Candidatos:
-{_linhas(cabecalhos)}
+{_linhas_cercadas(cabecalhos)}
 JSON:
 """

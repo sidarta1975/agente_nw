@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from agente_nw.nucleo.modelos.rotulo import RespostaRotulo
+from agente_nw.nucleo.prompts.seguranca import INSTRUCAO_DADO_EXTERNO, cercar_dado_externo
 
-VERSAO = "2026-09-19-1"
+VERSAO = "2026-11-02-1"
 ESQUEMA = RespostaRotulo
 
 # Cenário do exemplo deliberadamente distante de qualquer entrada real de teste
@@ -16,7 +17,7 @@ _EXEMPLO_SAIDA = '{"titulo": "Prefeitura do Recife inicia obras de contenção n
 
 
 def construir_prompt(itens: list[tuple[str, str]]) -> str:
-    lista_itens = "\n".join(f'- "{titulo}" ({dominio})' for titulo, dominio in itens)
+    lista_itens = "\n".join(f"- {cercar_dado_externo(titulo)} ({dominio})" for titulo, dominio in itens)
     lista_exemplo = "\n".join(f'- "{titulo}" ({dominio})' for titulo, dominio in _EXEMPLO_ITENS)
 
     return f"""\
@@ -31,6 +32,8 @@ Exemplo resolvido:
 Itens:
 {lista_exemplo}
 JSON: {_EXEMPLO_SAIDA}
+
+{INSTRUCAO_DADO_EXTERNO}
 
 Itens a resumir:
 {lista_itens}

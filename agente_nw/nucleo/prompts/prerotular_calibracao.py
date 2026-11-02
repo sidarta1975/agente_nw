@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from agente_nw.nucleo.modelos.calibracao import RespostaComparacaoPar
+from agente_nw.nucleo.prompts.seguranca import INSTRUCAO_DADO_EXTERNO, cercar_dado_externo
 
-VERSAO = "2026-09-19-1"
+VERSAO = "2026-11-02-1"
 ESQUEMA = RespostaComparacaoPar
 
 # Dois exemplos, de propósito — um par que é o mesmo assunto e um que não é: um
@@ -52,9 +53,11 @@ Item B — título: "{_EXEMPLO_2_TITULO_B}"
 Item B — trecho: "{_EXEMPLO_2_TRECHO_B}"
 JSON: {_EXEMPLO_2_SAIDA}
 
+{INSTRUCAO_DADO_EXTERNO}
+
 Par a avaliar:
-Item A — título: "{titulo_a}"
-Item A — trecho: "{trecho_a}"
-Item B — título: "{titulo_b}"
-Item B — trecho: "{trecho_b}"
+Item A — título: {cercar_dado_externo(titulo_a)}
+Item A — trecho: {cercar_dado_externo(trecho_a)}
+Item B — título: {cercar_dado_externo(titulo_b)}
+Item B — trecho: {cercar_dado_externo(trecho_b)}
 """

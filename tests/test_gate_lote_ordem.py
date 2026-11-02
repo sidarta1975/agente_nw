@@ -29,7 +29,7 @@ from agente_nw.nucleo.modelos.cruzamento import (
     RespostaCruzarPorQue,
 )
 from agente_nw.nucleo.relevancia.cruzamento import cruzar_contato_por_consulta
-from tests.llm_falso import ProvenienciaFalsa
+from tests.llm_falso import ProvenienciaFalsa, candidatos_do_prompt, quantidade_assuntos_do_prompt
 
 AGORA = "2026-10-15T10:00:00+00:00"
 DATA = "2026-10-15"
@@ -44,8 +44,7 @@ CENTROIDE_ASSUNTO = _vetor(1.0, 0.0)
 
 
 def _quantidade_candidatos(prompt: str) -> int:
-    linhas = prompt.rsplit("Candidatos:\n", 1)[1].splitlines()
-    return len([linha for linha in linhas if linha.strip()])
+    return len(candidatos_do_prompt(prompt))
 
 
 class _ClienteGatePosicional(ProvenienciaFalsa):
@@ -64,7 +63,7 @@ class _ClienteGatePosicional(ProvenienciaFalsa):
             return RespostaAvaliarRelacaoObjetivo(
                 avaliacoes=[AvaliacaoRelacaoObjetivo(relaciona=r, motivo="") for r in self._respostas]
             )
-        quantidade = prompt.rsplit("Assuntos:\n", 1)[1].count('" — tipo:')
+        quantidade = quantidade_assuntos_do_prompt(prompt)
         return RespostaCruzarPorQue(por_que=[f"motivo {i}" for i in range(quantidade)])
 
 
@@ -86,7 +85,7 @@ class _ClienteGateTamanhoErrado(ProvenienciaFalsa):
             return RespostaAvaliarRelacaoObjetivo(
                 avaliacoes=[AvaliacaoRelacaoObjetivo(relaciona=True, motivo="")] * (quantidade - 1)
             )
-        quantidade = prompt.rsplit("Assuntos:\n", 1)[1].count('" — tipo:')
+        quantidade = quantidade_assuntos_do_prompt(prompt)
         return RespostaCruzarPorQue(por_que=[f"motivo {i}" for i in range(quantidade)])
 
 
