@@ -5,20 +5,20 @@ perfis:
     embeddings:
       modelo: bge-m3
     tarefas:
-      qualificar:            {modelo: qwen3:4b, num_ctx: 2048, temperature: 0.2, format: json, think: false}
-      rotular:               {modelo: qwen3:4b, num_ctx: 2048, temperature: 0.2, format: json, think: false}
-      cartao:                {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.3, format: json, think: false}
-      cruzar_por_que:        {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.3, format: json, think: false}
-      avaliar_relacao_objetivo: {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.1, format: json, think: false}
-      extrair_de_texto:      {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.2, format: json, think: false}
-      extrair_captura_rede_social: {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.2, format: json, think: false}
-      extrair_pedido:        {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.1, format: json, think: false}
-      desempatar_perfil:     {modelo: qwen3:4b, num_ctx: 2048, temperature: 0.1, format: json, think: false}
-      redigir_ganchos:       {modelo: qwen3:4b, num_ctx: 8192, temperature: 0.5, format: json, think: false}
-      extrair_termos_contato: {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.2, format: json, think: false}
-      descrever_tema:        {modelo: qwen3:4b, num_ctx: 2048, temperature: 0.2, format: json, think: false}
-      descrever_imagem:      {modelo: gemma3:4b, num_ctx: 4096, temperature: 0.2, format: json, think: false}
-      prerotular_calibracao: {modelo: qwen3:8b, num_ctx: 2048, temperature: 0.1, format: json, think: false}
+      qualificar:            {modelo: qwen3:4b, num_ctx: 2048, temperature: 0.2, format: json, think: false, num_predict: 256}
+      rotular:               {modelo: qwen3:4b, num_ctx: 2048, temperature: 0.2, format: json, think: false, num_predict: 256}
+      cartao:                {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.3, format: json, think: false, num_predict: 1024}
+      cruzar_por_que:        {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.3, format: json, think: false, num_predict: 512}
+      avaliar_relacao_objetivo: {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.1, format: json, think: false, num_predict: 512}
+      extrair_de_texto:      {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.2, format: json, think: false, num_predict: 1024}
+      extrair_captura_rede_social: {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.2, format: json, think: false, num_predict: 1024}
+      extrair_pedido:        {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.1, format: json, think: false, num_predict: 512}
+      desempatar_perfil:     {modelo: qwen3:4b, num_ctx: 2048, temperature: 0.1, format: json, think: false, num_predict: 256}
+      redigir_ganchos:       {modelo: qwen3:4b, num_ctx: 8192, temperature: 0.5, format: json, think: false, num_predict: 2048}
+      extrair_termos_contato: {modelo: qwen3:4b, num_ctx: 4096, temperature: 0.2, format: json, think: false, num_predict: 512}
+      descrever_tema:        {modelo: qwen3:4b, num_ctx: 2048, temperature: 0.2, format: json, think: false, num_predict: 512}
+      descrever_imagem:      {modelo: gemma3:4b, num_ctx: 4096, temperature: 0.2, format: json, think: false, num_predict: 1024}
+      prerotular_calibracao: {modelo: qwen3:8b, num_ctx: 2048, temperature: 0.1, format: json, think: false, num_predict: 512}
     nova_tentativa:
       temperature: 0.1
       maximo: 1
@@ -28,20 +28,20 @@ perfis:
     embeddings:
       modelo: bge-m3
     tarefas:
-      qualificar:            {modelo: qwen2.5:14b, num_ctx: 8192, temperature: 0.2, format: json, think: false}
-      rotular:               {modelo: qwen2.5:14b, num_ctx: 8192, temperature: 0.2, format: json, think: false}
-      cartao:                {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.3, format: json, think: false}
-      cruzar_por_que:        {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.3, format: json, think: false}
-      avaliar_relacao_objetivo: {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.1, format: json, think: false}
-      extrair_de_texto:      {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.2, format: json, think: false}
-      extrair_captura_rede_social: {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.2, format: json, think: false}
-      extrair_pedido:        {modelo: qwen2.5:14b, num_ctx: 8192, temperature: 0.1, format: json, think: false}
-      desempatar_perfil:     {modelo: qwen2.5:14b, num_ctx: 2048, temperature: 0.1, format: json, think: false}
-      redigir_ganchos:       {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.5, format: json, think: false}
-      extrair_termos_contato: {modelo: qwen2.5:14b, num_ctx: 4096, temperature: 0.2, format: json, think: false}
-      descrever_tema:        {modelo: qwen2.5:14b, num_ctx: 2048, temperature: 0.2, format: json, think: false}
-      descrever_imagem:      {modelo: gemma3:12b, num_ctx: 4096, temperature: 0.2, format: json, think: false}
-      prerotular_calibracao: {modelo: qwen2.5:14b, num_ctx: 8192, temperature: 0.1, format: json, think: false}
+      qualificar:            {modelo: qwen2.5:14b, num_ctx: 8192, temperature: 0.2, format: json, think: false, num_predict: 256}
+      rotular:               {modelo: qwen2.5:14b, num_ctx: 8192, temperature: 0.2, format: json, think: false, num_predict: 256}
+      cartao:                {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.3, format: json, think: false, num_predict: 1024}
+      cruzar_por_que:        {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.3, format: json, think: false, num_predict: 512}
+      avaliar_relacao_objetivo: {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.1, format: json, think: false, num_predict: 512}
+      extrair_de_texto:      {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.2, format: json, think: false, num_predict: 1024}
+      extrair_captura_rede_social: {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.2, format: json, think: false, num_predict: 1024}
+      extrair_pedido:        {modelo: qwen2.5:14b, num_ctx: 8192, temperature: 0.1, format: json, think: false, num_predict: 512}
+      desempatar_perfil:     {modelo: qwen2.5:14b, num_ctx: 2048, temperature: 0.1, format: json, think: false, num_predict: 256}
+      redigir_ganchos:       {modelo: qwen2.5:14b, num_ctx: 16384, temperature: 0.5, format: json, think: false, num_predict: 2048}
+      extrair_termos_contato: {modelo: qwen2.5:14b, num_ctx: 4096, temperature: 0.2, format: json, think: false, num_predict: 512}
+      descrever_tema:        {modelo: qwen2.5:14b, num_ctx: 2048, temperature: 0.2, format: json, think: false, num_predict: 512}
+      descrever_imagem:      {modelo: gemma3:12b, num_ctx: 4096, temperature: 0.2, format: json, think: false, num_predict: 1024}
+      prerotular_calibracao: {modelo: qwen2.5:14b, num_ctx: 8192, temperature: 0.1, format: json, think: false, num_predict: 512}
     nova_tentativa:
       temperature: 0.1
       maximo: 1

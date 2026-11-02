@@ -40,6 +40,7 @@ class TarefaRoteamento(BaseModel):
     temperature: float
     format: str
     think: bool
+    num_predict: int = Field(gt=0)
 
     @field_validator("think")
     @classmethod

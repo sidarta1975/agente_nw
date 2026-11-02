@@ -63,7 +63,7 @@ def origem_perfil_llm() -> str:
 
 @functools.lru_cache(maxsize=1)
 def http() -> httpx.Client:
-    return httpx.Client(timeout=120.0)
+    return httpx.Client(timeout=600.0)
 
 
 @functools.lru_cache(maxsize=1)

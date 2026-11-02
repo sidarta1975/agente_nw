@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypeVar
@@ -13,6 +14,12 @@ from agente_nw.nucleo.database.queries import fila_revisao
 from agente_nw.nucleo.modelos.configuracao import Roteamento, TarefaRoteamento
 
 EsquemaT = TypeVar("EsquemaT", bound=BaseModel)
+
+_SEED = 42
+_INTERVALOS_BACKOFF_TRANSPORTE: tuple[float, ...] = (2, 4, 8, 16)
+"""Erro de conexão/timeout/HTTP contra o Ollama — servidor local, compartilhado, pode estar
+carregando ou descarregando um modelo no momento exato da chamada. Camada separada da nova
+tentativa por temperatura, que é só para falha de conteúdo (JSON inválido/geração degenerada)."""
 
 
 class _GeracaoDegenerada(Exception):
@@ -47,7 +54,9 @@ class ClienteOllama:
         self._ollama_url = ollama_url
         self._caminho_log = caminho_log
 
-    def _registrar_log_chamada(self, tarefa_nome: str, tentativas_usadas: int, sucesso: bool) -> None:
+    def _registrar_log_chamada(
+        self, tarefa_nome: str, tentativas_usadas: int, sucesso: bool, falhas_transporte: int
+    ) -> None:
         try:
             self._caminho_log.parent.mkdir(parents=True, exist_ok=True)
             linha = json.dumps(
@@ -55,6 +64,7 @@ class ClienteOllama:
                     "tarefa": tarefa_nome,
                     "tentativas_usadas": tentativas_usadas,
                     "sucesso": sucesso,
+                    "falhas_transporte": falhas_transporte,
                     "quando": datetime.now(UTC).isoformat(),
                 },
                 ensure_ascii=False,
@@ -85,7 +95,12 @@ class ClienteOllama:
             "prompt": prompt,
             "format": tarefa.format,
             "stream": False,
-            "options": {"num_ctx": tarefa.num_ctx, "temperature": temperature},
+            "options": {
+                "num_ctx": tarefa.num_ctx,
+                "temperature": temperature,
+                "seed": _SEED,
+                "num_predict": tarefa.num_predict,
+            },
         }
         if imagens:
             corpo["images"] = imagens
@@ -105,6 +120,36 @@ class ClienteOllama:
         assert isinstance(texto, str)
         return texto
 
+    def _chamar_generate_com_backoff(
+        self,
+        tarefa: TarefaRoteamento,
+        prompt: str,
+        temperature: float,
+        imagens: list[str] | None,
+    ) -> tuple[str, int]:
+        """Nova tentativa só para erro de transporte (conexão, timeout, HTTP) — não para geração
+        degenerada, que é falha de tentativa e segue para a nova tentativa por temperatura."""
+        ultimo_erro: httpx.HTTPStatusError | httpx.RequestError | None = None
+        falhas = 0
+        for espera in (0.0, *_INTERVALOS_BACKOFF_TRANSPORTE):
+            if espera:
+                time.sleep(espera)
+            try:
+                return self._chamar_generate(tarefa, prompt, temperature, imagens), falhas
+            except _GeracaoDegenerada:
+                raise
+            except (httpx.HTTPStatusError, httpx.RequestError) as erro:
+                falhas += 1
+                ultimo_erro = erro
+        assert ultimo_erro is not None
+        raise ultimo_erro
+
+    def _ir_para_fila_revisao(self, tarefa_nome: str, prompt: str, erro: str) -> FalhaJsonInvalido:
+        agora = datetime.now(UTC).isoformat()
+        fila_id = fila_revisao.inserir(self._conexao, tarefa_nome, prompt, erro, agora)
+        self._conexao.commit()
+        return FalhaJsonInvalido(tarefa_nome, fila_id, erro)
+
     def gerar_json(
         self,
         tarefa_nome: str,
@@ -117,22 +162,29 @@ class ClienteOllama:
         nova_tentativa = self._roteamento.perfis[self._roteamento.perfil_ativo].nova_tentativa
 
         ultimo_erro = ""
+        falhas_transporte_total = 0
         tentativas = (tarefa.temperature, nova_tentativa.temperature)
         for indice, temperatura in enumerate(tentativas, start=1):
             try:
-                texto = self._chamar_generate(tarefa, prompt, temperatura, imagens)
+                texto, falhas_transporte = self._chamar_generate_com_backoff(
+                    tarefa, prompt, temperatura, imagens
+                )
+            except (httpx.HTTPStatusError, httpx.RequestError) as erro:
+                falhas_transporte_total += len(_INTERVALOS_BACKOFF_TRANSPORTE) + 1
+                self._registrar_log_chamada(tarefa_nome, indice, False, falhas_transporte_total)
+                raise self._ir_para_fila_revisao(tarefa_nome, prompt, str(erro)) from erro
+
+            falhas_transporte_total += falhas_transporte
+            try:
                 bruto = json.loads(texto)
                 resultado = esquema.model_validate(bruto)
-                self._registrar_log_chamada(tarefa_nome, indice, True)
+                self._registrar_log_chamada(tarefa_nome, indice, True, falhas_transporte_total)
                 return resultado
             except (json.JSONDecodeError, ValidationError, _GeracaoDegenerada) as erro:
                 ultimo_erro = str(erro)
 
-        self._registrar_log_chamada(tarefa_nome, len(tentativas), False)
-        agora = datetime.now(UTC).isoformat()
-        fila_id = fila_revisao.inserir(self._conexao, tarefa_nome, prompt, ultimo_erro, agora)
-        self._conexao.commit()
-        raise FalhaJsonInvalido(tarefa_nome, fila_id, ultimo_erro)
+        self._registrar_log_chamada(tarefa_nome, len(tentativas), False, falhas_transporte_total)
+        raise self._ir_para_fila_revisao(tarefa_nome, prompt, ultimo_erro)
 
     def embeddar(self, textos: list[str]) -> list[list[float]]:
         perfil = self._roteamento.perfis[self._roteamento.perfil_ativo]

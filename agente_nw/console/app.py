@@ -51,6 +51,7 @@ from agente_nw.nucleo.texto import sem_acento_e_caixa
 from agente_nw.perfil import configurador, extrator, inferencia
 from agente_nw.perfil.lacunas import campos_faltando
 from agente_nw.perfil.normalizacao import telefone_e164
+from config import container
 
 _NIVEIS: tuple[NivelTema, ...] = ("dominio", "interesse", "curiosidade")
 _MEIOS: tuple[str, ...] = ("pessoalmente", "telefone", "whatsapp", "carta", "outro")
@@ -93,9 +94,7 @@ def criar_app(
 
     def _cliente_llm() -> ClienteOllama:
         if "cliente_llm" not in g:
-            g.cliente_llm = ClienteOllama(
-                httpx.Client(timeout=120.0), _conn(), roteamento, ollama_url, caminho_log_llm
-            )
+            g.cliente_llm = ClienteOllama(container.http(), _conn(), roteamento, ollama_url, caminho_log_llm)
         return cast(ClienteOllama, g.cliente_llm)
 
     @app.teardown_appcontext
@@ -129,7 +128,7 @@ def criar_app(
         from agente_nw.coleta.capturas.extensao_backend import abrir_pagina_extensao
 
         def fabrica_llm(conn: sqlite3.Connection) -> ClienteOllama:
-            return ClienteOllama(httpx.Client(timeout=120.0), conn, roteamento, ollama_url, caminho_log_llm)
+            return ClienteOllama(container.http(), conn, roteamento, ollama_url, caminho_log_llm)
 
         perfil_llm = roteamento.perfis[roteamento.perfil_ativo]
         return fluxo_mod.Dependencias(
@@ -167,9 +166,7 @@ def criar_app(
         try:
             agora = datetime.now(UTC).isoformat()
             whatsapp_importador.enfileirar_extracao(conn_fundo, perfil_id, limiares.whatsapp, agora)
-            cliente = ClienteOllama(
-                httpx.Client(timeout=120.0), conn_fundo, roteamento, ollama_url, caminho_log_llm
-            )
+            cliente = ClienteOllama(container.http(), conn_fundo, roteamento, ollama_url, caminho_log_llm)
             extrator.processar_fila(cliente, conn_fundo)
         finally:
             conn_fundo.close()
