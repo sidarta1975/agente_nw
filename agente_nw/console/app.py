@@ -145,9 +145,12 @@ def criar_app(
             gravar_usuario=gravar_usuario,
         )
 
-    def _despachar_execucao(pedido_id: int, continuar: bool = False) -> None:
+    def _despachar_execucao(pedido_id: int, continuar: bool = False, apos_divergencia: bool = False) -> None:
         deps = _dependencias()
-        trabalho = fluxo_mod.continuar_pedido if continuar else fluxo_mod.executar_pedido
+        if apos_divergencia:  # o "Sim" ainda deixa a curadoria de rede social por fazer (brief 071)
+            trabalho = fluxo_mod.retomar_apos_divergencia
+        else:
+            trabalho = fluxo_mod.continuar_pedido if continuar else fluxo_mod.executar_pedido
         despachar(lambda: trabalho(deps, pedido_id))
 
     # Conversa do WhatsApp lida, à espera de confirmação de quem é "você" (brief 061): em memória, no
@@ -246,7 +249,7 @@ def criar_app(
             elif erro is None and fluxo_mod.sem_perguntas(conn, pedido_id):
                 pedidos.atualizar_status(conn, pedido_id, "na_fila")
                 conn.commit()
-                _despachar_execucao(pedido_id, continuar=True)
+                _despachar_execucao(pedido_id, apos_divergencia=True)
             return redirect(url_for("ver_pedido", pedido_id=pedido.id, erro=erro))
         if request.form.get("tipo") == "contato":
             erro = fluxo_mod.decidir_contato(conn, pedido_id, int(request.form.get("perfil_id", "0") or 0))

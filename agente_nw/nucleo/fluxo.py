@@ -239,8 +239,26 @@ def executar_pedido(deps: Dependencias, pedido_id: int) -> None:
 
 
 def continuar_pedido(deps: Dependencias, pedido_id: int) -> None:
-    """Retoma depois das respostas do usuário (não há mais pergunta pendente)."""
+    """Retoma depois das respostas do usuário (não há mais pergunta pendente).
+
+    Serve ao caminho de `decidir_rede`/`decidir_contato`, em que a localização já foi resolvida antes de
+    a última pergunta sair da lista. Depois do "Sim" da divergência não serve: ver
+    `retomar_apos_divergencia`."""
     _com_conexao_propria(deps, pedido_id, lambda conexao: _escrever(deps, conexao, pedido_id))
+
+
+def retomar_apos_divergencia(deps: Dependencias, pedido_id: int) -> None:
+    """Retoma depois do "Sim" à divergência, passando de novo por `_entender` (brief 071).
+
+    A divergência pausa o pedido *antes* de a curadoria de rede social acontecer: `_localizar_na_rede`
+    desiste quando o contato é divergente, para não gravar rede social em quem pode ser outra pessoa. Com
+    o "Sim", o contato está certo e essa curadoria ainda não rodou neste pedido — então a retomada não
+    pode ser o atalho de `continuar_pedido` (que vai direto à redação). `divergencia_aceita` evita que a
+    mesma pergunta volte: o nome do pedido continua diferente do nome do contato, e sem isso
+    `entender_pedido` recriaria a divergência a cada passada."""
+    _com_conexao_propria(
+        deps, pedido_id, lambda conexao: _entender(deps, conexao, pedido_id, divergencia_aceita=True)
+    )
 
 
 def _com_conexao_propria(
@@ -262,7 +280,11 @@ def _etapa(conexao: sqlite3.Connection, pedido_id: int, texto: str) -> None:
     conexao.commit()
 
 
-def _entender(deps: Dependencias, conexao: sqlite3.Connection, pedido_id: int) -> None:
+def _entender(
+    deps: Dependencias, conexao: sqlite3.Connection, pedido_id: int, divergencia_aceita: bool = False
+) -> None:
+    """`divergencia_aceita`: o usuário já respondeu "Sim" à divergência deste pedido, então o contato
+    forçado conta como confirmado e a pergunta não nasce de novo (brief 071)."""
     pedido = pedidos.obter_por_id(conexao, pedido_id)
     assert pedido is not None
     pedidos.atualizar_status(conexao, pedido_id, "processando")
@@ -291,6 +313,7 @@ def _entender(deps: Dependencias, conexao: sqlite3.Connection, pedido_id: int) -
         contato_id_forcado=pedido.perfil_id,  # correção, ou contato já escolhido pelo usuário
         navegacao=navegacao,
         pedido_id=pedido_id,
+        confirmar_contato=(lambda _nome_pedido, _nome_contato: True) if divergencia_aceita else None,
     )
 
     if orquestracao.encaminhar_pedido(resultado, CanalWeb(conexao, pedido_id)) is Desfecho.ESPERAR:

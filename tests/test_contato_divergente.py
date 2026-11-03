@@ -56,10 +56,89 @@ def test_console_sim_segue_o_pedido_ate_a_redacao(cenario: Cenario) -> None:
 
     assert fluxo_mod.decidir_divergencia(cenario.conn, pedido_id, True) is None
     assert fluxo_mod.sem_perguntas(cenario.conn, pedido_id)
-    fluxo_mod.continuar_pedido(cenario.deps, pedido_id)
+    fluxo_mod.retomar_apos_divergencia(cenario.deps, pedido_id)
 
     assert cenario.ler(pedido_id).status == "concluido"
     assert len(cenario.chamadas_preparar) == 1
+
+
+# ---- curadoria de rede social depois do "Sim" (brief 071) ----------------------------------------------
+
+
+def test_sim_na_divergencia_volta_a_curar_as_redes_sociais(cenario: Cenario) -> None:
+    """O contato está certo depois do "Sim", mas as redes dele nunca foram curadas neste pedido: a
+    retomada passa de novo por `_entender`, então a pergunta de rede aparece em vez de o pedido ir
+    direto para a redação (decisão [059-3])."""
+    perfil_id = cenario.contato("Joaquim Bastos")  # sem curar: toda rede está pendente
+    pedido_id = cenario.pedido()
+    pedidos.gravar_resolucao(cenario.conn, pedido_id, perfil_id, False, False)
+    cenario.conn.commit()
+    fluxo_mod.executar_pedido(cenario.deps, pedido_id)
+    assert cenario.redes_localizadas == []  # divergência pausa antes de procurar rede nenhuma
+
+    assert fluxo_mod.decidir_divergencia(cenario.conn, pedido_id, True) is None
+    fluxo_mod.retomar_apos_divergencia(cenario.deps, pedido_id)
+
+    gravado = cenario.ler(pedido_id)
+    assert gravado.status == "aguardando_pessoa"
+    assert cenario.redes_localizadas != []  # prova de que `_entender` rodou de novo
+    assert {p["tipo"] for p in _perguntas(cenario, pedido_id)} == {"rede"}
+    assert cenario.chamadas_preparar == []  # não foi para a redação sem perguntar
+
+
+def test_sim_na_divergencia_nao_repete_a_pergunta_de_divergencia(cenario: Cenario) -> None:
+    """Na segunda passada o contato já está confirmado pelo usuário: a divergência de nome continua
+    existindo (o pedido fala de outra pessoa), mas não pode virar pergunta de novo."""
+    perfil_id = cenario.contato("Joaquim Bastos", curar=True)
+    pedido_id = cenario.pedido()
+    pedidos.gravar_resolucao(cenario.conn, pedido_id, perfil_id, False, False)
+    perfis.inserir_novo_contato(cenario.conn, "Marta Quintela Dias", None, None, AGORA)
+    cenario.conn.commit()
+    fluxo_mod.executar_pedido(cenario.deps, pedido_id)
+
+    assert fluxo_mod.decidir_divergencia(cenario.conn, pedido_id, True) is None
+    fluxo_mod.retomar_apos_divergencia(cenario.deps, pedido_id)
+
+    tipos = {p["tipo"] for p in _perguntas(cenario, pedido_id)}
+    assert "divergencia" not in tipos
+    assert cenario.ler(pedido_id).perfil_id == perfil_id
+
+
+def test_rota_do_console_apos_o_sim_despacha_a_curadoria_de_rede(cenario: Cenario) -> None:
+    """A escolha do despacho é da rota: era ela que mandava `continuar=True` e pulava a curadoria."""
+    from tests.test_console_tela_unica import _app
+
+    perfil_id = cenario.contato("Joaquim Bastos")  # sem curar
+    pedido_id = cenario.pedido()
+    pedidos.gravar_resolucao(cenario.conn, pedido_id, perfil_id, False, False)
+    cenario.conn.commit()
+    client = _app(cenario)
+    fluxo_mod.executar_pedido(cenario.deps, pedido_id)
+    assert cenario.redes_localizadas == []
+
+    client.post(f"/pedido/{pedido_id}/pessoa", data={"tipo": "divergencia", "resposta": "sim"})
+
+    assert cenario.redes_localizadas != []  # a rota retomou por `_entender`, não por `_escrever`
+    assert cenario.chamadas_preparar == []
+    assert {p["tipo"] for p in _perguntas(cenario, pedido_id)} == {"rede"}
+
+
+def test_resposta_de_rede_continua_indo_direto_para_a_redacao(cenario: Cenario) -> None:
+    """Não regressão do caminho correto que já existia: quando a pergunta pendente era de rede, a
+    localização já foi resolvida, então a retomada é `continuar_pedido` e não repassa por `_entender`."""
+    cenario.contato()  # nome que bate com o do pedido: sem divergência
+    pedido_id = cenario.pedido()
+    fluxo_mod.executar_pedido(cenario.deps, pedido_id)
+    assert cenario.ler(pedido_id).status == "aguardando_pessoa"
+    passadas_de_entender = len(cenario.cliente.frases)
+
+    for pergunta in _perguntas(cenario, pedido_id):
+        assert fluxo_mod.decidir_rede(cenario.conn, pedido_id, pergunta["rede"], "pular", AGORA) is None
+    assert fluxo_mod.sem_perguntas(cenario.conn, pedido_id)
+    fluxo_mod.continuar_pedido(cenario.deps, pedido_id)
+
+    assert cenario.ler(pedido_id).status == "concluido"
+    assert len(cenario.cliente.frases) == passadas_de_entender  # `_entender` não rodou de novo
 
 
 def test_console_nao_mostra_os_contatos_parecidos(cenario: Cenario) -> None:
