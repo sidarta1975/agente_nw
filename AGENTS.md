@@ -103,3 +103,14 @@ Uma tarefa só está certificada quando: o gate fica verde dentro do `scripts/ag
 - Havendo teste de aceite, o executor cria o teste antes do código.
 - Não editar este arquivo, regra ou skill numa sessão de execução, salvo quando o brief tiver esse arquivo como alvo.
 - Todo brief é executado com `/executar <NNN>`.
+
+## 11. Cowork: o que a ponte com o computador pode e não pode fazer
+
+O Cowork (a sessão de planejamento que escreve os briefs) tem, por uma ponte de dispositivo, acesso de leitura e escrita aos arquivos deste repositório no computador de Sidarta — mas essa ponte roda numa máquina virtual Linux separada do Mac, não no Mac. Por isso:
+
+- **Pode:** ler qualquer arquivo e o código; escrever e revisar briefs (`docs/briefs/`), documentos e o `docs/PLAN.md`; inspecionar o resultado de um brief já executado (git log, arquivos alterados, conteúdo).
+- **Não pode:** rodar o gate (`scripts/verificar.sh`) nem a suíte de testes — os binários do `.venv` são de macOS (Mach-O arm64) e a VM Linux não os executa ("Exec format error"), e o projeto depende de um pacote exclusivo do macOS (`pyobjc-framework-Contacts`, que lê a agenda do Mac), então nem um ambiente novo dentro dessa VM resolveria. Sem rodar o gate de verdade, o Cowork nunca declara que um código "passou" ou "funciona" (§8).
+- **Não pode:** commitar nem publicar — a ponte não tem as credenciais do GitHub de Sidarta (sem chave SSH, sem `gh auth`, sem credential helper).
+- **Não pode:** digitar comandos no terminal ou numa IDE de Sidarta por controle de tela — essa ferramenta bloqueia digitação em terminal/IDE por categoria, e nenhuma concessão de acesso remove essa trava.
+
+**Conclusão prática:** gerar e validar código deste projeto continua sendo tarefa da sessão de terminal de Sidarta, com `/executar <NNN>`. O Cowork prepara o brief; Sidarta executa. Isto só muda se um brief futuro mudar alguma das quatro condições acima (por exemplo, um ambiente Linux equivalente dentro da ponte, ou credenciais de git configuradas nela por decisão explícita de Sidarta).
