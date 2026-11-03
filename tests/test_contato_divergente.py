@@ -60,6 +60,10 @@ def test_console_sim_segue_o_pedido_ate_a_redacao(cenario: Cenario) -> None:
 
     assert cenario.ler(pedido_id).status == "concluido"
     assert len(cenario.chamadas_preparar) == 1
+    # A leitura de rede social relevante acontece (não é correção) e a curadoria já feita em pedidos
+    # anteriores não é refeita: a retomada por `_entender` não repergunta o que já está curado.
+    assert cenario.chamadas_preparar[0]["ler_redes_sociais"] is True
+    assert cenario.redes_localizadas == []
 
 
 # ---- curadoria de rede social depois do "Sim" (brief 071) ----------------------------------------------
