@@ -114,3 +114,13 @@ O Cowork (a sessão de planejamento que escreve os briefs) tem, por uma ponte de
 - **Não pode:** digitar comandos no terminal ou numa IDE de Sidarta por controle de tela — essa ferramenta bloqueia digitação em terminal/IDE por categoria, e nenhuma concessão de acesso remove essa trava.
 
 **Conclusão prática:** gerar e validar código deste projeto continua sendo tarefa da sessão de terminal de Sidarta, com `/executar <NNN>`. O Cowork prepara o brief; Sidarta executa. Isto só muda se um brief futuro mudar alguma das quatro condições acima (por exemplo, um ambiente Linux equivalente dentro da ponte, ou credenciais de git configuradas nela por decisão explícita de Sidarta).
+
+## 12. Estado local: uma árvore de trabalho só
+
+Este projeto guarda estado que não é código nem está no git: o banco (`dados/agente.db` — caminho relativo em `config/local.yaml`, resolvido por `config/container.py::caminho_banco` contra `RAIZ`, que é a raiz da árvore de trabalho onde o processo roda) e a pasta `docs/` inteira (`docs/PLAN.md`, `docs/briefs/`, `docs/docs/`) — o `.gitignore` exclui `docs/*` de propósito, com exceção só de `docs/.gitkeep`; `git ls-files docs/` devolve vazio, isto é, nada dali jamais entrou num commit.
+
+Isso só se comporta como "o projeto" dentro de uma única árvore de trabalho. Uma sessão aberta numa **worktree** separada (`git worktree add`) tem sua própria cópia de disco, desconectada: seu próprio banco (vazio ou desatualizado) e sua própria pasta `docs/` (sem PLAN, sem briefs, sem relatório nenhum), mesmo rodando o mesmo código da `main`. Já existiu uma worktree deste tipo aqui: o registro de `agente_nw_040` (brief 040) continua em `.git/worktrees/`, embora a pasta já não exista.
+
+As quatro superfícies do Claude Code (terminal, aplicativo Desktop, Remote Control, Dispatch) rodam a mesma engine e leem a mesma configuração do projeto, mas **não compartilham histórico de conversa**, e só compartilham disco dentro da mesma árvore de trabalho.
+
+**Regra prática:** todo trabalho deste projeto — terminal, aplicativo Desktop ou Dispatch — roda na árvore de trabalho principal, nunca numa worktree. Para continuar, de outro aparelho, uma tarefa já em andamento, usar Remote Control (controla a sessão que já existe, com o mesmo estado) — nunca abrir uma sessão nova apontando para este projeto, porque ela não vai saber o que a sessão anterior já decidiu ou estava fazendo, e, se cair numa worktree, nem vai ver o banco ou o PLAN reais.
