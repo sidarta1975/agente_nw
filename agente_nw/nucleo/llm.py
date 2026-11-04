@@ -282,3 +282,243 @@ class ClienteOllama(_ClienteLLMBase):
                 raise ValueError(f"embedding com {len(vetor)} posições, esperado 1024")
 
         return vetores
+
+
+_MEDIA_TYPE_IMAGEM = "image/jpeg"
+"""As imagens publicadas chegam à tarefa `descrever_imagem` só como base64: `ImagemCapturada.mime`
+guarda o `content-type` real que a extensão leu, mas `coleta/capturas/imagens.py` passa apenas
+`dados_base64` para `gerar_json`. Sem o mime real chegando até aqui, os clientes de API assumem
+`image/jpeg` (brief 075, item 3.2). O Ollama não precisa disso: aceita a base64 sem rótulo."""
+
+
+class _ClienteApiBase(_ClienteLLMBase):
+    """O que os três clientes de API têm igual (brief 075): a chave, o modelo único do provedor e os
+    embeddings por composição com o `ClienteOllama` local. Cada provedor implementa só `_chamar`.
+
+    Fica numa base privada em vez de repetido três vezes pelo mesmo motivo do brief 074: a
+    composição do item 3.5 e a proveniência são idênticas nos três, e código igual copiado é o que
+    aquele brief existiu para acabar."""
+
+    def __init__(
+        self,
+        http_client: httpx.Client,
+        conexao_bd: sqlite3.Connection,
+        roteamento: Roteamento,
+        chave: str,
+        modelo: str,
+        caminho_log: Path,
+        cliente_embeddings: ClienteOllama,
+    ) -> None:
+        super().__init__(conexao_bd, roteamento, caminho_log)
+        self._http = http_client
+        self._chave = chave
+        self._modelo = modelo
+        self._cliente_embeddings = cliente_embeddings
+
+    def proveniencia(self, tarefa_nome: str, versao_prompt: str | None = None) -> Proveniencia:
+        """O modelo registrado é o do provedor de API, não o do `llm_routing.yaml` — é por este
+        campo, no `chamadas_llm.jsonl`, que se confere qual provedor atendeu a chamada."""
+        return Proveniencia(
+            modelo=self._modelo,
+            perfil=self._roteamento.perfil_ativo,
+            prompt_versao=versao_prompt,
+        )
+
+    @property
+    def modelo_embedding(self) -> str:
+        """Repasse: embeddings são sempre do Ollama local, qualquer que seja o provedor de geração
+        (brief 075, item 3.5) — a Anthropic não tem endpoint de embedding e trocar de modelo
+        invalidaria todo centróide já gravado (brief 066)."""
+        return self._cliente_embeddings.modelo_embedding
+
+    def embeddar(self, textos: list[str]) -> list[list[float]]:
+        """Repasse ao `ClienteOllama` injetado; nunca uma reimplementação (brief 075, item 3.5)."""
+        return self._cliente_embeddings.embeddar(textos)
+
+
+class ClienteAnthropic(_ClienteApiBase):
+    """`POST /v1/messages`. O esquema é forçado por uma tool única, obrigatória por `tool_choice`:
+    a resposta vem no bloco `tool_use`, já como dict conferido contra o `input_schema`."""
+
+    _URL = "https://api.anthropic.com/v1/messages"
+    _VERSAO_API = "2023-06-01"
+    _NOME_TOOL = "responder"
+
+    def _chamar(
+        self,
+        tarefa: TarefaRoteamento,
+        prompt: str,
+        temperature: float,
+        imagens: list[str] | None,
+        esquema: type[BaseModel],
+    ) -> str:
+        conteudo: list[dict[str, object]] = [
+            {
+                "type": "image",
+                "source": {"type": "base64", "media_type": _MEDIA_TYPE_IMAGEM, "data": imagem},
+            }
+            for imagem in imagens or []
+        ]
+        conteudo.append({"type": "text", "text": prompt})
+        corpo: dict[str, object] = {
+            "model": self._modelo,
+            "max_tokens": tarefa.num_predict,
+            "temperature": temperature,
+            "tools": [
+                {
+                    "name": self._NOME_TOOL,
+                    "description": "Devolve a resposta da tarefa no formato pedido.",
+                    "input_schema": esquema.model_json_schema(),
+                }
+            ],
+            "tool_choice": {"type": "tool", "name": self._NOME_TOOL},
+            "messages": [{"role": "user", "content": conteudo}],
+        }
+        resposta = self._http.post(
+            self._URL,
+            json=corpo,
+            headers={
+                "x-api-key": self._chave,
+                "anthropic-version": self._VERSAO_API,
+                "content-type": "application/json",
+            },
+        )
+        resposta.raise_for_status()
+        return _texto_da_resposta_anthropic(resposta.json())
+
+
+class ClienteGemini(_ClienteApiBase):
+    """`POST /v1beta/models/{modelo}:generateContent`. O esquema é forçado por
+    `generationConfig.response_schema`, com `response_mime_type: application/json`."""
+
+    _URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
+
+    def _chamar(
+        self,
+        tarefa: TarefaRoteamento,
+        prompt: str,
+        temperature: float,
+        imagens: list[str] | None,
+        esquema: type[BaseModel],
+    ) -> str:
+        partes: list[dict[str, object]] = [
+            {"inlineData": {"mimeType": _MEDIA_TYPE_IMAGEM, "data": imagem}} for imagem in imagens or []
+        ]
+        partes.append({"text": prompt})
+        corpo: dict[str, object] = {
+            "contents": [{"role": "user", "parts": partes}],
+            "generationConfig": {
+                "temperature": temperature,
+                "maxOutputTokens": tarefa.num_predict,
+                "response_mime_type": "application/json",
+                "response_schema": esquema.model_json_schema(),
+            },
+        }
+        resposta = self._http.post(
+            f"{self._URL_BASE}/{self._modelo}:generateContent",
+            json=corpo,
+            # A chave vai no header, nunca em `?key=`: `str(httpx.HTTPStatusError)` carrega a URL e
+            # `_ir_para_fila_revisao` grava esse texto no banco — chave na URL viraria chave gravada.
+            headers={"x-goog-api-key": self._chave, "content-type": "application/json"},
+        )
+        resposta.raise_for_status()
+        return _texto_da_resposta_gemini(resposta.json())
+
+
+class ClienteOpenAI(_ClienteApiBase):
+    """`POST /v1/chat/completions`. O esquema é forçado por
+    `response_format: {"type": "json_schema", ...}`; a resposta já vem como string JSON."""
+
+    _URL = "https://api.openai.com/v1/chat/completions"
+
+    def _chamar(
+        self,
+        tarefa: TarefaRoteamento,
+        prompt: str,
+        temperature: float,
+        imagens: list[str] | None,
+        esquema: type[BaseModel],
+    ) -> str:
+        conteudo: list[dict[str, object]] = [{"type": "text", "text": prompt}]
+        conteudo.extend(
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:{_MEDIA_TYPE_IMAGEM};base64,{imagem}"},
+            }
+            for imagem in imagens or []
+        )
+        corpo: dict[str, object] = {
+            "model": self._modelo,
+            "max_tokens": tarefa.num_predict,
+            "temperature": temperature,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": esquema.__name__,
+                    "schema": esquema.model_json_schema(),
+                    "strict": True,
+                },
+            },
+            "messages": [{"role": "user", "content": conteudo}],
+        }
+        resposta = self._http.post(
+            self._URL,
+            json=corpo,
+            headers={
+                "Authorization": f"Bearer {self._chave}",
+                "content-type": "application/json",
+            },
+        )
+        resposta.raise_for_status()
+        return _texto_da_resposta_openai(resposta.json())
+
+
+def _texto_da_resposta_anthropic(dados: object) -> str:
+    """O bloco `tool_use` reserializado para texto, para a base fazer o mesmo `json.loads` que faz
+    com o Ollama. Sem bloco `tool_use`, devolve o texto que vier (ou vazio): resposta 200 sem o que
+    se pediu é falha de **conteúdo**, e quem trata é `gerar_json` — nova tentativa por temperatura
+    e, esgotada, `fila_revisao`. Nenhuma exceção nova escapa daqui (armadilha do brief 067)."""
+    blocos = dados.get("content", []) if isinstance(dados, dict) else []
+    if not isinstance(blocos, list):
+        return ""
+    for bloco in blocos:
+        if isinstance(bloco, dict) and bloco.get("type") == "tool_use":
+            return json.dumps(bloco.get("input", {}), ensure_ascii=False)
+    textos = [
+        str(bloco.get("text", ""))
+        for bloco in blocos
+        if isinstance(bloco, dict) and bloco.get("type") == "text"
+    ]
+    return "".join(textos)
+
+
+def _texto_da_resposta_gemini(dados: object) -> str:
+    """`candidates[0].content.parts[*].text`. Resposta fora dessa forma devolve vazio, que a base
+    trata como conteúdo inválido — ver `_texto_da_resposta_anthropic`."""
+    if not isinstance(dados, dict):
+        return ""
+    candidatos = dados.get("candidates")
+    if not isinstance(candidatos, list) or not candidatos:
+        return ""
+    primeiro = candidatos[0]
+    conteudo = primeiro.get("content") if isinstance(primeiro, dict) else None
+    partes = conteudo.get("parts") if isinstance(conteudo, dict) else None
+    if not isinstance(partes, list):
+        return ""
+    return "".join(str(parte.get("text", "")) for parte in partes if isinstance(parte, dict))
+
+
+def _texto_da_resposta_openai(dados: object) -> str:
+    """`choices[0].message.content`. Resposta fora dessa forma devolve vazio, que a base trata como
+    conteúdo inválido — ver `_texto_da_resposta_anthropic`."""
+    if not isinstance(dados, dict):
+        return ""
+    escolhas = dados.get("choices")
+    if not isinstance(escolhas, list) or not escolhas:
+        return ""
+    primeira = escolhas[0]
+    mensagem = primeira.get("message") if isinstance(primeira, dict) else None
+    if not isinstance(mensagem, dict):
+        return ""
+    conteudo = mensagem.get("content")
+    return conteudo if isinstance(conteudo, str) else ""
