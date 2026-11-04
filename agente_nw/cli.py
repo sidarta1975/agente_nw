@@ -1269,6 +1269,7 @@ def console_cmd(caminho_banco_str: str, porta: int) -> int:
         cfg.roteamento,
         cfg.limiares,
         cfg.local.ollama_url,
+        cfg.local.ia_api,
         usuarios_rede={r: v.usuario for r, v in cfg.local.redes.items() if v.usuario},
         gravar_usuario=gravar_usuario_rede,
     )

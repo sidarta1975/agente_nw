@@ -3,6 +3,21 @@ pasta_saida: saidas            # na Etapa 3 vira a pasta do Drive
 pasta_backups: dados/backups
 ollama_url: http://127.0.0.1:11434
 # perfil_llm: pro48   # perfil de config/llm_routing.yaml desta máquina; ausente = air16
+# Geração de texto por API em vez do Ollama local (brief 076). Todo o bloco é opcional: sem nenhuma
+# chave, a geração roda no Ollama, como sempre. Embeddings são SEMPRE do Ollama local, qualquer que
+# seja o provedor aqui — então o Ollama continua precisando estar de pé.
+# ia_api:
+#   provedor: auto       # auto (padrão: a primeira cadastrada, na ordem anthropic, gemini, openai)
+#                        # ou ollama | anthropic | gemini | openai para mandar explicitamente
+#   anthropic:
+#     chave: "sk-ant-..."
+#     modelo: "claude-..."   # confirme o nome atual do modelo com a Anthropic antes de usar
+#   gemini:
+#     chave: "..."
+#     modelo: "gemini-..."   # confirme o nome atual do modelo com o Google antes de usar
+#   openai:
+#     chave: "..."
+#     modelo: "gpt-..."      # confirme o nome atual do modelo com a OpenAI antes de usar
 # URLs identificadoras da conta (alerts, iCal) entram só em config/local.yaml, fora do git
 # redes:                 # usuário da conta do próprio usuário; o sistema grava aqui sozinho na primeira leitura
 #   instagram:

@@ -3,16 +3,38 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from typing import Protocol, TypeVar
+
+from pydantic import BaseModel
 
 from agente_nw.nucleo.database.queries import fatos, fila_extracao
 from agente_nw.nucleo.database.queries import perfil_tema as queries_perfil_tema
 from agente_nw.nucleo.database.queries import perfis as queries_perfis
 from agente_nw.nucleo.database.queries import temas as queries_temas
-from agente_nw.nucleo.llm import ClienteOllama, FalhaJsonInvalido
+from agente_nw.nucleo.llm import FalhaJsonInvalido
 from agente_nw.nucleo.modelos.extracao import RespostaExtracaoTexto, TagSugerida
 from agente_nw.nucleo.modelos.fato import Fato
 from agente_nw.nucleo.modelos.fila import FilaExtracao
+from agente_nw.nucleo.modelos.proveniencia import Proveniencia
 from agente_nw.nucleo.prompts.extrair_de_texto import VERSAO, construir_prompt
+
+_EsquemaT = TypeVar("_EsquemaT", bound=BaseModel)
+
+
+class ClienteExtracaoPerfil(Protocol):
+    """Só o que `processar_fila` usa do cliente de LLM — `Protocol` local, como nos outros módulos
+    do produto, para o provedor de geração ser indiferente aqui (briefs 075/076)."""
+
+    def gerar_json(
+        self,
+        tarefa_nome: str,
+        prompt: str,
+        esquema: type[_EsquemaT],
+        imagens: list[str] | None = None,
+        versao_prompt: str | None = None,
+    ) -> _EsquemaT: ...
+
+    def proveniencia(self, tarefa_nome: str, versao_prompt: str | None = None) -> Proveniencia: ...
 
 
 @dataclass
@@ -42,7 +64,7 @@ def _gravar_tag(
 
 
 def processar_fila(
-    cliente_llm: ClienteOllama, conexao: sqlite3.Connection, limite: int = 20
+    cliente_llm: ClienteExtracaoPerfil, conexao: sqlite3.Connection, limite: int = 20
 ) -> ResumoProcessamento:
     """Lê itens pendentes de `fila_extracao`, extrai campos/tags/fatos via o
     contrato `extrair_de_texto` e grava tudo. Marca cada item como processado

@@ -15,6 +15,29 @@ class RedeLocal(BaseModel):
     usuario: str | None = None
 
 
+class ProvedorApi(BaseModel):
+    """Chave e modelo de um provedor de API de geração (config/local.yaml, bloco `ia_api`)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    chave: str
+    modelo: str
+
+
+class ConfiguracaoIaApi(BaseModel):
+    """Geração de texto por API em vez do Ollama local (brief 076). Tudo opcional: sem nenhuma chave
+    cadastrada — o caso de todo instalador existente — a geração segue no Ollama, como sempre foi.
+    Embeddings são sempre do Ollama local, qualquer que seja o provedor escolhido aqui."""
+
+    model_config = ConfigDict(frozen=True)
+
+    provedor: Literal["auto", "ollama", "anthropic", "gemini", "openai"] = "auto"
+    """`auto` usa a primeira cadastrada na ordem Anthropic, Gemini, OpenAI; nome explícito manda."""
+    anthropic: ProvedorApi | None = None
+    gemini: ProvedorApi | None = None
+    openai: ProvedorApi | None = None
+
+
 class Configuracao(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -24,6 +47,7 @@ class Configuracao(BaseModel):
     ollama_url: str
     perfil_llm: str | None = None
     redes: dict[str, RedeLocal] = Field(default_factory=dict)
+    ia_api: ConfiguracaoIaApi = Field(default_factory=ConfiguracaoIaApi)
 
 
 class EmbeddingsRoteamento(BaseModel):

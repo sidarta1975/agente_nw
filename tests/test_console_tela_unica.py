@@ -240,7 +240,7 @@ def test_pagina_da_pessoa_mostra_o_que_a_ia_sabe_e_aceita_texto_e_troca_de_perfi
     client = _app(cenario)
     _pedir(client)
     monkeypatch.setattr(console_app.extrator, "processar_fila", lambda *_a, **_k: None)
-    monkeypatch.setattr(console_app, "ClienteOllama", lambda *_a, **_k: object())
+    monkeypatch.setattr(console_app, "selecionar_cliente_llm", lambda *_a, **_k: object())
 
     pagina = client.get(f"/pessoa/{perfil_id}").get_data(as_text=True)
 

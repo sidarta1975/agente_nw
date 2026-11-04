@@ -36,10 +36,15 @@ from agente_nw.nucleo.database.queries import (
     redes_sociais,
 )
 from agente_nw.nucleo.database.queries import temas as queries_temas
-from agente_nw.nucleo.llm import ClienteOllama
 from agente_nw.nucleo.modelos.assunto import Assunto
 from agente_nw.nucleo.modelos.assunto_contato import AssuntoContato
-from agente_nw.nucleo.modelos.configuracao import Limiares, NivelTema, Roteamento, TemaUsuario
+from agente_nw.nucleo.modelos.configuracao import (
+    ConfiguracaoIaApi,
+    Limiares,
+    NivelTema,
+    Roteamento,
+    TemaUsuario,
+)
 from agente_nw.nucleo.modelos.contexto_consulta import ContextoConsulta
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.perfil import Perfil
@@ -52,6 +57,7 @@ from agente_nw.perfil import configurador, extrator, inferencia
 from agente_nw.perfil.lacunas import campos_faltando
 from agente_nw.perfil.normalizacao import telefone_e164
 from config import container
+from config.container import ClienteLLM, selecionar_cliente_llm
 
 _NIVEIS: tuple[NivelTema, ...] = ("dominio", "interesse", "curiosidade")
 _MEIOS: tuple[str, ...] = ("pessoalmente", "telefone", "whatsapp", "carta", "outro")
@@ -68,6 +74,7 @@ def criar_app(
     roteamento: Roteamento,
     limiares: Limiares,
     ollama_url: str,
+    ia_api: ConfiguracaoIaApi | None = None,
     dependencias: fluxo_mod.Dependencias | None = None,
     executar: Callable[[Callable[[], None]], None] | None = None,
     usuarios_rede: dict[str, str] | None = None,
@@ -92,10 +99,12 @@ def criar_app(
             g.conn = conexao.abrir(caminho_banco)
         return cast(sqlite3.Connection, g.conn)
 
-    def _cliente_llm() -> ClienteOllama:
+    def _cliente_llm() -> ClienteLLM:
         if "cliente_llm" not in g:
-            g.cliente_llm = ClienteOllama(container.http(), _conn(), roteamento, ollama_url, caminho_log_llm)
-        return cast(ClienteOllama, g.cliente_llm)
+            g.cliente_llm = selecionar_cliente_llm(
+                container.http(), _conn(), roteamento, ollama_url, caminho_log_llm, ia_api
+            )
+        return cast(ClienteLLM, g.cliente_llm)
 
     @app.teardown_appcontext
     def _fechar_conexao(exc: BaseException | None) -> None:
@@ -127,8 +136,10 @@ def criar_app(
             return dependencias
         from agente_nw.coleta.capturas.extensao_backend import abrir_pagina_extensao
 
-        def fabrica_llm(conn: sqlite3.Connection) -> ClienteOllama:
-            return ClienteOllama(container.http(), conn, roteamento, ollama_url, caminho_log_llm)
+        def fabrica_llm(conn: sqlite3.Connection) -> ClienteLLM:
+            return selecionar_cliente_llm(
+                container.http(), conn, roteamento, ollama_url, caminho_log_llm, ia_api
+            )
 
         perfil_llm = roteamento.perfis[roteamento.perfil_ativo]
         return fluxo_mod.Dependencias(
@@ -169,7 +180,9 @@ def criar_app(
         try:
             agora = datetime.now(UTC).isoformat()
             whatsapp_importador.enfileirar_extracao(conn_fundo, perfil_id, limiares.whatsapp, agora)
-            cliente = ClienteOllama(container.http(), conn_fundo, roteamento, ollama_url, caminho_log_llm)
+            cliente = selecionar_cliente_llm(
+                container.http(), conn_fundo, roteamento, ollama_url, caminho_log_llm, ia_api
+            )
             extrator.processar_fila(cliente, conn_fundo)
         finally:
             conn_fundo.close()

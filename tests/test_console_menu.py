@@ -92,7 +92,7 @@ def conn(caminho_banco: Path) -> sqlite3.Connection:
 def app(
     caminho_banco: Path, tmp_path: Path, conn: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> Flask:
-    monkeypatch.setattr(console_app, "ClienteOllama", _ClienteLLMFake)
+    monkeypatch.setattr(console_app, "selecionar_cliente_llm", _ClienteLLMFake)
     return console_app.criar_app(
         caminho_banco, tmp_path / "log.jsonl", object(), _limiares(), "http://unused"
     )

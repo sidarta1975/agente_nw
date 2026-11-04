@@ -246,7 +246,7 @@ def test_enviar_mostra_confirmacao_com_voce_sugerido(banco: Path, monkeypatch: p
 
 def test_confirmar_importa_e_mostra_resumo(banco: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(console_app.extrator, "processar_fila", lambda *_a, **_k: None)
-    monkeypatch.setattr(console_app, "ClienteOllama", lambda *_a, **_k: object())
+    monkeypatch.setattr(console_app, "selecionar_cliente_llm", lambda *_a, **_k: object())
     client = _app(banco)
     dados = (Path(__file__).parent / "fixtures" / "whatsapp_ios.zip").read_bytes()
     envio = client.post(
