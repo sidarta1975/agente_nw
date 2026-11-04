@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
+from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypeVar
@@ -18,16 +19,18 @@ EsquemaT = TypeVar("EsquemaT", bound=BaseModel)
 
 _SEED = 42
 _INTERVALOS_BACKOFF_TRANSPORTE: tuple[float, ...] = (2, 4, 8, 16)
-"""Erro de conexão/timeout/HTTP contra o Ollama — servidor local, compartilhado, pode estar
-carregando ou descarregando um modelo no momento exato da chamada. Camada separada da nova
-tentativa por temperatura, que é só para falha de conteúdo (JSON inválido/geração degenerada)."""
+"""Erro de conexão/timeout/HTTP contra o provedor — no caso do Ollama, servidor local,
+compartilhado, que pode estar carregando ou descarregando um modelo no momento exato da
+chamada. Camada separada da nova tentativa por temperatura, que é só para falha de conteúdo
+(JSON inválido/geração degenerada)."""
 
 
 class _GeracaoDegenerada(Exception):
-    """O Ollama abortou a geração (ex.: "prediction aborted, token repeat limit reached",
+    """O provedor abortou a geração (ex.: "prediction aborted, token repeat limit reached",
     quando o modelo entra num loop de repetição). É falha da tentativa, não da rede —
     tratada em ``gerar_json`` igual a JSON inválido: conta para a nova tentativa e,
-    esgotada, vai para ``fila_revisao`` em vez de derrubar o chamador."""
+    esgotada, vai para ``fila_revisao`` em vez de derrubar o chamador. Quem detecta é o
+    ``_chamar`` de cada provedor, porque a forma de dizer isso é específica dele."""
 
 
 class FalhaJsonInvalido(RuntimeError):
@@ -40,26 +43,40 @@ class FalhaJsonInvalido(RuntimeError):
         self.erro = erro
 
 
-class ClienteOllama:
+class _ClienteLLMBase(ABC):
+    """Orquestração de `gerar_json` que não depende de provedor (brief 074): nova tentativa por
+    temperatura, backoff de transporte, validação do JSON contra o esquema Pydantic, log da chamada
+    e `fila_revisao` quando tudo se esgota. Cada provedor implementa só `_chamar`.
+
+    Não é contrato público: os módulos do produto recebem um cliente concreto (`ClienteOllama` e,
+    a partir do brief 075, os clientes de API) e usam `gerar_json`/`proveniencia`/`embeddar`."""
+
     def __init__(
         self,
-        http_client: httpx.Client,
         conexao_bd: sqlite3.Connection,
         roteamento: Roteamento,
-        ollama_url: str,
         caminho_log: Path,
     ) -> None:
-        self._http = http_client
         self._conexao = conexao_bd
         self._roteamento = roteamento
-        self._ollama_url = ollama_url
         self._caminho_log = caminho_log
 
-    @property
-    def modelo_embedding(self) -> str:
-        """Modelo de embedding do perfil ativo — gravado com cada centróide e conferido na leitura
-        (brief 066): vetor de outro modelo é tratado como ausente."""
-        return self._roteamento.perfis[self._roteamento.perfil_ativo].embeddings.modelo
+    @abstractmethod
+    def _chamar(
+        self,
+        tarefa: TarefaRoteamento,
+        prompt: str,
+        temperature: float,
+        imagens: list[str] | None,
+        esquema: type[BaseModel],
+    ) -> str:
+        """Uma chamada ao provedor, sem nova tentativa: devolve o texto bruto da resposta.
+        Levanta `_GeracaoDegenerada` quando o provedor avisa que a geração degenerou, e
+        `httpx.HTTPStatusError`/`httpx.RequestError` em falha de transporte — o backoff e a nova
+        tentativa por temperatura ficam aqui na base, iguais para todo provedor.
+
+        `esquema` está na assinatura para os clientes de API forçarem o formato de saída com
+        `esquema.model_json_schema()`; o Ollama recebe o formato pelo `format` da tarefa e o ignora."""
 
     def proveniencia(self, tarefa_nome: str, versao_prompt: str | None = None) -> Proveniencia:
         """Perfil ativo, modelo da tarefa e versão do prompt — o que `gerar_json` usa e registra no log,
@@ -109,49 +126,13 @@ class ClienteOllama:
             )
         return perfil.tarefas[nome]
 
-    def _chamar_generate(
-        self,
-        tarefa: TarefaRoteamento,
-        prompt: str,
-        temperature: float,
-        imagens: list[str] | None = None,
-    ) -> str:
-        corpo: dict[str, object] = {
-            "model": tarefa.modelo,
-            "prompt": prompt,
-            "format": tarefa.format,
-            "stream": False,
-            "options": {
-                "num_ctx": tarefa.num_ctx,
-                "temperature": temperature,
-                "seed": _SEED,
-                "num_predict": tarefa.num_predict,
-            },
-        }
-        if imagens:
-            corpo["images"] = imagens
-        if self._roteamento.perfis[self._roteamento.perfil_ativo].enviar_think:
-            corpo["think"] = tarefa.think
-        resposta = self._http.post(f"{self._ollama_url}/api/generate", json=corpo)
-        if resposta.status_code == 500:
-            try:
-                mensagem_erro = str(resposta.json().get("error", ""))
-            except Exception:
-                mensagem_erro = ""
-            if "token repeat limit" in mensagem_erro:
-                raise _GeracaoDegenerada(mensagem_erro)
-        resposta.raise_for_status()
-        dados: dict[str, object] = resposta.json()
-        texto = dados["response"]
-        assert isinstance(texto, str)
-        return texto
-
-    def _chamar_generate_com_backoff(
+    def _chamar_com_backoff(
         self,
         tarefa: TarefaRoteamento,
         prompt: str,
         temperature: float,
         imagens: list[str] | None,
+        esquema: type[BaseModel],
     ) -> tuple[str, int]:
         """Nova tentativa só para erro de transporte (conexão, timeout, HTTP) — não para geração
         degenerada, que é falha de tentativa e segue para a nova tentativa por temperatura."""
@@ -161,7 +142,7 @@ class ClienteOllama:
             if espera:
                 time.sleep(espera)
             try:
-                return self._chamar_generate(tarefa, prompt, temperature, imagens), falhas
+                return self._chamar(tarefa, prompt, temperature, imagens, esquema), falhas
             except _GeracaoDegenerada:
                 raise
             except (httpx.HTTPStatusError, httpx.RequestError) as erro:
@@ -197,8 +178,8 @@ class ClienteOllama:
         tentativas = (tarefa.temperature, nova_tentativa.temperature)
         for indice, temperatura in enumerate(tentativas, start=1):
             try:
-                texto, falhas_transporte = self._chamar_generate_com_backoff(
-                    tarefa, prompt, temperatura, imagens
+                texto, falhas_transporte = self._chamar_com_backoff(
+                    tarefa, prompt, temperatura, imagens, esquema
                 )
             except (httpx.HTTPStatusError, httpx.RequestError) as erro:
                 falhas_transporte_total += len(_INTERVALOS_BACKOFF_TRANSPORTE) + 1
@@ -225,6 +206,66 @@ class ClienteOllama:
             tarefa_nome, len(tentativas), False, falhas_transporte_total, proveniencia, inicio
         )
         raise self._ir_para_fila_revisao(tarefa_nome, prompt, ultimo_erro)
+
+
+class ClienteOllama(_ClienteLLMBase):
+    def __init__(
+        self,
+        http_client: httpx.Client,
+        conexao_bd: sqlite3.Connection,
+        roteamento: Roteamento,
+        ollama_url: str,
+        caminho_log: Path,
+    ) -> None:
+        super().__init__(conexao_bd, roteamento, caminho_log)
+        self._http = http_client
+        self._ollama_url = ollama_url
+
+    @property
+    def modelo_embedding(self) -> str:
+        """Modelo de embedding do perfil ativo — gravado com cada centróide e conferido na leitura
+        (brief 066): vetor de outro modelo é tratado como ausente."""
+        return self._roteamento.perfis[self._roteamento.perfil_ativo].embeddings.modelo
+
+    def _chamar(
+        self,
+        tarefa: TarefaRoteamento,
+        prompt: str,
+        temperature: float,
+        imagens: list[str] | None,
+        esquema: type[BaseModel],
+    ) -> str:
+        """`esquema` não é usado: o formato de saída do Ollama vem do `format` da tarefa
+        (a string `"json"` do YAML), não de um esquema enviado no payload."""
+        corpo: dict[str, object] = {
+            "model": tarefa.modelo,
+            "prompt": prompt,
+            "format": tarefa.format,
+            "stream": False,
+            "options": {
+                "num_ctx": tarefa.num_ctx,
+                "temperature": temperature,
+                "seed": _SEED,
+                "num_predict": tarefa.num_predict,
+            },
+        }
+        if imagens:
+            corpo["images"] = imagens
+        if self._roteamento.perfis[self._roteamento.perfil_ativo].enviar_think:
+            corpo["think"] = tarefa.think
+        resposta = self._http.post(f"{self._ollama_url}/api/generate", json=corpo)
+        if resposta.status_code == 500:
+            try:
+                mensagem_erro = str(resposta.json().get("error", ""))
+            except Exception:
+                mensagem_erro = ""
+            if "token repeat limit" in mensagem_erro:
+                raise _GeracaoDegenerada(mensagem_erro)
+        resposta.raise_for_status()
+        dados: dict[str, object] = resposta.json()
+        texto = dados["response"]
+        assert isinstance(texto, str)
+        return texto
 
     def embeddar(self, textos: list[str]) -> list[list[float]]:
         perfil = self._roteamento.perfis[self._roteamento.perfil_ativo]
