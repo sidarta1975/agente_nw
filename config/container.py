@@ -15,6 +15,7 @@ from agente_nw.nucleo.llm import (
     ClienteGemini,
     ClienteOllama,
     ClienteOpenAI,
+    ModoPorteiro,
 )
 from agente_nw.nucleo.modelos.configuracao import (
     Configuracao,
@@ -110,12 +111,19 @@ def selecionar_cliente_llm(
     ollama_url: str,
     caminho_log: Path,
     ia_api: ConfiguracaoIaApi | None = None,
+    modo_porteiro: ModoPorteiro = "lote",
 ) -> ClienteLLM:
     """O único lugar que decide qual provedor gera texto (brief 076). Com chave cadastrada em
     `ia_api`, devolve o cliente daquela API; sem nenhuma, o `ClienteOllama` — o comportamento de
     sempre. O `ClienteOllama` é construído em qualquer caso, porque é ele que faz os embeddings,
-    que nunca saem da máquina (brief 075, item 3.5)."""
-    cliente_ollama = ClienteOllama(http_client, conexao_bd, roteamento, ollama_url, caminho_log)
+    que nunca saem da máquina (brief 075, item 3.5).
+
+    `modo_porteiro` vai sempre ao `ClienteOllama`, inclusive quando ele atende só os embeddings:
+    é ele que carrega modelo no Ollama local, e é por isso que ele consulta o `porteiro`
+    (brief 077). O padrão `"lote"` serve todo comando da CLI; o console passa `"interativo"`."""
+    cliente_ollama = ClienteOllama(
+        http_client, conexao_bd, roteamento, ollama_url, caminho_log, modo_porteiro
+    )
     escolhido = _provedor_escolhido(ia_api or ConfiguracaoIaApi())
     if escolhido == "ollama":
         return cliente_ollama

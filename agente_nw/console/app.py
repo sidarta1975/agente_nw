@@ -102,7 +102,15 @@ def criar_app(
     def _cliente_llm() -> ClienteLLM:
         if "cliente_llm" not in g:
             g.cliente_llm = selecionar_cliente_llm(
-                container.http(), _conn(), roteamento, ollama_url, caminho_log_llm, ia_api
+                container.http(),
+                _conn(),
+                roteamento,
+                ollama_url,
+                caminho_log_llm,
+                ia_api,
+                # Console é uso interativo, com uma pessoa esperando: consulta o `porteiro` uma vez
+                # e nunca espera por memória (brief 077) — ao contrário dos lotes da CLI.
+                modo_porteiro="interativo",
             )
         return cast(ClienteLLM, g.cliente_llm)
 
@@ -138,7 +146,13 @@ def criar_app(
 
         def fabrica_llm(conn: sqlite3.Connection) -> ClienteLLM:
             return selecionar_cliente_llm(
-                container.http(), conn, roteamento, ollama_url, caminho_log_llm, ia_api
+                container.http(),
+                conn,
+                roteamento,
+                ollama_url,
+                caminho_log_llm,
+                ia_api,
+                modo_porteiro="interativo",
             )
 
         perfil_llm = roteamento.perfis[roteamento.perfil_ativo]
@@ -181,7 +195,13 @@ def criar_app(
             agora = datetime.now(UTC).isoformat()
             whatsapp_importador.enfileirar_extracao(conn_fundo, perfil_id, limiares.whatsapp, agora)
             cliente = selecionar_cliente_llm(
-                container.http(), conn_fundo, roteamento, ollama_url, caminho_log_llm, ia_api
+                container.http(),
+                conn_fundo,
+                roteamento,
+                ollama_url,
+                caminho_log_llm,
+                ia_api,
+                modo_porteiro="interativo",
             )
             extrator.processar_fila(cliente, conn_fundo)
         finally:

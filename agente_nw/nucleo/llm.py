@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import subprocess
 import time
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -208,6 +209,49 @@ class _ClienteLLMBase(ABC):
         raise self._ir_para_fila_revisao(tarefa_nome, prompt, ultimo_erro)
 
 
+_PORTEIRO_PYTHON = "/opt/homebrew/bin/python3"
+_PORTEIRO_BIN = "/Users/sidarta48/github/porteiro_local/bin/porteiro"
+"""Caminho completo, com o Python na frente, como o `INTEGRACAO.md §4.1` do `porteiro` exige: um
+LaunchAgent ou um ambiente virtual pode não ver `~/.local/bin` nem escolher um Python ≥ 3.11."""
+
+_PORTEIRO_TIMEOUT_S = 30.0
+_PORTEIRO_ESPERA_S = 60.0
+_PORTEIRO_CONSULTAS_LOTE = 16
+"""16 consultas e 15 esperas de 60 s entre elas, os "até 15 min" do `INTEGRACAO.md §6`, com a
+primeira consulta imediata — o mesmo número do exemplo do §9 daquele documento."""
+
+_AVISO_MEMORIA_CHEIA = "rodou com memória cheia segundo o porteiro"
+_AVISO_SEM_SERVIDOR = "servidor Ollama da porta consultada não respondeu"
+_AVISO_PORTEIRO_INDISPONIVEL = "porteiro indisponível ou com erro, seguiu como se não existisse"
+_AVISOS_PORTEIRO: dict[int, str] = {
+    1: _AVISO_MEMORIA_CHEIA,
+    2: _AVISO_SEM_SERVIDOR,
+    3: _AVISO_PORTEIRO_INDISPONIVEL,
+}
+
+ModoPorteiro = Literal["lote", "interativo"]
+
+
+def _consultar_porteiro(modelo: str, porta: int) -> dict[str, object] | None:
+    """Uma consulta ao `porteiro` (`cabe`, nunca `status`), ou `None` quando ele não está
+    disponível: programa ausente, mais de 30 s, JSON ilegível ou JSON sem `codigo_de_saida`.
+    `None` vale o mesmo que o código `3` — seguir como se o `porteiro` não existisse. Nunca
+    levanta: a falta do `porteiro` não é erro deste projeto (`INTEGRACAO.md §6` e §8)."""
+    try:
+        processo = subprocess.run(
+            [_PORTEIRO_PYTHON, _PORTEIRO_BIN, "cabe", modelo, "--porta", str(porta), "--json"],
+            capture_output=True,
+            text=True,
+            timeout=_PORTEIRO_TIMEOUT_S,
+        )
+        resposta = json.loads(processo.stdout)
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        return None
+    if not isinstance(resposta, dict) or "codigo_de_saida" not in resposta:
+        return None
+    return resposta
+
+
 class ClienteOllama(_ClienteLLMBase):
     def __init__(
         self,
@@ -216,16 +260,78 @@ class ClienteOllama(_ClienteLLMBase):
         roteamento: Roteamento,
         ollama_url: str,
         caminho_log: Path,
+        modo_porteiro: ModoPorteiro = "lote",
     ) -> None:
+        """`modo_porteiro`: `"lote"` (padrão, todo comando da CLI) espera até 15 min quando o
+        `porteiro` diz que o modelo não cabe; `"interativo"` (o console, com uma pessoa esperando)
+        consulta uma vez e nunca espera. Em nenhum dos dois o `porteiro` impede a chamada."""
         super().__init__(conexao_bd, roteamento, caminho_log)
         self._http = http_client
         self._ollama_url = ollama_url
+        self._modo_porteiro = modo_porteiro
+        self._modelos_verificados_porteiro: set[str] = set()
+        """Uma consulta por modelo, por cliente — nunca dentro de um laço, item por item
+        (`INTEGRACAO.md §8`). Cada processo de lote cria o seu cliente, então o conjunto vazio
+        equivale a "uma vez no início do lote"."""
 
     @property
     def modelo_embedding(self) -> str:
         """Modelo de embedding do perfil ativo — gravado com cada centróide e conferido na leitura
         (brief 066): vetor de outro modelo é tratado como ausente."""
         return self._roteamento.perfis[self._roteamento.perfil_ativo].embeddings.modelo
+
+    def _registrar_aviso_porteiro(self, modelo: str, resposta: dict[str, object] | None) -> None:
+        """Uma linha no mesmo `chamadas_llm.jsonl` das chamadas, só quando há o que avisar. Mesmo
+        padrão de `_registrar_log_chamada`: falha de escrita nunca derruba a chamada de LLM."""
+        codigo = resposta.get("codigo_de_saida") if resposta is not None else None
+        try:
+            self._caminho_log.parent.mkdir(parents=True, exist_ok=True)
+            linha = json.dumps(
+                {
+                    "porteiro": True,
+                    "modelo": modelo,
+                    "porta": httpx.URL(self._ollama_url).port,
+                    "quando": datetime.now(UTC).isoformat(),
+                    "codigo_de_saida": codigo,
+                    "razao": resposta.get("razao") if resposta is not None else None,
+                    "aviso": _AVISOS_PORTEIRO.get(codigo if isinstance(codigo, int) else 3)
+                    or _AVISO_PORTEIRO_INDISPONIVEL,
+                },
+                ensure_ascii=False,
+            )
+            with self._caminho_log.open("a", encoding="utf-8") as arquivo:
+                arquivo.write(linha + "\n")
+        except Exception:
+            pass
+
+    def _verificar_porteiro_antes_de_carregar(self, modelo: str) -> None:
+        """Pergunta ao `porteiro` se este modelo cabe na memória da porta deste projeto, uma vez por
+        modelo. Nunca impede a chamada nem levanta: no modo `lote`, o código `1` adia por até 15
+        min e depois roda assim mesmo; qualquer outro código roda na hora. O que não for `0` vira
+        aviso no log. O modelo e a porta nunca mudam por causa da resposta (`INTEGRACAO.md §8`)."""
+        if modelo in self._modelos_verificados_porteiro:
+            return
+        self._modelos_verificados_porteiro.add(modelo)
+
+        porta = httpx.URL(self._ollama_url).port
+        if porta is None:
+            return
+
+        consultas = _PORTEIRO_CONSULTAS_LOTE if self._modo_porteiro == "lote" else 1
+        resposta: dict[str, object] | None = None
+        for restantes in range(consultas, 0, -1):
+            resposta = _consultar_porteiro(modelo, porta)
+            if resposta is None:
+                break
+            codigo = resposta.get("codigo_de_saida")
+            if codigo == 0:
+                return
+            if codigo != 1:  # 2 e 3 rodam na hora, com aviso; só o 1 manda esperar
+                break
+            if restantes > 1:
+                time.sleep(_PORTEIRO_ESPERA_S)
+
+        self._registrar_aviso_porteiro(modelo, resposta)
 
     def _chamar(
         self,
@@ -253,6 +359,7 @@ class ClienteOllama(_ClienteLLMBase):
             corpo["images"] = imagens
         if self._roteamento.perfis[self._roteamento.perfil_ativo].enviar_think:
             corpo["think"] = tarefa.think
+        self._verificar_porteiro_antes_de_carregar(tarefa.modelo)
         resposta = self._http.post(f"{self._ollama_url}/api/generate", json=corpo)
         if resposta.status_code == 500:
             try:
@@ -270,6 +377,7 @@ class ClienteOllama(_ClienteLLMBase):
     def embeddar(self, textos: list[str]) -> list[list[float]]:
         perfil = self._roteamento.perfis[self._roteamento.perfil_ativo]
         corpo = {"model": perfil.embeddings.modelo, "input": textos}
+        self._verificar_porteiro_antes_de_carregar(perfil.embeddings.modelo)
         resposta = self._http.post(f"{self._ollama_url}/api/embed", json=corpo)
         resposta.raise_for_status()
         dados: dict[str, object] = resposta.json()
