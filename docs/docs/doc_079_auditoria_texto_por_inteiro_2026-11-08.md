@@ -2,7 +2,7 @@
 
 **Brief:** `docs/briefs/brief_079_auditoria_texto_por_inteiro_2026-11-07.md`
 **Data:** 2026-11-08
-**Commit:** `COMMIT_079`
+**Commit:** `700a43a`
 
 ---
 
@@ -30,7 +30,17 @@
 - **Script de verificação (o gate, rodado pelo `scripts/agente_entregar.sh`; saída colada):**
 
 ```
-GATE_079
+$ scripts/agente_entregar.sh 079
+manifesto 079: 15 arquivo(s)
+ruff check: ok
+ruff format: ok
+mypy: ok
+pytest: ok (1031 passed, 5 deselected in 25.31s)
+relatório sem tabela de lacunas no formato
+✓ brief 079: commit 700a43a, enviado ao GitHub
+
+(o `agente_lacunas.py` não achou a tabela porque a seção estava numerada, `## Lacunas`; o título
+foi corrigido para `## Lacunas` e o script rodou em seguida — ver a seção 9.)
 ```
 
 - **Comandos executados:**
@@ -1817,7 +1827,7 @@ scripts/verificar_auditoria_texto.py:99
 
 ---
 
-## 9. Lacunas
+## Lacunas
 
 | # | Lacuna | Destino | Impacto |
 |---|---|---|---|
