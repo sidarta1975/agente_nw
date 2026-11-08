@@ -19,8 +19,16 @@ fontes.yaml
 config/local.yaml
 *.csv
 !tests/fixtures/*.csv
+# docs/: so os .md e a estrutura de pastas vao ao GitHub (repositorio privado); qualquer outro tipo de arquivo continua ignorado.
 docs/*
 !docs/.gitkeep
+!docs/*.md
+!docs/*/
+docs/*/*
+!docs/*/*.md
+!docs/*/*/
+docs/*/*/*
+!docs/*/*/*.md
 /.claude/settings.local.json
 /.claude/estado/
 /Claude outputs/
