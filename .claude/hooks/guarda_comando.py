@@ -39,11 +39,19 @@ GIT_ESCRITA = {
 }
 GIT_BRANCH_ESCRITA = {"-D", "-d", "-m", "-M", "--delete", "--move"}
 GIT_OPCAO_COM_VALOR = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
+GIT_WORKTREE_LEITURA = {"list"}
 SCRIPTS_DE_SIDARTA = {"commitar.sh"}
 PASTAS_LIBERADAS_PARA_RM = ("/tmp", "/private/tmp", "/var/folders", "/private/var/folders")
 RAIZ = Path(__file__).resolve().parents[2]
 REDE_SOCIAL = {"ler-rede-social", "listas", "pedir", "extensao"}
 PASSA_NA_PASTA_PRINCIPAL = {"verificar-ambiente", "copiar-banco"}
+# Leitura que pode rodar sozinha, em série, desde que aponte para uma cópia do banco (brief 086,
+# item 2.10). Nome novo entra aqui só por brief; o executor não acrescenta por conta própria.
+AGENTE_NW_LEITURA_EM_COPIA = {"comparar-vetores", "medir-dano", "reprocessar"}
+OPCAO_DO_BANCO = "--banco"
+NOME_DO_BANCO = "agente.db"
+PASTA_DO_BANCO = "dados"
+CARACTERES_NAO_LITERAIS = ("$", "`", "~", "*", "?")
 SEPARADORES = {"&&", "||", ";", ";;", "|", "|&", "&", "(", ")"}
 ENVOLTORIOS = {
     "env",
@@ -85,6 +93,18 @@ MOTIVO_REDE = "leitura de rede social nunca roda sozinha (AGENTS §6): é Sidart
 MOTIVO_PERGUNTA = (
     "agente_nw nesta pasta usa o banco real (AGENTS §6): confirme, ou trabalhe numa cópia "
     "(agente_nw copiar-banco)"
+)
+MOTIVO_COPIA = (
+    "leitura do agente_nw só roda sozinha apontando para uma cópia: --banco <caminho> fora de "
+    "dados/ (AGENTS §6; brief 086, item 2.10)"
+)
+MOTIVO_CAMINHO_NAO_LITERAL = (
+    "o caminho da cópia tem de ser literal: a trava lê o texto do comando e não sabe no que "
+    "variável, ~ ou curinga se transforma na hora de rodar (brief 086, item 2.10)"
+)
+MOTIVO_GRAVACAO = (
+    "reprocessar só passa em simulação (--simular, sem --confirmo): gravação não roda sozinha "
+    "(AGENTS §6; brief 095, item 2.2)"
 )
 
 BLOQUEAR = "bloquear"
@@ -171,6 +191,53 @@ def _acao_da_lista(argumentos: list[str]) -> str:
     return next((a for a in depois if not a.startswith("-")), "")
 
 
+def _primeira_acao(palavras: list[str]) -> str:
+    """A primeira palavra que não é opção."""
+    return next((p for p in palavras if not p.startswith("-")), "")
+
+
+def _valor_da_opcao(argumentos: list[str], nome: str) -> str | None:
+    """Valor de `--nome valor` ou `--nome=valor`; None se a opção não aparece."""
+    for i, argumento in enumerate(argumentos):
+        if argumento == nome:
+            return argumentos[i + 1] if i + 1 < len(argumentos) else ""
+        if argumento.startswith(f"{nome}="):
+            return argumento.split("=", 1)[1]
+    return None
+
+
+def _dentro_da_pasta_do_banco(caminho: str, cwd: str) -> bool:
+    """O caminho, com `..` e link simbólico já desfeitos, cai na pasta do banco da árvore principal.
+
+    Caminho que não dá para resolver conta como dentro: na dúvida, a trava bloqueia.
+    """
+    alvo = Path(caminho)
+    if not alvo.is_absolute():
+        alvo = Path(cwd or ".") / alvo
+    try:
+        resolvido = alvo.resolve()
+        pasta = (RAIZ / PASTA_DO_BANCO).resolve()
+    except OSError:
+        return True
+    return resolvido == pasta or pasta in resolvido.parents
+
+
+def _decidir_leitura_em_copia(subcomando: str, argumentos: list[str], cwd: str) -> Decisao:
+    """As cinco condições do item 2.10 do brief 086, todas ao mesmo tempo."""
+    if any(NOME_DO_BANCO in argumento for argumento in argumentos):
+        return BLOQUEAR, MOTIVO_BANCO
+    if subcomando == "reprocessar" and ("--confirmo" in argumentos or "--simular" not in argumentos):
+        return BLOQUEAR, MOTIVO_GRAVACAO
+    caminho = _valor_da_opcao(argumentos, OPCAO_DO_BANCO)
+    if not caminho:
+        return PERGUNTAR, MOTIVO_PERGUNTA
+    if any(c in caminho for c in CARACTERES_NAO_LITERAIS):
+        return BLOQUEAR, MOTIVO_CAMINHO_NAO_LITERAL
+    if _dentro_da_pasta_do_banco(caminho, cwd):
+        return BLOQUEAR, MOTIVO_COPIA
+    return PASSAR, ""
+
+
 def _na_pasta_principal(cwd: str) -> bool:
     """A pasta principal tem `.git` como diretório; num worktree `.git` é um arquivo."""
     pasta = Path(cwd or ".").resolve()
@@ -231,6 +298,8 @@ def _decidir_segmento(palavras: list[str], cwd: str, profundidade: int) -> Decis
 
     if programa == "git":
         subcomando, resto = _subcomando_git(argumentos)
+        if subcomando == "worktree" and _primeira_acao(resto) in GIT_WORKTREE_LEITURA:
+            return PASSAR, ""  # `worktree list` é leitura; add, remove e prune seguem bloqueados
         if subcomando in GIT_ESCRITA:
             return BLOQUEAR, MOTIVO_GIT
         if subcomando == "branch" and GIT_BRANCH_ESCRITA & set(resto):
@@ -248,6 +317,8 @@ def _decidir_segmento(palavras: list[str], cwd: str, profundidade: int) -> Decis
             return PASSAR, ""  # `listas ver` só lê o cache local; `listas atualizar` acessa a rede
         if subcomando in REDE_SOCIAL:
             return BLOQUEAR, MOTIVO_REDE
+        if subcomando in AGENTE_NW_LEITURA_EM_COPIA:
+            return _decidir_leitura_em_copia(subcomando, argumentos, cwd)
         if not subcomando or subcomando in PASSA_NA_PASTA_PRINCIPAL:
             return PASSAR, ""
         if _na_pasta_principal(cwd):

@@ -132,3 +132,135 @@ def test_ferramenta_que_nao_e_bash_passa(pasta_principal: Path) -> None:
 def test_entrada_ilegivel_nao_derruba_a_sessao() -> None:
     codigo, _saida, _erro = _executar("isto não é json")
     assert codigo == 0
+
+
+# --- brief 086, item 2.10: leitura do agente_nw numa cópia do banco ------------------------------
+
+RAIZ = Path(__file__).resolve().parent.parent
+BANCO_REAL = RAIZ / "dados" / "agente.db"
+
+
+def _decisao(saida: str) -> str:
+    return str(json.loads(saida)["hookSpecificOutput"]["permissionDecision"])
+
+
+@pytest.mark.parametrize(
+    "comando",
+    [
+        "agente_nw comparar-vetores --banco /tmp/copia.db --amostra 50",
+        "agente_nw comparar-vetores --banco=/tmp/copia.db",
+        "agente_nw medir-dano --banco /tmp/copia.db",
+        "agente_nw reprocessar --simular --banco /tmp/copia.db",
+        "agente_nw copiar-banco /tmp/copia.db && agente_nw medir-dano --banco /tmp/copia.db",
+    ],
+)
+def test_leitura_apontando_para_a_copia_passa(comando: str, pasta_principal: Path) -> None:
+    assert _rodar(comando, pasta_principal) == (0, "", "")
+
+
+@pytest.mark.parametrize(
+    "comando",
+    [
+        "agente_nw comparar-vetores --amostra 50",
+        "agente_nw medir-dano",
+        "agente_nw reprocessar --simular",
+    ],
+)
+def test_leitura_sem_apontar_a_copia_continua_perguntando(comando: str, pasta_principal: Path) -> None:
+    codigo, saida, _erro = _rodar(comando, pasta_principal)
+    assert codigo == 0
+    assert _decisao(saida) == "ask"
+
+
+@pytest.mark.parametrize(
+    "comando",
+    [
+        "agente_nw medir-dano --banco dados/agente.db",
+        "agente_nw medir-dano --banco=dados/agente.db",
+        "agente_nw medir-dano --banco ./dados/agente.db",
+        "agente_nw comparar-vetores --banco /tmp/copia.db --comparar dados/agente.db",
+        "agente_nw medir-dano --banco /tmp/../Users/sidarta48/github/agente_nw/dados/agente.db",
+        "agente_nw medir-dano --banco $BANCO",
+        'agente_nw medir-dano --banco "$HOME/github/agente_nw/dados/x.db"',
+        "agente_nw medir-dano --banco ~/github/agente_nw/dados/x.db",
+        "agente_nw medir-dano --banco $(echo /tmp/copia.db)",
+        "agente_nw medir-dano --banco /tmp/*.db",
+        "agente_nw reprocessar --simular --confirmo --banco /tmp/copia.db",
+        "agente_nw reprocessar --banco /tmp/copia.db",
+        "agente_nw reprocessar --confirmo --banco /tmp/copia.db",
+    ],
+)
+def test_tentativa_de_driblar_a_copia_e_bloqueada(comando: str, pasta_principal: Path) -> None:
+    codigo, _saida, erro = _rodar(comando, pasta_principal)
+    assert codigo == 2
+    assert erro.strip()
+
+
+def test_link_simbolico_para_o_banco_real_e_bloqueado(pasta_principal: Path) -> None:
+    link = pasta_principal / "copia_link.db"
+    link.symlink_to(BANCO_REAL)
+
+    codigo, _saida, erro = _rodar(f"agente_nw medir-dano --banco {link}", pasta_principal)
+
+    assert codigo == 2
+    assert erro.strip()
+
+
+def test_pasta_que_e_link_para_dados_e_bloqueada(pasta_principal: Path) -> None:
+    pasta = pasta_principal / "pasta_link"
+    pasta.symlink_to(RAIZ / "dados", target_is_directory=True)
+
+    codigo, _saida, erro = _rodar(f"agente_nw medir-dano --banco {pasta}/nova.db", pasta_principal)
+
+    assert codigo == 2
+    assert erro.strip()
+
+
+@pytest.mark.parametrize(
+    "comando",
+    [
+        "agente_nw coletar --banco /tmp/copia.db",
+        "agente_nw processar-fila --banco /tmp/copia.db",
+        "agente_nw inventado --banco /tmp/copia.db",
+    ],
+)
+def test_subcomando_fora_da_lista_de_leitura_continua_perguntando(
+    comando: str, pasta_principal: Path
+) -> None:
+    codigo, saida, _erro = _rodar(comando, pasta_principal)
+    assert codigo == 0
+    assert _decisao(saida) == "ask"
+
+
+@pytest.mark.parametrize(
+    "comando",
+    [
+        "agente_nw ler-rede-social --banco /tmp/copia.db",
+        "agente_nw listas atualizar --banco /tmp/copia.db",
+        "agente_nw pedir --banco /tmp/copia.db",
+        "agente_nw extensao testar --banco /tmp/copia.db",
+    ],
+)
+def test_rede_social_continua_bloqueada_mesmo_com_copia(comando: str, pasta_principal: Path) -> None:
+    codigo, _saida, erro = _rodar(comando, pasta_principal)
+    assert codigo == 2
+    assert erro.strip()
+
+
+def test_worktree_list_e_leitura_e_passa(pasta_principal: Path) -> None:
+    assert _rodar("git worktree list", pasta_principal) == (0, "", "")
+    assert _rodar("git worktree list --porcelain", pasta_principal) == (0, "", "")
+
+
+@pytest.mark.parametrize(
+    "comando",
+    [
+        "git worktree add ../nova",
+        "git worktree remove ../nova",
+        "git worktree prune",
+    ],
+)
+def test_worktree_de_escrita_continua_bloqueado(comando: str, pasta_principal: Path) -> None:
+    codigo, _saida, erro = _rodar(comando, pasta_principal)
+    assert codigo == 2
+    assert erro.strip()

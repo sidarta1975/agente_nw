@@ -67,7 +67,18 @@ done < "$LISTA"
 (( ${#ARQUIVOS[@]} > 0 )) || parar "$LISTA não lista nenhum arquivo"
 echo "manifesto $NUMERO: ${#ARQUIVOS[@]} arquivo(s)" | tee -a "$LOG"
 
-# 2. Nada fora da lista
+# 1b. Lacunas do relatório vão para o PLAN **antes** do commit (brief 086, item 2.4): o PLAN está no
+# manifesto de todo brief, então a mudança entra neste commit e a árvore não fica suja depois dele —
+# em série, árvore suja faz o brief seguinte parar. A linha de contagem só é impressa no fim, junto
+# da linha final, para a ordem da saída continuar a mesma. Nunca derruba a entrega. Em simulação não roda:
+# --simular não toca em nada.
+LACUNAS=""
+if (( ! SIMULAR )) && [[ -f scripts/agente_lacunas.py ]]; then
+  LACUNAS="$(python3 scripts/agente_lacunas.py "$NUMERO" 2>> "$LOG" || true)"
+  [[ -z "$LACUNAS" ]] || echo "$LACUNAS" >> "$LOG"
+fi
+
+# 2. Nada fora da lista (o PLAN já alterado por 1b entra aqui: se faltar no manifesto, para)
 FORA=()
 DENTRO=0
 while IFS= read -r linha; do
@@ -96,6 +107,7 @@ fi
 if (( SIMULAR )); then
   echo "[simulação] brief $NUMERO, nada será executado:"
   echo "  1. manifesto conferido: $MENSAGEM e $LISTA (${#ARQUIVOS[@]} arquivos)"
+  echo "  1b. rodaria scripts/agente_lacunas.py $NUMERO (lacunas no PLAN, antes do commit)"
   echo "  2. nenhum arquivo alterado fora da lista"
   echo "  3. rodaria scripts/verificar.sh (o gate)"
   echo "  4. rodaria scripts/commitar.sh $MENSAGEM <${#ARQUIVOS[@]} arquivos> (sem pergunta)"
@@ -122,10 +134,8 @@ PUSH_OK=1
 git push >> "$LOG" 2>&1 || PUSH_OK=0
 mv "$MENSAGEM" "logs/entregue_${NUMERO}_commit.txt"
 mv "$LISTA" "logs/entregue_${NUMERO}_arquivos.txt"
-# Lacunas do relatório vão para o PLAN (fora do git; não muda o commit). Nunca derruba a entrega.
-if [[ -f scripts/agente_lacunas.py ]]; then
-  python3 scripts/agente_lacunas.py "$NUMERO" 2>> "$LOG" | tee -a "$LOG" || true
-fi
+# A contagem das lacunas (já gravadas no PLAN no passo 1b, antes do commit).
+[[ -z "$LACUNAS" ]] || echo "$LACUNAS"
 if (( ! PUSH_OK )); then
   tail -n 3 "$LOG"
   echo "✗ brief $NUMERO: commit $HASH feito localmente; falhou só o envio. Rode: !git push"
