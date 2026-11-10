@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class CamposExtraidos(BaseModel):
     """Campos guiados da ficha que o modelo pode ter encontrado no texto livre.
 
-    Mesmos nove campos guiados de ``perfil`` (`ARQUITETURA.md` seção 3) — nenhum
+    Mesmos nove campos guiados de ``perfil`` (`ARQUITETURA_agente_nw.md` seção 3) — nenhum
     campo fora deste conjunto é aceito pelo contrato.
     """
 
@@ -41,7 +41,7 @@ class FatoDatado(BaseModel):
 
 
 class RespostaExtracaoTexto(BaseModel):
-    """Esquema do contrato ``extrair_de_texto`` (`ARQUITETURA.md` seção 4)."""
+    """Esquema do contrato ``extrair_de_texto`` (`ARQUITETURA_agente_nw.md` seção 4)."""
 
     model_config = ConfigDict(frozen=True)
 

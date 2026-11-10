@@ -6,7 +6,7 @@ VERSAO = "2026-10-31-1"
 ESQUEMA = PedidoExtraido
 
 # Cenário do exemplo resolvido deliberadamente distante de qualquer entrada real de
-# teste (armadilha 24, docs/PLAN.md) — evita que o modelo copie o exemplo em vez de ler a frase.
+# teste (armadilha 24, docs/PLAN_agente_nw.md) — evita que o modelo copie o exemplo em vez de ler a frase.
 _EXEMPLO_FRASE = (
     "Jantar sábado com o Teodoro, dono de uma marcenaria em Joinville que conheço da faculdade. "
     "Não nos falamos desde a pandemia. Quero saber como andam os negócios dele, sem falar de política."

@@ -11,7 +11,7 @@ ESQUEMA = RespostaComparacaoPar
 # a mesma coisa. O segundo exemplo é deliberadamente do mesmo tema geral do primeiro
 # (não um tema totalmente alheio) — é essa a distinção que o modelo precisa aprender:
 # mesmo tema não é mesmo assunto. Os títulos e trechos dos exemplos são deliberadamente
-# distantes de qualquer texto real de teste (armadilha 24, docs/PLAN.md) para não
+# distantes de qualquer texto real de teste (armadilha 24, docs/PLAN_agente_nw.md) para não
 # incentivar o modelo a copiar o rótulo do exemplo em vez de julgar o par de verdade.
 _EXEMPLO_1_TITULO_A = "Prefeitura de Recife anuncia obras na orla"
 _EXEMPLO_1_TRECHO_A = "A prefeitura do Recife anunciou nesta terça-feira um pacote de obras de contenção."

@@ -6,6 +6,8 @@ __pycache__/
 .ruff_cache/
 .pytest_cache/
 .DS_Store
+# Sobras do sistema de arquivos quando um arquivo e renomeado/apagado estando aberto (FUSE).
+.fuse_hidden*
 /dados/
 /saidas/
 /capturas/

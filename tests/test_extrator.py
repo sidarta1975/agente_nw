@@ -68,7 +68,7 @@ def test_extracao_real_produz_tags_e_campos_esperados(conn: sqlite3.Connection, 
     # correção do exemplo do prompt, mas variando entre 2 e 3 tags por rodada (2/8 só
     # com logística+vela ou vela+clube náutico) — 2 é o piso real observado, não um
     # palpite. "administração" sai corretamente como campo `formacao`, não como tag.
-    # Ver docs/PLAN.md, dívida sobre confiabilidade do extrator.
+    # Ver docs/PLAN_agente_nw.md, dívida sobre confiabilidade do extrator.
     assert resumo.tags_gravadas >= 2
 
     linha = conn.execute(

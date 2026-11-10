@@ -467,7 +467,7 @@ def test_pastas_ignoradas_ficam_fora_do_universo(arvore: Path) -> None:
             "agente_nw/__pycache__/alfa.cpython-312.pyc": "lixo\n",
             "dados/despejo.py": "x = 1\n",
             "logs/arquivos_079.py": "x = 1\n",
-            "docs/PLAN.md": "# plano\n",
+            "docs/PLAN_agente_nw.md": "# plano\n",
             "docs/exemplo.py": "x = 1\n",
         },
     )

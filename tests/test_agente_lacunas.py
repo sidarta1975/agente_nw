@@ -8,7 +8,7 @@ import pytest
 
 SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "agente_lacunas.py"
 
-PLAN = """# PLAN.md — estado vivo
+PLAN = """# PLAN_agente_nw.md — estado vivo
 
 ## Resumo
 
@@ -68,7 +68,7 @@ Texto solto.
 @pytest.fixture
 def raiz(tmp_path: Path) -> Path:
     (tmp_path / "docs" / "docs").mkdir(parents=True)
-    (tmp_path / "docs" / "PLAN.md").write_text(PLAN)
+    (tmp_path / "docs" / "PLAN_agente_nw.md").write_text(PLAN)
     (tmp_path / "docs" / "docs" / "doc_099_teste_2026-10-25.md").write_text(RELATORIO)
     return tmp_path
 
@@ -84,7 +84,7 @@ def _rodar(raiz: Path, numero: str = "099") -> str:
 
 
 def _plan(raiz: Path) -> str:
-    return (raiz / "docs" / "PLAN.md").read_text()
+    return (raiz / "docs" / "PLAN_agente_nw.md").read_text()
 
 
 def _secao(plano: str, titulo: str) -> str:
@@ -177,7 +177,7 @@ def test_sem_lacunas(raiz: Path) -> None:
 
 def test_secao_que_so_tem_o_marcador_nenhum_troca_o_marcador_pela_linha(raiz: Path) -> None:
     vazio = PLAN.replace("- Teste real das dez frases do brief 036.", "(nenhum)")
-    (raiz / "docs" / "PLAN.md").write_text(vazio)
+    (raiz / "docs" / "PLAN_agente_nw.md").write_text(vazio)
 
     _rodar(raiz)
 

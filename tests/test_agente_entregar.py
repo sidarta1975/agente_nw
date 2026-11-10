@@ -45,7 +45,7 @@ def repo(tmp_path: Path) -> Path:
     _git(pasta, "config", "user.email", "teste@example.com")
     _git(pasta, "config", "user.name", "Teste")
     (pasta / "docs" / "docs").mkdir(parents=True)
-    (pasta / "docs" / "PLAN.md").write_text("## Backlog\n\n- 040 · algo · não iniciado\n\n## Done\n")
+    (pasta / "docs/PLAN_agente_nw.md").write_text("## Backlog\n\n- 040 · algo · não iniciado\n\n## Done\n")
     (pasta / "docs" / "docs" / "doc_001_teste_2026-10-25.md").write_text(
         "# DOC 001\n\n## Lacunas\n\n| # | Lacuna | Destino | Impacto |\n|---|---|---|---|\n"
         "| 1 | Falta medir | backlog | nice |\n"
@@ -111,7 +111,7 @@ def test_manifesto_completo_faz_gate_commit_push_e_renomeia(repo: Path, ambiente
     assert linhas[-1] == f"✓ brief 001: commit {curto}, enviado ao GitHub"
     assert (repo / "logs" / "entregar_ultimo.txt").exists()
     assert linhas[-2] == "lacunas do 001: 1 no Backlog, 0 em Pendências, 0 em Dívidas, 0 em Decisões"
-    assert "- [001-1] Falta medir · nice · " in (repo / "docs" / "PLAN.md").read_text()
+    assert "- [001-1] Falta medir · nice · " in (repo / "docs" / "PLAN_agente_nw.md").read_text()
 
 
 def test_arquivo_fora_da_lista_para_antes_do_gate(repo: Path, ambiente: dict[str, str]) -> None:

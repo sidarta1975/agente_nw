@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""agente_lacunas.py — copia as lacunas de um relatório de brief para o docs/PLAN.md (brief 062).
+"""agente_lacunas.py — copia as lacunas de um relatório de brief para o docs/PLAN_agente_nw.md (brief 062).
 
 Uso: scripts/agente_lacunas.py <NNN> [--raiz <pasta>] [--data AAAA-MM-DD]
 
@@ -113,7 +113,7 @@ def main() -> int:
         print("sem lacunas")
         return 0
 
-    caminho = args.raiz / "docs" / "PLAN.md"
+    caminho = args.raiz / "docs" / "PLAN_agente_nw.md"
     plano = caminho.read_text()
     linhas = plano.split("\n")
     contagem = dict.fromkeys(SECOES, 0)

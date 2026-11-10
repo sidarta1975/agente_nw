@@ -7,7 +7,7 @@ VERSAO = "2026-11-02-1"
 ESQUEMA = RespostaRotulo
 
 # Cenário do exemplo deliberadamente distante de qualquer entrada real de teste
-# (armadilha 24, docs/PLAN.md) — evita que o modelo copie conteúdo do exemplo em
+# (armadilha 24, docs/PLAN_agente_nw.md) — evita que o modelo copie conteúdo do exemplo em
 # vez de resumir os itens de verdade.
 _EXEMPLO_ITENS = [
     ("Prefeitura do Recife detalha cronograma das obras de contenção na orla", "g1.globo.com"),

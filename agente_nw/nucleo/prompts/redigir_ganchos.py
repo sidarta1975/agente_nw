@@ -21,7 +21,7 @@ _HISTORICO_NO_CORTE = 1
 _FATOS_NO_CORTE = 5
 
 # Cenário do exemplo deliberadamente distante de qualquer entrada real de teste (armadilha 24,
-# docs/PLAN.md): evita que o modelo copie o exemplo em vez de ler os dados. Os textos do exemplo
+# docs/PLAN_agente_nw.md): evita que o modelo copie o exemplo em vez de ler os dados. Os textos do exemplo
 # respeitam os limites do registro "cordial".
 _EXEMPLO = """\
 QUEM ESCREVE: Rafael Quintela. Temas dele: cerâmica (interesse), mercado editorial (domínio).

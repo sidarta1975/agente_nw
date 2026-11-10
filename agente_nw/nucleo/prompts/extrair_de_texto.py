@@ -30,7 +30,7 @@ _EXEMPLO_ENTRADA = (
 # de qualquer texto real de teste — um exemplo parecido demais com a entrada real
 # (mesmo nome, mesma cidade, mesmo cargo) faz o modelo copiar conteúdo do exemplo
 # em vez de extrair só o que está no texto de verdade (visto na prática: "cabotagem"
-# aparecendo numa extração que não mencionava cabotagem). Ver docs/PLAN.md, dívida
+# aparecendo numa extração que não mencionava cabotagem). Ver docs/PLAN_agente_nw.md, dívida
 # sobre confiabilidade do extrator (brief 004).
 _EXEMPLO_SAIDA = (
     '{"campos": {"cidade": "Belo Horizonte", "cargo": "advogada tributarista"}, '

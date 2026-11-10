@@ -1,7 +1,7 @@
 """Hook PreToolUse da ferramenta Bash (brief 057, ajustado no 058).
 
-Trava o que o AGENTS.md ainda veda ao modelo: git de escrita digitado direto (§5), o banco real e a leitura
-de rede social (§6), e `rm -rf` fora de `logs/` e de pastas temporárias. O gate e a entrega
+Trava o que o AGENTS_agente_nw.md ainda veda ao modelo: git de escrita digitado direto (§5), o banco
+real e a leitura de rede social (§6), e `rm -rf` fora de `logs/` e de pastas temporárias. O gate e a entrega
 (`scripts/verificar.sh`, `scripts/agente_entregar.sh`, pytest) passaram ao executor no brief 058; o único
 caminho para commitar é o `agente_entregar.sh`. O que Sidarta digita com `!` não passa por aqui.
 

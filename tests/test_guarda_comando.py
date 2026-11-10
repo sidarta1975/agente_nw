@@ -30,7 +30,7 @@ def pasta_principal(tmp_path: Path) -> Path:
     "comando",
     [
         "git commit -m x",
-        "git add AGENTS.md",
+        "git add AGENTS_agente_nw.md",
         "git push",
         "git -C . push origin main",
         "git reset --hard",
@@ -125,7 +125,7 @@ def test_bloqueio_vale_tambem_fora_da_pasta_principal(tmp_path: Path) -> None:
 
 
 def test_ferramenta_que_nao_e_bash_passa(pasta_principal: Path) -> None:
-    pedido = {"tool_name": "Read", "tool_input": {"file_path": "AGENTS.md"}, "cwd": str(pasta_principal)}
+    pedido = {"tool_name": "Read", "tool_input": {"file_path": "x.md"}, "cwd": str(pasta_principal)}
     assert _executar(json.dumps(pedido)) == (0, "", "")
 
 

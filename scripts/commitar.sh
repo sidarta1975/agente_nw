@@ -11,7 +11,7 @@
 #   1. Confere que o arquivo de mensagem existe e não está vazio.
 #   2. Confere que cada arquivo listado existe (rastreado ou não).
 #   3. git status antes do add.
-#   4. git add em cada arquivo, um por um (§5 do AGENTS.md: nunca -A).
+#   4. git add em cada arquivo, um por um (§5 do AGENTS_agente_nw.md: nunca -A).
 #   5. git status para mostrar o staged.
 #   6. Pede confirmação (S/n); com SEM_PERGUNTA=1 pula a pergunta (usado por agente_entregar.sh).
 #   7. git commit -F <arquivo_de_mensagem>.

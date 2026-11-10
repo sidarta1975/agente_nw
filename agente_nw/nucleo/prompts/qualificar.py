@@ -16,7 +16,7 @@ _EXEMPLOS_CONVERSAVEL: list[str] = _exemplos["conversavel"]
 _EXEMPLOS_NAO_CONVERSAVEL: list[str] = _exemplos["nao_conversavel"]
 
 # Cenário do exemplo resolvido deliberadamente distante de qualquer entrada real de
-# teste (armadilha 24, docs/PLAN.md) — evita que o modelo copie conteúdo do exemplo
+# teste (armadilha 24, docs/PLAN_agente_nw.md) — evita que o modelo copie conteúdo do exemplo
 # em vez de julgar o assunto de verdade.
 _EXEMPLO_TITULO = "Prefeitura do Recife inicia obras de contenção na orla"
 _EXEMPLO_ITENS = [

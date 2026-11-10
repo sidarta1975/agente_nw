@@ -6,7 +6,7 @@ VERSAO = "2026-10-31-1"
 ESQUEMA = RespostaDescreverTema
 
 # Cenário do exemplo deliberadamente distante de qualquer termo real de teste (armadilha 24,
-# docs/PLAN.md) — evita que o modelo copie a descrição do exemplo em vez de descrever o termo de verdade.
+# docs/PLAN_agente_nw.md) — evita que o modelo copie a descrição do exemplo em vez da do termo real.
 _EXEMPLO_TERMO = "cerâmica"
 _EXEMPLO_SAIDA = (
     '{"descricao": "Técnicas e tradições de moldar e queimar argila para fazer peças utilitárias '

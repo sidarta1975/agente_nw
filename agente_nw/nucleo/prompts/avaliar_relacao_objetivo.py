@@ -7,7 +7,7 @@ VERSAO = "2026-11-02-1"
 ESQUEMA = RespostaAvaliarRelacaoObjetivo
 
 # Cenário do exemplo deliberadamente distante de qualquer entrada real de teste (armadilha 24,
-# docs/PLAN.md). O gate julga relação com o objetivo, nunca se o tema é "adequado" — por isso o
+# docs/PLAN_agente_nw.md). O gate julga relação com o objetivo, nunca se o tema é "adequado" — por isso o
 # exemplo tem um candidato claramente fora do objetivo e outro claramente dentro, nenhum sensível.
 _EXEMPLO_OBJETIVO = "conseguir apoio para a campanha de arrecadação do grêmio da escola"
 _EXEMPLO_FRASE = "Queria pedir pro Heitor ajudar a divulgar a campanha do grêmio."

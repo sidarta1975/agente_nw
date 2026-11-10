@@ -1,4 +1,4 @@
-# AGENTS.md — agente_nw
+# AGENTS_agente_nw.md — agente_nw
 
 > Coloque este arquivo na raiz do repositório. Claude Code lê antes de qualquer tarefa.
 > Padrão herdado dos repositórios lex_hub, pandora_96 e claw_planalto (ferramenta externa, não clonada nesta máquina).
@@ -9,15 +9,15 @@
 
 Você implementa briefs. Não tem latitude criativa. Se o brief não cobre algo, pare e registre no relatório final como pendência — não invente.
 
-O Claude Code carrega este arquivo sozinho no início da sessão (versão 2.1.277 ou posterior; sem `CLAUDE.md` na pasta). Antes de alterar qualquer coisa, leia: `docs/PLAN.md` até o fim de `## Dívidas conhecidas`; as seções do PLANO, da ARQUITETURA e das armadilhas citadas em "Seções a ler" no cabeçalho do brief; o brief; o código existente da área afetada. O histórico (`docs/historico/`) é consultado por busca, nunca lido inteiro. Não criar `CLAUDE.md` nem `CLAUDE.local.md` neste repositório: com eles, o Claude Code deixa de ler este arquivo.
+O Claude Code carrega este arquivo sozinho no início da sessão (versão 2.1.277 ou posterior; sem `CLAUDE.md` na pasta). Antes de alterar qualquer coisa, leia: `docs/PLAN_agente_nw.md` até o fim de `## Dívidas conhecidas`; as seções do PLANO, da ARQUITETURA e das armadilhas citadas em "Seções a ler" no cabeçalho do brief; o brief; o código existente da área afetada. O histórico (`docs/historico/`) é consultado por busca, nunca lido inteiro. Não criar `CLAUDE.md` nem `CLAUDE.local.md` neste repositório: com eles, o Claude Code deixa de ler este arquivo.
 
 ## 2. Estrutura do repositório
 
-Estrutura do repositório: `docs/ARQUITETURA.md` §2. Nome do pacote e da pasta é sempre `agente_nw`; desvio de nomenclatura é corrigido imediatamente.
+Estrutura do repositório: `docs/ARQUITETURA_agente_nw.md` §2. Nome do pacote e da pasta é sempre `agente_nw`; desvio de nomenclatura é corrigido imediatamente.
 
 ## 3. Stack
 
-Descrição (perfis `air16`/`pro48`, tarefas de LLM, embeddings): `docs/ARQUITETURA.md` §8. Aqui só o que é regra.
+Descrição (perfis `air16`/`pro48`, tarefas de LLM, embeddings): `docs/ARQUITETURA_agente_nw.md` §8. Aqui só o que é regra.
 
 - Python 3.12 do Homebrew; Bash para utilitários.
 - SQLite em modo WAL, arquivo único em `dados/agente.db`, nunca compartilhado entre processos.
@@ -44,6 +44,7 @@ Descrição (perfis `air16`/`pro48`, tarefas de LLM, embeddings): `docs/ARQUITET
 - Antes de diagnosticar erro: "isso funcionava antes?" Responder essa pergunta antes de tocar em código.
 - Toda alteração de tabela é uma migração numerada em `scripts/migracoes/`. Nenhum brief cria ou altera tabela fora de migração.
 - Quem decide que tema cabe numa mensagem é o usuário (brief 046): o programa não descarta conteúdo por tema (política, saúde, religião…). Em troca, a redação nunca afirma sobre a pessoa o que ela não disse (opinião, posição, adesão), trata fato `[antigo]` ou `[de imagem]` como não atual, e o motor só entrega assunto com relação com o objetivo do pedido (`conector.consulta.minima` é piso necessário).
+- **Texto por inteiro (brief 079).** Quando o projeto analisa um texto (notícia, página, mensagem, comentário, histórico, fato, pedido), analisa o texto inteiro. O princípio é do dono do projeto: só Sidarta aprova exceção, e só ele (ou um brief escrito por ele) escreve em `docs/EXCECOES_TEXTO_INTEGRAL.md`. O executor não aprova exceção nem marca ponto como aprovado. Sem linha no registro, o corte é violação. O verificador é `scripts/verificar_auditoria_texto.py`. Todo brief que lê, monta ou envia texto a modelo, embedding ou filtro responde, no relatório: **"algum texto é analisado só em parte?"** (sim, onde e com que aprovação; ou não, e a prova).
 
 ## 5. Git
 
@@ -74,7 +75,7 @@ O usuário escreve um pedido em texto livre sobre uma pessoa ou um grupo e um ob
 
 ## 8. Relatório final obrigatório
 
-Todo brief termina com este bloco preenchido, escrito no relatório do brief, `docs/docs/doc_<NNN>_<slug>_<data>.md`, e não na resposta da conversa. Sem ele, a sessão é considerada incompleta. A resposta final da sessão tem três linhas: o caminho do relatório, uma linha do que foi feito e `Nada para você.` ou só o que exige Sidarta (teste com pessoa real, login em rede social, decisão de produto). Comando para Sidarta digitar só aparece se a entrega parou na terceira falha do gate. Sem saída de comando colada no relatório, não se escreve que algo passou. O relatório termina com a seção `## Lacunas`, uma tabela `# | Lacuna | Destino | Impacto` (destino: `backlog`, `pendência`, `dívida`, `decisão` ou `nenhum`; sem lacunas: `Sem lacunas.`). O executor não copia lacunas para o `docs/PLAN.md` à mão: o `scripts/agente_entregar.sh` roda `scripts/agente_lacunas.py` e as leva ao Backlog, às Pendências, às Dívidas ou às Decisões em aberto.
+Todo brief termina com este bloco preenchido, escrito no relatório do brief, `docs/docs/doc_<NNN>_<slug>_<data>.md`, e não na resposta da conversa. Sem ele, a sessão é considerada incompleta. A resposta final da sessão tem três linhas: o caminho do relatório, uma linha do que foi feito e `Nada para você.` ou só o que exige Sidarta (teste com pessoa real, login em rede social, decisão de produto). Comando para Sidarta digitar só aparece se a entrega parou na terceira falha do gate. Sem saída de comando colada no relatório, não se escreve que algo passou. O relatório termina com a seção `## Lacunas`, uma tabela `# | Lacuna | Destino | Impacto` (destino: `backlog`, `pendência`, `dívida`, `decisão` ou `nenhum`; sem lacunas: `Sem lacunas.`). O executor não copia lacunas para o `docs/PLAN_agente_nw.md` à mão: o `scripts/agente_entregar.sh` roda `scripts/agente_lacunas.py` e as leva ao Backlog, às Pendências, às Dívidas ou às Decisões em aberto.
 
 Pendência só pode ser (a) decisão de produto, que cabe a Sidarta, ou (b) algo que exige a máquina ou a presença dele — login em rede social, teste com pessoa real, aprovação de limiar. Defeito, inconsistência, limpeza ou verificação que o executor consiga resolver ou rodar sozinho é resolvido antes do relatório, não listado. Quando um critério de aceite depende de rede social ou do modelo real, o executor roda o que está ao seu alcance (por exemplo `agente_nw listas ver --rede instagram --filtro a`) e cola a saída no relatório; o que fica para Sidarta é só o que exige Sidarta.
 
@@ -90,27 +91,28 @@ O executor roda o gate dentro do `scripts/agente_entregar.sh`, que só commita c
 - Comandos executados:
 - Manifesto do commit (`logs/arquivos_<NNN>.txt` e `logs/commit_<NNN>.txt`, conteúdo colado):
 - Pendências e decisões que ficaram abertas:
-- Resumo, Doing, Backlog e Done do `docs/PLAN.md` atualizados: sim/não
+- Resumo, Doing, Backlog e Done do `docs/PLAN_agente_nw.md` atualizados: sim/não
 ```
 
 ## 9. Certificação
 
-Uma tarefa só está certificada quando: o gate fica verde dentro do `scripts/agente_entregar.sh` (commit e push feitos), escopo respeitado (nada além do brief), relatório final completo e Resumo, Doing, Backlog e Done do `docs/PLAN.md` atualizados. Auditoria independente em doze passes é aplicada ao fim de cada fase de implementação, com validação cruzada em outro modelo.
+Uma tarefa só está certificada quando: o gate fica verde dentro do `scripts/agente_entregar.sh` (commit e push feitos), escopo respeitado (nada além do brief), relatório final completo e Resumo, Doing, Backlog e Done do `docs/PLAN_agente_nw.md` atualizados. Auditoria independente em doze passes é aplicada ao fim de cada fase de implementação, com validação cruzada em outro modelo.
 
 ## 10. Briefs e numeração
 
 - Briefs e DOCs seguem uma única sequência numérica. O próximo número é o maior encontrado em `docs/briefs/` e `docs/docs/`, mais um.
 - Todo brief escrito no Projeto é gravado em `docs/briefs/` antes de ser executado. O executor não executa brief que não esteja no disco.
-- O cabeçalho do brief segue `docs/briefs/_modelo.md`: Conjunto, Arquivos-alvo, Seções a ler, Modelo, Teste de aceite.
+- O cabeçalho do brief segue `docs/briefs/_modelo_agente_nw.md`: Conjunto, Arquivos-alvo, Seções a ler, Modelo, Teste de aceite, Depende de, Ordem em série.
 - Havendo teste de aceite, o executor cria o teste antes do código.
 - Não editar este arquivo, regra ou skill numa sessão de execução, salvo quando o brief tiver esse arquivo como alvo.
 - Todo brief é executado com `/executar <NNN>`.
+- **Execução em série.** Vários briefs, um depois do outro, sem acompanhamento: `scripts/executar_serie.sh <NNN> <NNN> ...` (o script nasce no brief 086; até lá, um `/executar` por vez). Cada brief roda em contexto novo (`claude -p "/executar NNN"`), com o modelo e o esforço do próprio cabeçalho. A série confere a cada brief, e não pelo código de saída do Claude Code (uma parada do `/executar` sai com 0): o manifesto `logs/entregue_<NNN>_commit.txt`, o commit com `(brief NNN)`, `origin/main..HEAD` igual a zero e a árvore limpa. **Qualquer falha para a série**, sem tentar o brief seguinte, grava `logs/serie/<data>/STATUS.txt` e avisa por notificação do macOS. Nunca automático na série: aprovar exceção ao texto por inteiro, banco real, leitura de rede social, decisão de produto, mudança de `AGENTS_agente_nw.md`, `settings` ou trava. A ordem dos briefs vem do campo `Ordem em série` do cabeçalho.
 
 ## 11. Cowork: o que a ponte com o computador pode e não pode fazer
 
 O Cowork (a sessão de planejamento que escreve os briefs) tem, por uma ponte de dispositivo, acesso de leitura e escrita aos arquivos deste repositório no computador de Sidarta — mas essa ponte roda numa máquina virtual Linux separada do Mac, não no Mac. Por isso:
 
-- **Pode:** ler qualquer arquivo e o código; escrever e revisar briefs (`docs/briefs/`), documentos e o `docs/PLAN.md`; inspecionar o resultado de um brief já executado (git log, arquivos alterados, conteúdo).
+- **Pode:** ler qualquer arquivo e o código; escrever e revisar briefs (`docs/briefs/`), documentos e o `docs/PLAN_agente_nw.md`; inspecionar o resultado de um brief já executado (git log, arquivos alterados, conteúdo).
 - **Não pode:** rodar o gate (`scripts/verificar.sh`) nem a suíte de testes — os binários do `.venv` são de macOS (Mach-O arm64) e a VM Linux não os executa ("Exec format error"), e o projeto depende de um pacote exclusivo do macOS (`pyobjc-framework-Contacts`, que lê a agenda do Mac), então nem um ambiente novo dentro dessa VM resolveria. Sem rodar o gate de verdade, o Cowork nunca declara que um código "passou" ou "funciona" (§8).
 - **Não pode:** commitar nem publicar — a ponte não tem as credenciais do GitHub de Sidarta (sem chave SSH, sem `gh auth`, sem credential helper).
 - **Não pode:** digitar comandos no terminal ou numa IDE de Sidarta por controle de tela — essa ferramenta bloqueia digitação em terminal/IDE por categoria, e nenhuma concessão de acesso remove essa trava.
@@ -119,7 +121,7 @@ O Cowork (a sessão de planejamento que escreve os briefs) tem, por uma ponte de
 
 ## 12. Estado local: uma árvore de trabalho só
 
-Este projeto guarda estado que não é código nem está no git: o banco (`dados/agente.db` — caminho relativo em `config/local.yaml`, resolvido por `config/container.py::caminho_banco` contra `RAIZ`, que é a raiz da árvore de trabalho onde o processo roda) e a pasta `docs/` (`docs/PLAN.md`, `docs/briefs/`, `docs/docs/`). Até o relatório 078 o `.gitignore` excluía `docs/*` por inteiro; desde então os arquivos `.md` de `docs/` são versionados e vão ao GitHub (repositório privado, decisão de Sidarta), e o `.gitignore` continua ignorando ali qualquer outro tipo de arquivo. O banco segue só local. Um `.md` alterado em `docs/` só chega a outra árvore de trabalho depois de commitado.
+Este projeto guarda estado que não é código nem está no git: o banco (`dados/agente.db` — caminho relativo em `config/local.yaml`, resolvido por `config/container.py::caminho_banco` contra `RAIZ`, que é a raiz da árvore de trabalho onde o processo roda) e a pasta `docs/` (`docs/PLAN_agente_nw.md`, `docs/briefs/`, `docs/docs/`). Até o relatório 078 o `.gitignore` excluía `docs/*` por inteiro; desde então os arquivos `.md` de `docs/` são versionados e vão ao GitHub (repositório privado, decisão de Sidarta), e o `.gitignore` continua ignorando ali qualquer outro tipo de arquivo. O banco segue só local. Um `.md` alterado em `docs/` só chega a outra árvore de trabalho depois de commitado.
 
 Isso só se comporta como "o projeto" dentro de uma única árvore de trabalho. Uma sessão aberta numa **worktree** separada (`git worktree add`) tem sua própria cópia de disco, desconectada: seu próprio banco (vazio ou desatualizado) e sua própria pasta `docs/` (só com os `.md` do último commit, sem o que foi escrito ou alterado depois), mesmo rodando o mesmo código da `main`. Já existiu uma worktree deste tipo aqui: o registro de `agente_nw_040` (brief 040) continua em `.git/worktrees/`, embora a pasta já não exista.
 

@@ -7,7 +7,7 @@ VERSAO = "2026-11-02-1"
 ESQUEMA = RespostaCartao
 
 # Cenário do exemplo deliberadamente distante de qualquer entrada real de teste
-# (armadilha 24, docs/PLAN.md). O exemplo tem um número em cada uma das três
+# (armadilha 24, docs/PLAN_agente_nw.md). O exemplo tem um número em cada uma das três
 # linhas, cada um com a fonte entre parênteses na mesma linha — é exatamente o
 # que a checagem determinística de cartoes.py exige; um exemplo sem número
 # não ensinaria o modelo a citar a fonte quando o texto de verdade tiver um.

@@ -24,7 +24,7 @@ echo "Suba o servidor manualmente, num terminal à parte, quando for usar o agen
 echo "  OLLAMA_MAX_LOADED_MODELS=2 OLLAMA_KEEP_ALIVE=30m ollama serve"
 echo "Nunca use 'brew services start ollama' nem o aplicativo Ollama.app."
 echo "Em máquina compartilhada com outros projetos (Pro), não suba outro servidor: aponte ollama_url"
-echo "em config/local.yaml para a instância já existente e defina perfil_llm (ver AGENTS.md)."
+echo "em config/local.yaml para a instância já existente e defina perfil_llm (ver AGENTS_agente_nw.md)."
 echo
 
 python3.12 -m venv .venv

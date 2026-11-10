@@ -8,6 +8,7 @@
 **Esforço:** baixo | médio | alto
 **Teste de aceite:** arquivo ou comando que prova o critério; havendo teste, o executor o cria antes do código
 **Depende de:** brief, commit ou ação de Sidarta que precisa existir antes; o executor confere literalmente e, se faltar, para
+**Ordem em série:** "livre" | "depois de NNN" | "antes de NNN"; a série (`scripts/executar_serie.sh`) recusa lista que fira isto
 **Data:** AAAA-MM-DD
 
 ---
@@ -27,7 +28,7 @@ Decisões já tomadas por Sidarta que o executor não reabre. Cada uma com a raz
 
 ## 4. Testes
 
-Casos de teste com entrada e resultado esperado. Teste que chama Ollama ou rede real usa banco isolado (`conexao.abrir(tmp_path/...)`), nunca `container.banco()`.
+Casos de teste com entrada e resultado esperado. Teste que chama Ollama ou rede real usa banco isolado (`conexao.abrir(tmp_path/...)`), nunca `container.banco()`. Todo brief que lê, monta ou envia texto a modelo, embedding ou filtro responde no relatório: "algum texto é analisado só em parte?" (AGENTS §4, brief 079).
 
 ## 5. Fora de escopo
 

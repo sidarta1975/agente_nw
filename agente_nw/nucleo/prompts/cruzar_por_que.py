@@ -8,7 +8,7 @@ VERSAO = "2026-11-02-1"
 ESQUEMA = RespostaCruzarPorQue
 
 # Cenário do exemplo deliberadamente distante de qualquer entrada real de teste
-# (armadilha 24, docs/PLAN.md). Dois assuntos no exemplo, de propósito — um só
+# (armadilha 24, docs/PLAN_agente_nw.md). Dois assuntos no exemplo, de propósito — um só
 # não ensinaria o modelo a fechar um item da lista e abrir o próximo. O "por quê"
 # de cada exemplo cita literalmente o ponto de apoio dado, nunca inventa outro —
 # é isso que o teste real (brief 009, critério de aceite 2) confirma contra saída

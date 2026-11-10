@@ -1,4 +1,4 @@
-# ARQUITETURA.md — agente_nw
+# ARQUITETURA_agente_nw.md — agente_nw
 
 > Arquitetura hexagonal. Dependências resolvidas em `config/container.py`. Nenhum módulo instancia cliente de LLM, conexão de banco ou cliente HTTP diretamente.
 
@@ -42,7 +42,7 @@ A extensão do Chrome (captura assistida de rede social), a exportação de conv
 
 ```
 agente_nw/
-├── AGENTS.md                  # regras do executor (commitado)
+├── AGENTS_agente_nw.md                  # regras do executor (commitado)
 ├── pyproject.toml
 ├── .gitignore
 ├── temas.exemplo.yaml
@@ -280,8 +280,20 @@ Só escuta em `127.0.0.1`. Nunca em `0.0.0.0`. A ponte da extensão é outro ser
 
 Não existe agendamento (brief 016). Toda execução é disparada por Sidarta pelo console ou pela CLI. O arquivo sentinela `dados/PARE` e o comando `ciclo` não existem mais no código (`grep` em `agente_nw/`, `config/` e `scripts/`, 25/10/2026).
 
-Tarefas não assistidas: nenhuma. **Nunca rodam sozinhos:** git, leitura de rede social, alteração de ficha de contato, a suíte de testes padrão.
+Tarefas não assistidas do produto: nenhuma. **Nunca rodam sozinhos:** leitura de rede social, alteração de ficha de contato, operação no banco real. O gate e o git de entrega rodam pelo executor (`scripts/agente_entregar.sh`, AGENTS §5–§6); a execução de vários briefs em série (AGENTS §10) é disparada por Sidarta, não é agendamento.
 
 ## 12. Banco
 
 SQLite em modo WAL, `busy_timeout` 5 s, `foreign_keys` ligado, `sqlite-vec` carregado na abertura da conexão. Backup diário pela API de backup do SQLite, em `dados/backups/`, retenção de 7 dias, fora da pasta sincronizada com o Drive. `agente_nw copiar-banco` gera uma cópia para desenvolvimento, para que o banco real só seja tocado por operação autorizada por Sidarta.
+
+## 13. Execução em série de briefs
+
+Não é agendamento do produto: é Sidarta mandando executar uma lista de briefs de uma vez (AGENTS §10). Estado: o procedimento está decidido; o script nasce no brief 086 (`scripts/executar_serie.sh` e `.claude/serie.settings.json`). Até lá, um `/executar` por vez.
+
+- **Um brief por sessão nova.** Cada brief roda em `claude -p "/executar NNN"`, com o modelo e o esforço do cabeçalho; nada de contexto herdado de um brief para o seguinte.
+- **Sucesso se confere fora do Claude Code.** O código de saída não vale (uma parada do `/executar` sai com 0). Vale: o manifesto `logs/entregue_<NNN>_commit.txt`, um commit com `(brief NNN)`, `origin/main..HEAD` igual a zero e a árvore limpa.
+- **Qualquer falha para a série.** O script não tenta o brief seguinte, grava `logs/serie/<data>/STATUS.txt` com onde parou e por quê, e avisa por notificação do macOS.
+- **Ordem.** Vem do campo `Ordem em série` do cabeçalho de cada brief; a série recusa uma lista que fira a ordem.
+- **Nunca automático na série:** aprovar exceção ao texto por inteiro, tocar o banco real, ler rede social ou fazer login, decidir produto, alterar `AGENTS_agente_nw.md`, `settings` ou a trava de comandos. O que exigir pessoa vira "Para você" e a série para.
+- **Uma série por vez** (trava de instância), com o Mac na tomada e a tampa aberta.
+- **Permissões** da série ficam em arquivo próprio (`.claude/serie.settings.json`, passado por `--settings`); `.claude/settings.json` da sessão interativa não ganha permissão de escrita automática.

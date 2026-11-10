@@ -1,4 +1,4 @@
-# PLAN.md — estado vivo do agente_nw
+# PLAN_agente_nw.md — estado vivo do agente_nw
 
 > Estado vivo. Resumo, Doing, Backlog e Done são atualizados ao fim de todo brief; o resto, quando muda. O histórico (decisões, atualizações por brief, dívidas resolvidas) está em `docs/historico/PLAN_historico_ate_2026-10-25.md`: consulta por busca (`grep`), nunca leitura inteira.
 
@@ -11,7 +11,7 @@
 **Próximos três (ordem sugerida; Sidarta decide):** 041 continuidade de conversa; 042 medição de uma semana de uso; 043 documentação e comitê.
 **Último commit:** `700a43a` (2026-11-08; brief 079).
 **Bloqueios:** nenhum. Pendência de Sidarta: teste real do brief 036 e de um `pedir` com pessoa real pela extensão (ver abaixo).
-**Máquinas:** Air M3 16 GB = produção (`air16`, `qwen3:4b`); Pro 48 GB = desenvolvimento (`pro48`, `qwen2.5:14b`, Ollama compartilhado em `127.0.0.1:11435`). Detalhes em `docs/PLANO.md` §5 e `docs/ARQUITETURA.md` §8.
+**Máquinas:** Air M3 16 GB = produção (`air16`, `qwen3:4b`); Pro 48 GB = desenvolvimento (`pro48`, `qwen2.5:14b`, Ollama compartilhado em `127.0.0.1:11435`). Detalhes em `docs/PLANO.md` §5 e `docs/ARQUITETURA_agente_nw.md` §8.
 **Banco:** `dados/agente.db` só é tocado por operação autorizada; desenvolvimento em cópia (`agente_nw copiar-banco`). Última migração: 019.
 
 ## Doing
@@ -32,6 +32,9 @@
 - [068-3] O exemplo resolvido de cada prompt ficou sem cerco enquanto o dado real está cercado (seção 5 do brief); só `extrair_de_texto` tem teste `llm_real` e passou, os outros oito prompts não têm teste com o modelo real que confirme a saída depois do cerco · nice · 2026-11-02
 - [076-2] Não há comando que diga qual provedor está ativo. Depois de cadastrar a chave, a única forma de confirmar que a geração saiu do Ollama é abrir `dados/logs/chamadas_llm.jsonl` e olhar o campo `modelo` — é o que a pendência de aceite do brief manda fazer. Um `agente_nw verificar-ambiente` que informasse o provedor de geração escolhido pouparia isso · nice · 2026-11-03
 - [079-2] Depois das decisões, cada correção aprovada precisa de um brief próprio (o brief 079 proíbe corrigir aqui). Os dois que eu faria primeiro: P-014 (post acima de 5.000 caracteres descartado inteiro, em silêncio) e P-034 (o `evitar` do usuário cortado em 5 itens) · degrada · 2026-11-08
+- [084-1] `scripts/executar_serie.sh` + `.claude/serie.settings.json` (série sem acompanhamento: critério de sucesso fora do código de saída, STATUS, notificação, `caffeinate`, trava de instância) · degrada · 2026-11-08
+- [084-2] Liberar `git worktree list` na trava (hoje bloqueado por estar inteiro em `GIT_ESCRITA`) · nice · 2026-11-08
+- [084-3] Skill/AGENTS: o manifesto sempre inclui relatório, PLAN e brief (os `.md` de `docs/` são versionados desde `d8eda04`) · degrada · 2026-11-08 · resolvido nos documentos canônicos em 2026-11-08
 
 ## Done — últimos 30 dias
 
@@ -61,7 +64,7 @@
 - 056 · orquestrador único pedido → ganchos; SQL cru movido para queries/ · concluído · `caab38a` · 2026-10-25
 - 058 · o Claude Code entrega sozinho: hook de lint, skill /executar, regras de git e gate · concluído · `243fb5b` · 2026-10-25
 - 057 · entregar num comando e trava de comandos do executor (entregue pelo executor no passo 2 do 058) · concluído · `d945020` · 2026-10-25
-- 055 · documentos canônicos: ler menos, nada desatualizado (só o `AGENTS.md` é rastreado) · concluído · `acb2a67` · 2026-10-25
+- 055 · documentos canônicos: ler menos, nada desatualizado (só o `AGENTS_agente_nw.md` é rastreado) · concluído · `acb2a67` · 2026-10-25
 - auditoria de contaminação externa (antes "052" no Projeto) · sem achados: nenhuma assinatura do incidente jurimetria_comum, nenhum commit estranho em 21–25/10 · feita pela sessão do Projeto · — · 2026-10-25
 - 050 · comentários do usuário (migração 014) · concluído · `a283d4b`, `2c31eac` · 2026-10-25
 - 051–054 · documentos de avaliação de skills e proposta de evolução (`docs/docs/`, fora do git) · entregues · — · 2026-10-25
@@ -113,7 +116,7 @@
 - [076-1] A chave de API fica em texto puro em `config/local.yaml` (decisão do brief, seção 5: o arquivo já é o lugar do que é específico da máquina e já é ignorado pelo git). Não há nada impedindo que ela vá para a tela: nenhum comando do produto imprime a configuração hoje, mas também não existe máscara — um `print(cfg.local)` futuro exibiria a chave inteira. Sidarta decide se vale um tipo que esconde o valor na repr · nice · 2026-11-03
 - [077-3] O agente_nw não está no mapa de portas do `porteiro` (`INTEGRACAO.md §2`: "ainda não tem porta confirmada"). A consulta funciona porque a porta `11435` já é uma das configuradas lá, mas o mapa do outro repositório não registra este projeto; cadastrar é do lado do `porteiro_local`, fora do fluxo de briefs daqui · nice · 2026-11-06
 - [079-1] Os 45 pontos da seção 3 deste relatório esperam a decisão de Sidarta (aprovar a exceção, escrevendo a linha em `docs/EXCECOES_TEXTO_INTEGRAL.md`, ou mandar corrigir). Enquanto nenhum for decidido, o projeto quebra o princípio do texto por inteiro em 45 lugares sem aprovação registrada · degrada · 2026-11-08
-- [079-3] `AGENTS.md` não cita `docs/EXCECOES_TEXTO_INTEGRAL.md` nem o princípio do texto por inteiro, e `scripts/verificar_auditoria_texto.py` não roda no gate — então nada impede que o próximo brief abra um corte novo sem passar por você. Transformá-lo em guarda permanente quebraria a cada edição de linha (o relatório cita `arquivo:linha`), então a forma certa precisa de desenho · degrada · 2026-11-08
+- [079-3] `AGENTS_agente_nw.md` não cita `docs/EXCECOES_TEXTO_INTEGRAL.md` nem o princípio do texto por inteiro, e `scripts/verificar_auditoria_texto.py` não roda no gate — então nada impede que o próximo brief abra um corte novo sem passar por você. Transformá-lo em guarda permanente quebraria a cada edição de linha (o relatório cita `arquivo:linha`), então a forma certa precisa de desenho · degrada · 2026-11-08 · resolvido em 2026-11-08 (AGENTS §4)
 - [079-4] O material bruto da leitura (`docs/auditoria_079_material/`, 11 arquivos, ~250 KB) vai ao GitHub junto com o relatório, por causa da regra nova do `.gitignore` que versiona `docs/**/*.md`. É a prova de que cada arquivo foi lido inteiro; se você preferir não versionar isso, é uma decisão sua (apagar a pasta não invalida o relatório) · nice · 2026-11-08
 
 ## Dívidas conhecidas
@@ -127,7 +130,7 @@
 - [055-1] ARQUITETURA §1 (fluxo em oito passos), §3 (faltam tabelas posteriores à 001 e `descarte_sensivel` aparece ativa), §4 e §5 (sem os contratos de `extrair_pedido`, `desempatar_perfil`, `redigir_ganchos`, `extrair_termos_contato`, `descrever_imagem`; regra do conector sem o piso `conector.consulta.minima`) e §7 (diz 30% de divergência; o vigente é 8%) estão desatualizadas · degrada · 2026-10-25
 - [055-2] PLANO §1 e §2 dizem que o software não escreve mensagem (escreve, desde o 038/047); §3 lista categorias sensíveis e três telas; §4 e §5 trazem Etapas e perfis `air16b`/`air16c`/`win8` de desenho antigo · degrada · 2026-10-25
 - [057-5] A trava lê só o texto do comando: `python -c "sqlite3.connect('dados/agente.db')"` e comandos montados dinamicamente passam; `pytest -m llm_real` sem arquivo é bloqueado; corpo de heredoc é ignorado · nice · 2026-10-25
-- [058-3] `docs/briefs/_modelo.md` passo 6 ainda diz que o executor não roda git nem a suíte e que Sidarta roda · degrada · 2026-10-25
+- [058-3] `docs/briefs/_modelo_agente_nw.md` passo 6 ainda diz que o executor não roda git nem a suíte e que Sidarta roda · degrada · 2026-10-25
 - [059-2] A comparação de nomes que decide o contato divergente continua em `pedido.processar`; só o limiar mora no orquestrador. Movê-la exige inverter a dependência entre `pedido.py` e `orquestracao.py` · nice · 2026-10-25
 - [061-4] `tests/test_coleta_bloqueio.py` usava `datetime.now(UTC)` real e falhava perto da virada do dia em UTC; corrigido fora do brief 061 por decisão de Sidarta (ver seção 2, item 6) — vale conferir se outros testes de `coleta/` têm o mesmo padrão de hora real não fixada · nice · 2026-10-30
 - [048-6] `unir_contatos` não funde `genero_gramatical` entre contatos unidos (o merge assume "vazio" = NULL; o campo nunca é NULL) · nice · 2026-10-30
