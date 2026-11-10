@@ -151,8 +151,7 @@ $ for i in 1 2 3; do .venv/bin/pytest tests/test_executar_serie.py -q | tail -1;
 21 passed in 28.69s
 ```
 
-Gate completo, rodado por mim antes de entregar (o `agente_entregar.sh` roda o mesmo gate; a saída da
-entrega fica em `logs/verificar_ultimo.txt`):
+Gate completo, rodado por mim antes de entregar:
 
 ```
 $ scripts/verificar.sh
@@ -161,6 +160,40 @@ ruff format: ok
 mypy: ok
 pytest: ok (1086 passed, 5 deselected in 66.59s (0:01:06))
 ```
+
+A entrega, com o gate rodado **pelo `scripts/agente_entregar.sh`** (é esta a saída que o AGENTS §8 pede):
+
+```
+$ scripts/agente_entregar.sh 086
+manifesto 086: 9 arquivo(s)
+ruff check: ok
+ruff format: ok
+mypy: ok
+pytest: ok (1086 passed, 5 deselected in 57.90s)
+lacunas do 086: 1 no Backlog, 0 em Pendências, 4 em Dívidas, 2 em Decisões
+✓ brief 086: commit e491463, enviado ao GitHub
+```
+
+Critério de aceite 3 — a árvore fica limpa depois da entrega, e as lacunas entraram **dentro** do
+commit (é a prova de ponta a ponta do item 2.4):
+
+```
+$ git status --porcelain -uall
+            (vazio)
+$ git rev-list --count origin/main..HEAD
+0
+$ git show e491463 --stat | tail -4
+ scripts/executar_serie.sh                         | 279 +++++++++++++++
+ tests/test_executar_serie.py                      | 404 ++++++++++++++++++++++
+ tests/test_guarda_comando.py                      | 132 +++++++
+ 9 files changed, 1308 insertions(+), 10 deletions(-)
+$ git show e491463 -- docs/PLAN_agente_nw.md | grep -c "^+.*\[086-"
+7
+```
+
+Note a ordem da penúltima linha da entrega: a contagem das lacunas aparece onde sempre apareceu, embora
+elas tenham sido gravadas no PLAN no começo. Era o que permitia não editar nenhuma asserção de
+`tests/test_agente_entregar.py`.
 
 Escopo, antes de acrescentar relatório, PLAN e manifesto:
 
