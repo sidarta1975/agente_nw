@@ -39,3 +39,122 @@ aqui uma linha com o mesmo identificador e o texto `Aprovado por Sidarta em AAAA
 | P-043 | agente_nw/nucleo/database/queries/fila_extracao.py:34 — lotes com retomada | `LIMIT` no lote da fila de extração (l. 34), no lote do agrupamento (`itens.py:68`) e nas duas últimas execuções do feed (`fontes.py:70`). | `LIMIT ?` em `agente_nw/nucleo/database/queries/fila_extracao.py:34` e em `queries/itens.py:68`; `LIMIT 2` em `queries/fontes.py:70`. | Vale enquanto o valor acima for o do código ou da configuração e o corte continuar servindo só ao fim descrito. | Alcance: lotes com retomada da fila de extração (paginação). Razão (proposta do executor, relatório 079): aprovar. É paginação de lote, não corte de análise — registro aqui só porque a varredura mecânica os encontra e o princípio pede que nada fique sem resposta. | Aprovado por Sidarta em 2026-11-08 |
 | P-044 | agente_nw/perfil/agenda_google_csv.py:37 — importação da agenda | da agenda, só o **primeiro** telefone e o **primeiro** e-mail de cada contato entram (`agenda_google_csv.py:37-40`, `agenda_macos.py:91-93`). | primeiro telefone e primeiro e-mail (`agente_nw/perfil/agenda_google_csv.py:37-38`, colunas `phone 1` e `e-mail 1`; `agente_nw/perfil/agenda_macos.py:91-93`). | Vale enquanto o valor acima for o do código ou da configuração e o corte continuar servindo só ao fim descrito. | Alcance: importação da agenda do Google (CSV). Razão (proposta do executor, relatório 079): é dado de identificação, não texto analisado, mas o efeito (contato duplicado) é real. Proponho aprovar como está e lembrar que `unir-contatos` existe para isso; corrigir pede coluna nova e migração. | Aprovado por Sidarta em 2026-11-08 |
 | P-045 | agente_nw/nucleo/database/queries/listas.py:75 — busca na lista pelo primeiro nome | a busca de uma pessoa na lista da rede usa só o **primeiro nome** (`split()[:1]`, l. 75); em `perfis.py:453` o primeiro nome precisa bater por inteiro e o sobrenome só por prefixo. | `sem_acento_e_caixa(nome).split()[:1]` (`agente_nw/nucleo/database/queries/listas.py:75`); em `queries/perfis.py:453` o primeiro nome bate por inteiro e o sobrenome por prefixo. | Vale enquanto o valor acima for o do código ou da configuração e o corte continuar servindo só ao fim descrito. A confirmação humana continua depois da busca. | Alcance: busca na lista pelo primeiro nome, com confirmação humana. Razão (proposta do executor, relatório 079): aprovar. É heurística de nome, com confirmação humana depois, e afrouxá-la aumenta o número de homônimos que você tem de resolver — que é o custo que o brief 037 tentou reduzir. | Aprovado por Sidarta em 2026-11-08 |
+
+## Cortes não analíticos
+
+Escrita pelo brief 093 (item 2.5: Sidarta aprova o brief e, com ele, esta tabela). Aqui fica cada corte do
+código de produção que **não** alimenta análise: data, endereço, nome, tela, aviso, consulta de existência,
+divisão que cobre o texto todo. O teste `tests/test_sem_corte_de_texto.py` lê esta tabela: um achado da
+varredura dele (fatia, `LIMIT`, teto passado como argumento, `truncate`/`shorten`/`cortar`) só passa se
+estiver aqui, numa exceção aprovada acima, ou na lista de violações pendentes do próprio teste.
+
+A chave é o arquivo mais o **trecho** normalizado (as linhas do trecho, com os espaços colapsados, sem
+número de linha); `\|` dentro do trecho é a barra do código. Como o resto do registro, esta tabela só é
+escrita por brief de Sidarta. Qualquer linha pode ser contestada: contestada, ela sai daqui e o trecho
+vira exceção a aprovar ou violação a corrigir.
+
+**Classes.** NA-001 a NA-007 são as da seção 4 do relatório 079, copiadas de lá (a NA-006, dos scripts de
+entrega, não tem linha aqui porque o teste só varre `agente_nw/`). NA-008 a NA-015 são os motivos de
+descarte do apêndice A do mesmo relatório, que o brief 093 nomeou para poder citar; a linha que já estava
+descartada no apêndice A traz o motivo de lá, e as que nasceram depois do 079 foram classificadas pelo
+executor do brief 093 (lista no relatório `doc_093`).
+
+| Classe | O que é | Origem no relatório 079 |
+|---|---|---|
+| NA-001 | data ISO 8601: `[:10]` é o dia, `[:7]` o mês, o resto é a hora | seção 4 |
+| NA-002 | trecho da página só na frase de erro (`motivo`), nunca gravado nem analisado | seção 4 |
+| NA-003 | listagem de tela (contatos, páginas, fatos da ficha, pedidos) | seção 4 |
+| NA-004 | exportação em Markdown e releitura das marcações | seção 4 |
+| NA-005 | número da migração | seção 4 |
+| NA-006 | cortes nos scripts de entrega (fora de `agente_nw/`) | seção 4 |
+| NA-007 | blocos do WhatsApp: repartem, não cortam | seção 4 |
+| NA-008 | endereço ou nome de arquivo: tira consulta, âncora ou caminho | apêndice A, "split de URL, nome" |
+| NA-009 | reparte com cobertura total: as partes somam o texto (nome e cabeçalho, bloco partido, texto dividido) | apêndice A, briefs 083, 088 e 092 |
+| NA-010 | índice fixo sobre nome, palavra ou texto que o próprio programa escreveu | apêndice A, "fatia a partir de índice fixo" |
+| NA-011 | conferência de janela: mede, recusa ou divide; não corta | apêndice A, briefs 082 e 088 |
+| NA-012 | consulta de existência ou por identificador (`LIMIT 1`) | apêndice A, "parâmetro de limite" |
+| NA-013 | rótulo do aviso que mostra o que um corte já classificado tirou | apêndice A, brief 091 |
+| NA-014 | `LIMIT ?` sem valor: quem decide o teto é quem chama, e o chamador aparece na guarda | apêndice A, "parâmetro de limite" |
+| NA-015 | amostra de diagnóstico, só leitura, mostrada a Sidarta | apêndice A, brief 089 |
+
+| NA | Arquivo | Trecho (normalizado) | O que é cortado | Por que não é análise |
+|---|---|---|---|---|
+| NA-001 | `agente_nw/cli.py` | `dia = str(registro.get("quando", ""))[:10]` | o dia de uma data ISO no histórico impresso | data ISO 8601: o resto é a hora |
+| NA-001 | `agente_nw/cli.py` | `print(f"{grupo}: {contagem.itens} (o mais antigo: {contagem.mais_antigo[:10]})")` | o dia de uma data ISO na contagem impressa | data ISO 8601: o resto é a hora |
+| NA-001 | `agente_nw/coleta/rss/leitor.py` | `ano, mes, dia, hora, minuto, segundo = estrutura[:6]` | ano a segundo de uma `struct_time` (data) | data ISO 8601: o resto é a hora |
+| NA-001 | `agente_nw/nucleo/consulta.py` | `data_hoje = agora[:10]` | o dia da consulta | data ISO 8601: o resto é a hora |
+| NA-001 | `agente_nw/nucleo/database/queries/conversa.py` | `mes = str(linha["enviada_em"])[:7]` | a chave `AAAA-MM` do mês | data ISO 8601: o resto é a hora |
+| NA-001 | `agente_nw/nucleo/historico.py` | `data = consulta.criado_em[:10]` | o dia da consulta | data ISO 8601: o resto é a hora |
+| NA-001 | `agente_nw/nucleo/historico.py` | `return f"[{consulta.criado_em[:10]}] " + " · ".join(partes) if partes else ""` | o dia da consulta | data ISO 8601: o resto é a hora |
+| NA-001 | `agente_nw/nucleo/redacao.py` | `data = (com_dominio.item.publicado_em or "")[:10]` | o dia de publicação | data ISO 8601: o resto é a hora |
+| NA-001 | `agente_nw/nucleo/redacao.py` | `data = fato.data_do_fato or fato.registrado_em[:10]` | o dia do fato | data ISO 8601: o resto é a hora |
+| NA-001 | `agente_nw/nucleo/redacao.py` | `f"[{nota.criado_em[:10]}] {nota.texto}"` | o dia da nota; a nota vai inteira | data ISO 8601: o resto é a hora |
+| NA-001 | `agente_nw/nucleo/redacao.py` | `linhas.append(f"{data[:10]} ({fato.tipo}){sufixo}: {fato.conteudo}")` | o dia do fato; o fato vai inteiro | data ISO 8601: o resto é a hora |
+| NA-001 | `agente_nw/nucleo/redacao.py` | `publicado = datetime.fromisoformat(data[:10]).replace(tzinfo=UTC)` | conversão de data | data ISO 8601: o resto é a hora |
+| NA-001 | `agente_nw/nucleo/relevancia/cruzamento.py` | `data = agora[:10]` | o dia da consulta | data ISO 8601: o resto é a hora |
+| NA-001 | `agente_nw/perfil/inferencia.py` | `ultimo_uso = datetime.fromisoformat(ultimo_uso_texto[:10]).date()` | conversão de data | data ISO 8601: o resto é a hora |
+| NA-002 | `agente_nw/coleta/capturas/busca.py` | `resumo = " ".join(texto.split())[:120]` | trecho da página na mensagem de erro | trecho da página só na mensagem de erro |
+| NA-002 | `agente_nw/nucleo/localizacao.py` | `resumo = " ".join(str(texto).split())[:160]` | trecho da página na mensagem de erro | trecho da página só na mensagem de erro |
+| NA-003 | `agente_nw/console/app.py` | `contatos = perfis.listar_para_inicio(conn, termo, 50 if termo else 20)` | contatos da tela inicial | listagem de tela; o caminho analítico usa outras consultas |
+| NA-003 | `agente_nw/console/app.py` | `entradas=entradas[inicio_pagina : inicio_pagina + por_pagina],` | página da lista de rede na tela | listagem de tela; o caminho analítico usa outras consultas |
+| NA-003 | `agente_nw/console/app.py` | `fatos=fatos.listar_recentes(conn, perfil_id, 15),` | fatos mostrados na ficha | listagem de tela; o caminho analítico usa outras consultas |
+| NA-003 | `agente_nw/nucleo/confirmacao.py` | `for numero, item in enumerate(entradas[inicio : inicio + _POR_PAGINA], start=inicio + 1):` | página da lista na confirmação | listagem de tela; o caminho analítico usa outras consultas |
+| NA-003 | `agente_nw/nucleo/database/queries/pedidos.py` | `"SELECT p.perfil_id AS perfil_id, f.nome AS nome, MAX(p.criado_em) AS ultimo, " "(SELECT COUNT(*) FROM gancho_uso g JOIN consulta_contato c ON c.id = g.consulta_id " " WHERE c.perfil_id = p.perfil_id AND g.status = 'usado') AS usados " "FROM pedido p JOIN perfil f ON f.id = p.perfil_id " "WHERE p.perfil_id IS NOT NULL GROUP BY p.perfil_id ORDER BY ultimo DESC LIMIT ?",` | pessoas recentes da tela inicial | listagem de tela; o caminho analítico usa outras consultas |
+| NA-003 | `agente_nw/nucleo/database/queries/pedidos.py` | `f"SELECT {_COLUNAS} FROM pedido ORDER BY criado_em DESC, id DESC LIMIT ?", (limite,)` | listagem de pedidos | listagem de tela; o caminho analítico usa outras consultas |
+| NA-003 | `agente_nw/nucleo/database/queries/pedidos.py` | `linha = conexao.execute(f"SELECT {_COLUNAS} FROM pedido ORDER BY id DESC LIMIT 1").fetchone()` | o último pedido | listagem de tela; o caminho analítico usa outras consultas |
+| NA-003 | `agente_nw/nucleo/database/queries/perfis.py` | `selecionados = (com_uso + sem_uso)[:limite]` | contatos da tela inicial | listagem de tela; o caminho analítico usa outras consultas |
+| NA-003 | `agente_nw/nucleo/database/queries/perfis.py` | `selecionados = [ c for c in contatos if alvo in sem_acento_e_caixa(c.nome) or (c.apelido is not None and alvo in sem_acento_e_caixa(c.apelido)) ][:limite]` | contatos da tela inicial | listagem de tela; o caminho analítico usa outras consultas |
+| NA-004 | `agente_nw/nucleo/saidas/markdown.py` | `bloco = texto[inicio:fim]` | o trecho do arquivo exportado entre duas marcações | exportação e releitura do Markdown; só marcações e ids voltam |
+| NA-005 | `agente_nw/nucleo/database/migracoes.py` | `migracoes = [(int(caminho.name.split("_", 1)[0]), caminho) for caminho in pasta.glob("*.sql")]` | número da migração | número da migração; o `.sql` é lido inteiro |
+| NA-007 | `agente_nw/coleta/whatsapp/importador.py` | `conexao, perfil_id, limiares.maximo_caracteres_bloco, limiares.meses_extraidos` | tamanho do bloco do WhatsApp: reparte, não corta | reparte em blocos e todos são enfileirados |
+| NA-007 | `agente_nw/coleta/whatsapp/importador.py` | `for mes, blocos in conversa_q.blocos_por_mes( conexao, perfil_id, limiares.maximo_caracteres_bloco, limiares.meses_extraidos ):` | tamanho do bloco do WhatsApp: reparte, não corta (os 24 meses são o P-022, na consulta) | reparte em blocos e todos são enfileirados |
+| NA-007 | `agente_nw/nucleo/database/queries/conversa.py` | `(mes, _em_blocos(por_mes[mes], maximo_caracteres))` | blocos do WhatsApp repartem, não cortam | reparte em blocos e todos são enfileirados |
+| NA-007 | `agente_nw/nucleo/database/queries/conversa.py` | `conexao: sqlite3.Connection, perfil_id: int, maximo_caracteres: int, meses_extraidos: int` | tamanho do bloco do WhatsApp (os meses são o P-022, logo abaixo) | reparte em blocos e todos são enfileirados |
+| NA-007 | `agente_nw/nucleo/database/queries/conversa.py` | `def _em_blocos(textos: list[str], maximo_caracteres: int) -> list[str]:` | blocos do WhatsApp repartem, não cortam | reparte em blocos e todos são enfileirados |
+| NA-007 | `agente_nw/nucleo/database/queries/conversa.py` | `if atual and tamanho + len(texto) + 1 > maximo_caracteres:` | fecha um bloco e começa outro | reparte em blocos e todos são enfileirados |
+| NA-007 | `agente_nw/nucleo/modelos/configuracao.py` | `maximo_caracteres_bloco: int = Field(default=6000, ge=1)` | tamanho do bloco do WhatsApp | reparte em blocos e todos são enfileirados |
+| NA-008 | `agente_nw/coleta/capturas/busca.py` | `chave = href.split("?")[0].rstrip("/")` | tira a consulta do endereço do perfil, que vira chave | endereço ou nome de arquivo, não texto de conteúdo |
+| NA-008 | `agente_nw/coleta/capturas/leitor.py` | `return link.split("?")[0].rstrip("/") + "/recent-activity/all/"` | tira a consulta do endereço antes de montar o da atividade recente | endereço ou nome de arquivo, não texto de conteúdo |
+| NA-008 | `agente_nw/coleta/capturas/listas.py` | `achado = re.search(r"\.com/([A-Za-z0-9_.]+)", href.split("?")[0])` | tira a consulta do endereço para achar o identificador | endereço ou nome de arquivo, não texto de conteúdo |
+| NA-008 | `agente_nw/coleta/capturas/listas.py` | `base = href if "profile.php" in href else href.split("?")[0]` | tira a consulta do endereço do perfil | endereço ou nome de arquivo, não texto de conteúdo |
+| NA-008 | `agente_nw/coleta/capturas/listas.py` | `bruto = caminho.split("/")[0]` | primeiro segmento do caminho do endereço (o identificador) | endereço ou nome de arquivo, não texto de conteúdo |
+| NA-008 | `agente_nw/coleta/capturas/listas.py` | `caminho = re.sub(r"^(?:https?://)?[^/]+/?", "", bruto.split("?")[0])` | tira a consulta do endereço | endereço ou nome de arquivo, não texto de conteúdo |
+| NA-008 | `agente_nw/coleta/capturas/listas.py` | `sem_ancora = href.split("#")[0]` | tira a âncora do endereço | endereço ou nome de arquivo, não texto de conteúdo |
+| NA-008 | `agente_nw/coleta/capturas/listas.py` | `sem_consulta = sem_ancora.split("?")[0]` | tira a consulta do endereço | endereço ou nome de arquivo, não texto de conteúdo |
+| NA-008 | `agente_nw/coleta/capturas/navegador.py` | `return src.split("?")[0]` | tira a consulta do endereço da imagem | endereço ou nome de arquivo, não texto de conteúdo |
+| NA-008 | `agente_nw/coleta/whatsapp/leitor.py` | `do_iphone = [nome for nome in nomes if nome.rsplit("/", 1)[-1].lower() == "_chat.txt"]` | nome do arquivo dentro do .zip | endereço ou nome de arquivo, não texto de conteúdo |
+| NA-008 | `agente_nw/nucleo/localizacao.py` | `base = bruto if "profile.php" in bruto else bruto.split("?")[0]` | tira a consulta do endereço do perfil | endereço ou nome de arquivo, não texto de conteúdo |
+| NA-009 | `agente_nw/coleta/capturas/busca.py` | `descricao = " · ".join(linhas[1:]) if len(linhas) > 1 else ""` | a linha 0 é o nome e as demais, inteiras, a descrição (brief 092) | reparte com cobertura total: as partes somam o texto |
+| NA-009 | `agente_nw/coleta/capturas/listas.py` | `nome, cabecalho = linhas[0], linhas[1:]` | a linha 0 é o nome e as demais, inteiras, o cabeçalho (brief 092) | reparte com cobertura total: as partes somam o texto |
+| NA-009 | `agente_nw/coleta/capturas/listas.py` | `nome, cabecalho = linhas[1], [f"@{linhas[0].lstrip('@')}", *linhas[2:]]` | nome, @ e as demais linhas inteiras no cabeçalho (brief 092) | reparte com cobertura total: as partes somam o texto |
+| NA-009 | `agente_nw/coleta/capturas/navegador.py` | `def partir_bloco(bloco: str, maximo: int = _BLOCO_TAMANHO_MAXIMO) -> list[str]:` | tamanho de cada pedaço do bloco partido; os pedaços somam o bloco (brief 083) | reparte com cobertura total: as partes somam o texto |
+| NA-009 | `agente_nw/coleta/capturas/navegador.py` | `fim = inicio + _onde_cortar(bloco[inicio : inicio + maximo])` | procura onde partir dentro da janela; nada fica de fora (brief 083) | reparte com cobertura total: as partes somam o texto |
+| NA-009 | `agente_nw/coleta/capturas/navegador.py` | `pedacos.append(bloco[inicio:])` | último pedaço do bloco partido (brief 083) | reparte com cobertura total: as partes somam o texto |
+| NA-009 | `agente_nw/coleta/capturas/navegador.py` | `pedacos.append(bloco[inicio:fim])` | pedaço do bloco partido (brief 083) | reparte com cobertura total: as partes somam o texto |
+| NA-009 | `agente_nw/nucleo/redacao.py` | `alvo, vetores_resto = vetores[0], vetores[1:]` | o primeiro vetor e os demais, todos | reparte com cobertura total: as partes somam o texto |
+| NA-009 | `agente_nw/nucleo/texto_integral.py` | `Parte(indice, total, ini, fim, sobre, texto[ini:fim])` | cada parte do texto dividido; as partes somam o texto (brief 088) | reparte com cobertura total: as partes somam o texto |
+| NA-009 | `agente_nw/nucleo/texto_integral.py` | `if estimar_tokens_conservador(texto[inicio : inicio + meio]) <= orcamento:` | mede uma janela para decidir onde dividir (brief 088) | reparte com cobertura total: as partes somam o texto |
+| NA-009 | `agente_nw/nucleo/texto_integral.py` | `janela = texto[piso:limite]` | procura onde dividir dentro da janela (brief 088) | reparte com cobertura total: as partes somam o texto |
+| NA-009 | `agente_nw/nucleo/texto_integral.py` | `return "".join(parte.texto[parte.sobreposicao :] for parte in partes)` | reconstrói o texto tirando a sobreposição repetida (brief 088) | reparte com cobertura total: as partes somam o texto |
+| NA-010 | `agente_nw/cli.py` | `pids = [int(linha[1:]) for linha in saida.splitlines() if linha.startswith("p")]` | tira o `p` da saída do `lsof` para ler o número do processo | índice fixo sobre nome, palavra ou texto escrito pelo próprio programa |
+| NA-010 | `agente_nw/nucleo/confirmacao.py` | `link = resposta[1:].strip() or entrada("Cole o link do perfil: ").strip()` | tira o prefixo do comando digitado | índice fixo sobre nome, palavra ou texto escrito pelo próprio programa |
+| NA-010 | `agente_nw/nucleo/database/queries/perfis.py` | `if all(any(p.startswith(termo) for p in palavras[1:]) for termo in resto):` | as palavras depois da primeira, todas, para comparar o sobrenome por prefixo | índice fixo sobre nome, palavra ou texto escrito pelo próprio programa |
+| NA-010 | `agente_nw/nucleo/database/queries/perfis.py` | `primeiro = sem_acento_e_caixa(nome).split()[0] if nome.strip() else ""` | primeiro nome para inferir o gênero gramatical | índice fixo sobre nome, palavra ou texto escrito pelo próprio programa |
+| NA-010 | `agente_nw/nucleo/database/queries/perfis.py` | `primeiro, resto = busca[0], busca[1:]` | primeira palavra e as demais, todas, da busca por nome | índice fixo sobre nome, palavra ou texto escrito pelo próprio programa |
+| NA-010 | `agente_nw/nucleo/pedido.py` | `return perfis.upsert_usuario(conexao, login[:1].upper() + login[1:], agora)` | maiúscula na primeira letra do login | índice fixo sobre nome, palavra ou texto escrito pelo próprio programa |
+| NA-010 | `agente_nw/nucleo/prompts/extrair_captura_rede_social.py` | `return f"{inteiro[: -len(final)]}{INSTRUCAO_DADO_EXTERNO}\n\nBloco a processar:\n{cerco}\n"` | tira o rodapé que o próprio programa escreveu, para pôr a parte cercada no lugar (brief 088) | índice fixo sobre nome, palavra ou texto escrito pelo próprio programa |
+| NA-010 | `agente_nw/nucleo/prompts/redigir_ganchos.py` | `origem = cortada.molde_origem_id if cortada.moldes_comentados[:1] == cortada.moldes[:1] else None` | compara o primeiro molde para saber de onde ele veio | índice fixo sobre nome, palavra ou texto escrito pelo próprio programa |
+| NA-010 | `agente_nw/nucleo/texto.py` | `return all(any(p.startswith(termo) for p in palavras[1:]) for termo in termos[1:])` | as palavras depois da primeira, todas, para comparar por prefixo | índice fixo sobre nome, palavra ou texto escrito pelo próprio programa |
+| NA-011 | `agente_nw/nucleo/llm.py` | `_registrar_estouro( self._caminho_log, "embeddings", modelo, self._roteamento.perfil_ativo, "embedding_acima_do_limite", tokens_medidos, tokens_estimados, LIMITE_TOKENS_EMBEDDING, )` | registra que o texto passou da janela do embedding; não corta | conferência de janela: mede, recusa ou divide; não corta |
+| NA-011 | `agente_nw/nucleo/llm.py` | `return FalhaJanelaEmbedding(modelo, tokens_medidos, tokens_estimados, LIMITE_TOKENS_EMBEDDING)` | recusa o texto acima da janela do embedding; não corta | conferência de janela: mede, recusa ou divide; não corta |
+| NA-011 | `agente_nw/nucleo/llm.py` | `vetores, partes = processar_dividindo( texto, LIMITE_TOKENS_EMBEDDING, vetores_das_partes, FalhaJanelaEmbedding )` | divide em partes que somam o texto (brief 088) | conferência de janela: mede, recusa ou divide; não corta |
+| NA-012 | `agente_nw/nucleo/database/queries/fatos.py` | `"SELECT 1 FROM fato WHERE perfil_id = ? AND tipo = ? AND fonte = ? LIMIT 1", (perfil_id, tipo, fonte)` | existe ou não existe | consulta de existência ou por identificador |
+| NA-012 | `agente_nw/nucleo/database/queries/fila_revisao.py` | `"SELECT id FROM fila_extracao WHERE erro LIKE ? ORDER BY id DESC LIMIT 1",` | acha a linha pelo identificador gravado no erro | consulta de existência ou por identificador |
+| NA-012 | `agente_nw/nucleo/database/queries/itens.py` | `"SELECT 1 FROM item WHERE url_canonica = ? OR hash_titulo = ? LIMIT 1",` | existe ou não existe (a deduplicação é o P-002) | consulta de existência ou por identificador |
+| NA-013 | `agente_nw/nucleo/prompts/redigir_ganchos.py` | `perdidas = [c for c in entrada.historico_comentarios[_HISTORICO_NO_CORTE:] if c]` | lista os comentários que o corte do P-033 tirou, para o aviso | rótulo de aviso do que um corte já classificado tirou |
+| NA-013 | `agente_nw/nucleo/redacao.py` | `+ " \| ".join(fato[:40] for fato in nao_incluidos)` | rótulo dos fatos que ficaram fora, no aviso (brief 091) | rótulo de aviso do que um corte já classificado tirou |
+| NA-014 | `agente_nw/nucleo/database/queries/consulta_contato.py` | `f"SELECT {_COLUNAS} FROM consulta_contato WHERE perfil_id = ? " "ORDER BY criado_em DESC, id DESC LIMIT ?",` | `LIMIT ?` genérico; o valor vem de quem chama (`historico.py`, `redacao.py`) | `LIMIT ?` sem valor: quem decide o teto é o chamador, e o chamador aparece nesta guarda |
+| NA-014 | `agente_nw/nucleo/database/queries/fatos.py` | `"SELECT id, perfil_id, data_do_fato, tipo, conteudo, fonte, registrado_em FROM fato " "WHERE perfil_id = ? ORDER BY COALESCE(data_do_fato, registrado_em) DESC, id DESC LIMIT ?",` | `LIMIT ?` genérico; o valor vem de quem chama (redação, termos, centróide, localização, ficha) | `LIMIT ?` sem valor: quem decide o teto é o chamador, e o chamador aparece nesta guarda |
+| NA-014 | `agente_nw/nucleo/database/queries/nota_contato.py` | `linhas = conexao.execute(consulta + " LIMIT ?", (perfil_id, limite)).fetchall()` | `LIMIT ?` genérico; o valor vem de quem chama (`redacao.py`) | `LIMIT ?` sem valor: quem decide o teto é o chamador, e o chamador aparece nesta guarda |
+| NA-014 | `agente_nw/nucleo/database/queries/perfis.py` | `f"SELECT {_COLUNAS} FROM perfil WHERE tipo = 'contato' ORDER BY atualizado_em DESC, id DESC LIMIT ?",` | `LIMIT ?` genérico; o valor vem de quem chama (`pedido.py`) | `LIMIT ?` sem valor: quem decide o teto é o chamador, e o chamador aparece nesta guarda |
+| NA-015 | `agente_nw/nucleo/agrupamento/comparar_vetores.py` | `"SELECT i.id, i.titulo, i.texto, i.assunto_id, v.embedding AS embedding " "FROM item i JOIN vetor_item v ON v.item_id = i.id ORDER BY i.id DESC LIMIT ?",` | amostra do `comparar-vetores` (brief 089), só leitura | amostra de diagnóstico, só leitura, mostrada a Sidarta |

@@ -1193,6 +1193,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | tests/test_seguranca_prompt.py | 354/354 | CERTIFICADO | `cercar_dado_externo` e os 9 modulos de prompt: texto entra inteiro entre marcadores, marcador forjado neutralizado, conteudo preservado (`INJECAO in cercado`); entradas de 1 linha; `qualificar` e `rotular` com o resumo de cada item, também cercado (brief 090). | — |
 | tests/test_selecao_provedor.py | 216/216 | CERTIFICADO | `selecionar_cliente_llm` (ordem Anthropic > Gemini > OpenAI); le so `container.py`/`app.py` para contar construcoes; sem texto de conteudo. | — |
 | tests/test_sem_censura_de_tema.py | 75/75 | CERTIFICADO | Tag/fato politico ou de saude sao gravados; prompt de extracao sem "sensive"; texto de fila "texto qualquer" (curto), resposta simulada. | — |
+| tests/test_sem_corte_de_texto.py | 1157/1157 | CERTIFICADO | brief 093, guarda estática: percorre `agente_nw/` por AST e classifica cada fatia, `LIMIT` e teto em exceção aprovada, corte não analítico ou violação pendente; os testes do teste montam código e registro sintéticos em `tmp_path`. Não lê nem envia texto a modelo. | — |
 | tests/test_sem_objetivo_avisa.py | 38/38 | CERTIFICADO | Todos abaixo do piso -> aviso; reaproveita fixtures de `test_cruzamento_por_consulta`; fato de 1 linha, assunto so com titulo. | — |
 | tests/test_sem_redes_sociais.py | 74/74 | CERTIFICADO | Botao "sem redes sociais" no console Flask; sem texto de conteudo. | — |
 | tests/test_temas_atualizar.py | 33/33 | CERTIFICADO | `temas.atualizar` regrava descricao e sinonimos; descricoes curtas, sem corte. | — |
@@ -2073,6 +2074,50 @@ tests/test_pequenos_ajustes_texto.py:271 tests/test_pequenos_ajustes_texto.py:28
 tests/test_pequenos_ajustes_texto.py:289 tests/test_pequenos_ajustes_texto.py:289 tests/test_pequenos_ajustes_texto.py:293
 tests/test_pequenos_ajustes_texto.py:299 tests/test_pequenos_ajustes_texto.py:303 tests/test_pequenos_ajustes_texto.py:306
 tests/test_pequenos_ajustes_texto.py:307
+```
+
+**Brief 093 (sem ponto novo)** — 154 linha(s) citada(s), todas descartadas. O brief 093 criou a guarda permanente `tests/test_sem_corte_de_texto.py` e não alterou código de produção. As ocorrências são do próprio teste: os padrões que ele procura (fatia, `LIMIT`, `max_chars`, `truncate`, `cortar`, `sample`, `limite`, `maximo`), escritos como expressão regular, como código sintético dos testes do teste e como chave das listas de exceção aprovada e de violação pendente (cópia normalizada de linhas de `agente_nw/` que já têm destino neste relatório). Nenhuma corta texto do usuário nem de fonte externa.
+
+```
+tests/test_sem_corte_de_texto.py:4 tests/test_sem_corte_de_texto.py:5 tests/test_sem_corte_de_texto.py:6 tests/test_sem_corte_de_texto.py:9
+tests/test_sem_corte_de_texto.py:10 tests/test_sem_corte_de_texto.py:12 tests/test_sem_corte_de_texto.py:53 tests/test_sem_corte_de_texto.py:56
+tests/test_sem_corte_de_texto.py:59 tests/test_sem_corte_de_texto.py:66 tests/test_sem_corte_de_texto.py:102 tests/test_sem_corte_de_texto.py:147
+tests/test_sem_corte_de_texto.py:148 tests/test_sem_corte_de_texto.py:153 tests/test_sem_corte_de_texto.py:174 tests/test_sem_corte_de_texto.py:205
+tests/test_sem_corte_de_texto.py:206 tests/test_sem_corte_de_texto.py:237 tests/test_sem_corte_de_texto.py:263 tests/test_sem_corte_de_texto.py:280
+tests/test_sem_corte_de_texto.py:371 tests/test_sem_corte_de_texto.py:372 tests/test_sem_corte_de_texto.py:503 tests/test_sem_corte_de_texto.py:513
+tests/test_sem_corte_de_texto.py:520 tests/test_sem_corte_de_texto.py:525 tests/test_sem_corte_de_texto.py:526 tests/test_sem_corte_de_texto.py:536
+tests/test_sem_corte_de_texto.py:537 tests/test_sem_corte_de_texto.py:540 tests/test_sem_corte_de_texto.py:544 tests/test_sem_corte_de_texto.py:545
+tests/test_sem_corte_de_texto.py:554 tests/test_sem_corte_de_texto.py:559 tests/test_sem_corte_de_texto.py:560 tests/test_sem_corte_de_texto.py:561
+tests/test_sem_corte_de_texto.py:564 tests/test_sem_corte_de_texto.py:567 tests/test_sem_corte_de_texto.py:568 tests/test_sem_corte_de_texto.py:574
+tests/test_sem_corte_de_texto.py:579 tests/test_sem_corte_de_texto.py:582 tests/test_sem_corte_de_texto.py:583 tests/test_sem_corte_de_texto.py:586
+tests/test_sem_corte_de_texto.py:604 tests/test_sem_corte_de_texto.py:607 tests/test_sem_corte_de_texto.py:608 tests/test_sem_corte_de_texto.py:616
+tests/test_sem_corte_de_texto.py:618 tests/test_sem_corte_de_texto.py:623 tests/test_sem_corte_de_texto.py:629 tests/test_sem_corte_de_texto.py:633
+tests/test_sem_corte_de_texto.py:636 tests/test_sem_corte_de_texto.py:637 tests/test_sem_corte_de_texto.py:646 tests/test_sem_corte_de_texto.py:654
+tests/test_sem_corte_de_texto.py:659 tests/test_sem_corte_de_texto.py:663 tests/test_sem_corte_de_texto.py:667 tests/test_sem_corte_de_texto.py:668
+tests/test_sem_corte_de_texto.py:670 tests/test_sem_corte_de_texto.py:671 tests/test_sem_corte_de_texto.py:672 tests/test_sem_corte_de_texto.py:674
+tests/test_sem_corte_de_texto.py:677 tests/test_sem_corte_de_texto.py:681 tests/test_sem_corte_de_texto.py:685 tests/test_sem_corte_de_texto.py:690
+tests/test_sem_corte_de_texto.py:702 tests/test_sem_corte_de_texto.py:717 tests/test_sem_corte_de_texto.py:720 tests/test_sem_corte_de_texto.py:721
+tests/test_sem_corte_de_texto.py:723 tests/test_sem_corte_de_texto.py:736 tests/test_sem_corte_de_texto.py:739 tests/test_sem_corte_de_texto.py:742
+tests/test_sem_corte_de_texto.py:743 tests/test_sem_corte_de_texto.py:754 tests/test_sem_corte_de_texto.py:757 tests/test_sem_corte_de_texto.py:768
+tests/test_sem_corte_de_texto.py:771 tests/test_sem_corte_de_texto.py:772 tests/test_sem_corte_de_texto.py:775 tests/test_sem_corte_de_texto.py:781
+tests/test_sem_corte_de_texto.py:782 tests/test_sem_corte_de_texto.py:783 tests/test_sem_corte_de_texto.py:805 tests/test_sem_corte_de_texto.py:811
+tests/test_sem_corte_de_texto.py:812 tests/test_sem_corte_de_texto.py:813 tests/test_sem_corte_de_texto.py:822 tests/test_sem_corte_de_texto.py:828
+tests/test_sem_corte_de_texto.py:835 tests/test_sem_corte_de_texto.py:836 tests/test_sem_corte_de_texto.py:839 tests/test_sem_corte_de_texto.py:840
+tests/test_sem_corte_de_texto.py:857 tests/test_sem_corte_de_texto.py:862 tests/test_sem_corte_de_texto.py:866 tests/test_sem_corte_de_texto.py:906
+tests/test_sem_corte_de_texto.py:907 tests/test_sem_corte_de_texto.py:919 tests/test_sem_corte_de_texto.py:920 tests/test_sem_corte_de_texto.py:950
+tests/test_sem_corte_de_texto.py:951 tests/test_sem_corte_de_texto.py:952 tests/test_sem_corte_de_texto.py:953 tests/test_sem_corte_de_texto.py:954
+tests/test_sem_corte_de_texto.py:955 tests/test_sem_corte_de_texto.py:956 tests/test_sem_corte_de_texto.py:957 tests/test_sem_corte_de_texto.py:959
+tests/test_sem_corte_de_texto.py:960 tests/test_sem_corte_de_texto.py:962 tests/test_sem_corte_de_texto.py:981 tests/test_sem_corte_de_texto.py:985
+tests/test_sem_corte_de_texto.py:991 tests/test_sem_corte_de_texto.py:992 tests/test_sem_corte_de_texto.py:994 tests/test_sem_corte_de_texto.py:998
+tests/test_sem_corte_de_texto.py:1002 tests/test_sem_corte_de_texto.py:1005 tests/test_sem_corte_de_texto.py:1009 tests/test_sem_corte_de_texto.py:1010
+tests/test_sem_corte_de_texto.py:1014 tests/test_sem_corte_de_texto.py:1015 tests/test_sem_corte_de_texto.py:1021 tests/test_sem_corte_de_texto.py:1022
+tests/test_sem_corte_de_texto.py:1028 tests/test_sem_corte_de_texto.py:1029 tests/test_sem_corte_de_texto.py:1037 tests/test_sem_corte_de_texto.py:1044
+tests/test_sem_corte_de_texto.py:1045 tests/test_sem_corte_de_texto.py:1050 tests/test_sem_corte_de_texto.py:1052 tests/test_sem_corte_de_texto.py:1059
+tests/test_sem_corte_de_texto.py:1060 tests/test_sem_corte_de_texto.py:1065 tests/test_sem_corte_de_texto.py:1066 tests/test_sem_corte_de_texto.py:1073
+tests/test_sem_corte_de_texto.py:1074 tests/test_sem_corte_de_texto.py:1087 tests/test_sem_corte_de_texto.py:1088 tests/test_sem_corte_de_texto.py:1096
+tests/test_sem_corte_de_texto.py:1097 tests/test_sem_corte_de_texto.py:1102 tests/test_sem_corte_de_texto.py:1109 tests/test_sem_corte_de_texto.py:1116
+tests/test_sem_corte_de_texto.py:1120 tests/test_sem_corte_de_texto.py:1126 tests/test_sem_corte_de_texto.py:1141 tests/test_sem_corte_de_texto.py:1142
+tests/test_sem_corte_de_texto.py:1146 tests/test_sem_corte_de_texto.py:1155
 ```
 
 ---
