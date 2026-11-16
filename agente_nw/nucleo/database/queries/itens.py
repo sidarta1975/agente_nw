@@ -7,6 +7,7 @@ from typing import NamedTuple
 import sqlite_vec
 
 from agente_nw.nucleo.modelos.item import Item
+from agente_nw.nucleo.modelos.proveniencia import Proveniencia
 
 _COLUNAS = "id, fonte_id, url_canonica, titulo, texto, publicado_em, coletado_em, hash_titulo, assunto_id"
 
@@ -107,3 +108,46 @@ def listar_com_embedding(conexao: sqlite3.Connection) -> list[tuple[Item, list[f
         "FROM item i JOIN vetor_item v ON v.item_id = i.id ORDER BY i.id"
     ).fetchall()
     return [(_para_item(linha), _desserializar(linha["embedding"])) for linha in linhas]
+
+
+class ResumoGravado(NamedTuple):
+    """O resumo guardado de um item (brief 090, migração 022)."""
+
+    resumo: str
+    versao: str
+    partes: int
+
+
+def obter_resumo(conexao: sqlite3.Connection, item_id: int) -> ResumoGravado | None:
+    """O resumo do item, de qualquer versão; `None` se o item ainda não tem resumo."""
+    linha = conexao.execute(
+        "SELECT resumo, resumo_versao, resumo_partes FROM item WHERE id = ? AND resumo IS NOT NULL",
+        (item_id,),
+    ).fetchone()
+    if linha is None:
+        return None
+    return ResumoGravado(linha["resumo"], linha["resumo_versao"], linha["resumo_partes"])
+
+
+def gravar_resumo(
+    conexao: sqlite3.Connection,
+    item_id: int,
+    resumo: str,
+    versao: str,
+    partes: int,
+    proveniencia: Proveniencia | None,
+) -> None:
+    """Grava o resumo do item com a versão da regra, quantas partes foram lidas (0 = o resumo é o próprio
+    texto) e quem o gerou (nulo quando não houve chamada ao modelo). O texto do item não é tocado."""
+    conexao.execute(
+        "UPDATE item SET resumo = ?, resumo_versao = ?, resumo_partes = ?, resumo_modelo = ?, "
+        "resumo_perfil = ? WHERE id = ?",
+        (
+            resumo,
+            versao,
+            partes,
+            proveniencia.modelo if proveniencia else None,
+            proveniencia.perfil if proveniencia else None,
+            item_id,
+        ),
+    )

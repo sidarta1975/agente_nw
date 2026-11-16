@@ -209,18 +209,35 @@ def gravar_qualificacao(
 
 
 def gravar_cartao(
-    conexao: sqlite3.Connection, assunto_id: int, resumo_cartao: str, proveniencia: Proveniencia | None = None
+    conexao: sqlite3.Connection,
+    assunto_id: int,
+    resumo_cartao: str,
+    proveniencia: Proveniencia | None = None,
+    itens_cobertos: int | None = None,
+    niveis: int | None = None,
 ) -> None:
-    """`proveniencia` (brief 066) substitui a da qualificação na mesma linha."""
+    """`proveniencia` (brief 066) substitui a da qualificação na mesma linha. A versão do prompt também vai
+    para `cartao_versao`, que só o cartão escreve, com a cobertura: quantos itens o cartão cobriu e em
+    quantos níveis os resumos foram consolidados (brief 090, migração 022)."""
     conexao.execute(
         "UPDATE assunto SET resumo_cartao = ?, "
-        "gerado_por_modelo = ?, gerado_por_perfil = ?, gerado_por_prompt_versao = ? WHERE id = ?",
+        "gerado_por_modelo = ?, gerado_por_perfil = ?, gerado_por_prompt_versao = ?, "
+        "cartao_versao = ?, cartao_itens = ?, cartao_niveis = ? WHERE id = ?",
         (
             resumo_cartao,
             *colunas_gerado_por(proveniencia),
+            proveniencia.prompt_versao if proveniencia else None,
+            itens_cobertos,
+            niveis,
             assunto_id,
         ),
     )
+
+
+def versao_do_cartao(conexao: sqlite3.Connection, assunto_id: int) -> str | None:
+    """Versão do prompt que gerou o cartão; `None` para cartão gravado antes do brief 090 (ou sem cartão)."""
+    linha = conexao.execute("SELECT cartao_versao FROM assunto WHERE id = ?", (assunto_id,)).fetchone()
+    return linha["cartao_versao"] if linha is not None else None
 
 
 def listar_qualificados_nao_vistos(

@@ -115,17 +115,23 @@ def test_avaliar_relacao_objetivo_cerca_titulo_e_resumo() -> None:
 
 
 def test_qualificar_cerca_titulo_e_itens() -> None:
-    prompt = qualificar.construir_prompt("Título do assunto", [(INJECAO, "g1.globo.com")], ["urbanismo"])
+    prompt = qualificar.construir_prompt(
+        "Título do assunto", [(INJECAO, "g1.globo.com", "resumo do item")], ["urbanismo"]
+    )  # brief 090: cada item leva o resumo do texto inteiro, também cercado
     assert _cercado("Título do assunto") in prompt
     assert _cercado(INJECAO) in prompt
-    assert _marcadores_fora_da_instrucao(prompt) == (2, 2)
+    assert _cercado("resumo do item") in prompt
+    assert _marcadores_fora_da_instrucao(prompt) == (3, 3)
 
 
 def test_rotular_cerca_cada_titulo() -> None:
-    prompt = rotular.construir_prompt([(INJECAO, "g1.globo.com"), ("Outro", "uol.com.br")])
+    prompt = rotular.construir_prompt(
+        [(INJECAO, "g1.globo.com", "resumo um"), ("Outro", "uol.com.br", "resumo dois")]
+    )  # brief 090: cada item leva o resumo do texto inteiro, também cercado
     assert _cercado(INJECAO) in prompt
     assert _cercado("Outro") in prompt
-    assert _marcadores_fora_da_instrucao(prompt) == (2, 2)
+    assert _cercado("resumo um") in prompt and _cercado("resumo dois") in prompt
+    assert _marcadores_fora_da_instrucao(prompt) == (4, 4)
 
 
 def test_prerotular_calibracao_cerca_os_quatro_textos() -> None:
