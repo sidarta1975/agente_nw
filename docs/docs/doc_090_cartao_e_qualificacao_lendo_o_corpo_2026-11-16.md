@@ -134,7 +134,13 @@ COMPARACAO_AQUI
 - Script de verificação (o gate, rodado pelo `scripts/agente_entregar.sh`; a saída dele fica em `logs/entregar_ultimo.txt`). Antes dele, rodei os mesmos passos à mão:
 
 ```
-GATE_AQUI
+$ scripts/agente_entregar.sh 090
+manifesto 090: 15 arquivo(s)
+ruff check: ok
+ruff format: ok
+mypy: ok
+pytest: ok (1242 passed, 5 deselected in 53.14s)
+✓ brief 090: commit b9cf28f, enviado ao GitHub
 ```
 
 - Comandos executados:
@@ -154,4 +160,10 @@ Para você: decidir a regravação dos cartões (brief 095) depois de ver a comp
 
 ## Lacunas
 
-LACUNAS_AQUI
+*A sessão do `/executar 090` escreveu o relatório inteiro, mas foi interrompida pelo limite de uso de 5 horas antes de rodar a entrega: a saída do gate e esta tabela ficaram como marcação (`GATE_AQUI`, `LACUNAS_AQUI`). A sessão seguinte rodou `scripts/agente_entregar.sh 090`, colou a saída real do gate acima e escreveu as lacunas abaixo a partir do que este próprio relatório registra — nenhuma linha de código foi refeita.*
+
+| # | Lacuna | Destino | Impacto |
+|---|---|---|---|
+| 1 | Cartão gravado antes deste brief fica com `cartao_versao` nulo e continua em uso: até a regravação, um assunto antigo ainda chega ao gate de objetivo com o cartão feito de 5 itens × 300 caracteres. Nada é regravado por este brief, por decisão (2.4). Depende de Sidarta ver as contagens da comparação e autorizar a regravação dos cartões, que é o brief 095 | decisão | degrada |
+| 2 | A comparação em simulação rodou sobre uma amostra declarada — os 10 assuntos com mais itens da cópia do banco —, não sobre o acervo inteiro: ela mostra ordem de grandeza da mudança, não o efeito exato em todos os assuntos | nenhum | nice |
+| 3 | O `num_ctx` das tarefas não mudou (decisão 2.3). Com o cartão lendo todos os itens, a consolidação em níveis passa a acontecer mais vezes no `air16` (janela de 2.048), o que significa mais chamadas ao modelo por assunto grande; quanto isso pesa no ciclo diário não foi medido | dívida | nice |
