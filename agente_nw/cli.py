@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sqlite3
 import subprocess
 import sys
@@ -20,6 +21,7 @@ from agente_nw.coleta.capturas.busca import REDES_SUPORTADAS, redes_automaticas
 from agente_nw.coleta.capturas.listas import PaginaLista
 from agente_nw.coleta.rss import leitor
 from agente_nw.console.app import criar_app
+from agente_nw.manutencao import reprocessamento
 from agente_nw.nucleo import orquestracao
 from agente_nw.nucleo.agrupamento import agrupador, comparar_vetores
 from agente_nw.nucleo.agrupamento import calibracao as calibracao_agrupamento
@@ -37,7 +39,7 @@ from agente_nw.nucleo.database.queries import (
 from agente_nw.nucleo.database.queries import listas as queries_listas
 from agente_nw.nucleo.database.queries import temas as queries_temas
 from agente_nw.nucleo.fluxo import FRACAO_DO_CONTEXTO_NO_PROMPT
-from agente_nw.nucleo.llm import ClienteOllama
+from agente_nw.nucleo.llm import ClienteOllama, identificador_do_vetor
 from agente_nw.nucleo.localizacao import ContextoNavegacao, atualizar_lista, aviso_de_lista_truncada
 from agente_nw.nucleo.modelos.configuracao import PerfilRoteamento, Roteamento, TemasArquivo
 from agente_nw.nucleo.modelos.pedido import ResultadoPedido
@@ -51,6 +53,7 @@ from agente_nw.perfil.lacunas import ORDEM_IMPACTO, campos_faltando
 from agente_nw.perfil.normalizacao import telefone_e164
 from config.container import (
     RAIZ,
+    ClienteLLM,
     banco,
     caminho_banco,
     caminho_limiares_yaml,
@@ -64,6 +67,7 @@ from config.container import (
     http,
     llm,
     origem_perfil_llm,
+    selecionar_cliente_llm,
 )
 
 COMANDOS_RESERVADOS: dict[str, int] = {
@@ -560,6 +564,143 @@ def comparar_vetores_cmd(amostra: int, caminho: str) -> int:
     print(f"sha256 depois: {hash_depois}")
     if hash_depois != hash_antes:
         print("FALHA: o arquivo do banco mudou durante a comparação")
+        return 1
+    return 0
+
+
+def caminho_plan() -> Path:
+    return RAIZ / "docs" / "PLAN_agente_nw.md"
+
+
+def _cliente_do_reprocessamento(conn: sqlite3.Connection) -> ClienteLLM:
+    """O cliente de sempre (`selecionar_cliente_llm`), mas ligado ao banco onde a etapa grava: a fila de
+    revisão e a proveniência vão para a cópia da simulação, nunca para o banco real (brief 095)."""
+    cfg = configuracao()
+    return selecionar_cliente_llm(
+        http(), conn, cfg.roteamento, cfg.local.ollama_url, caminho_log_chamadas_llm(), cfg.local.ia_api
+    )
+
+
+def _conferir_copia(comando: str, destino: Path) -> str | None:
+    if destino.resolve() == caminho_banco().resolve():
+        return f"{comando} não roda no banco real; use uma cópia (agente_nw copiar-banco)"
+    if not destino.is_file():
+        return f"{destino} não existe"
+    return None
+
+
+def medir_dano_cmd(caminho: str) -> int:
+    """Somente leitura (brief 095, 2.1): contagens do que foi produzido pelo critério antigo, numa cópia do
+    banco. Nenhum texto de terceiros na saída; hash do arquivo conferido antes e depois."""
+    destino = Path(caminho)
+    recusa = _conferir_copia("medir-dano", destino)
+    if recusa is not None:
+        print(f"FALHA: {recusa}")
+        return 1
+    hash_antes = _sha256_do_arquivo(destino)
+    print(f"Banco: {destino}")
+    print(f"sha256 antes: {hash_antes}")
+    conn = reprocessamento.abrir_somente_leitura(destino)
+    try:
+        if reprocessamento.versao_do_esquema(conn) < reprocessamento.ESQUEMA_MINIMO:
+            print(f"FALHA: a cópia está antes da migração {reprocessamento.ESQUEMA_MINIMO:03d}; migre-a")
+            return 1
+        roteamento = configuracao().roteamento
+        modelo = roteamento.perfis[roteamento.perfil_ativo].embeddings.modelo
+        dano = reprocessamento.medir_dano(conn, identificador_do_vetor(modelo))
+    finally:
+        conn.close()
+    for linha in reprocessamento.linhas_do_dano(dano):
+        print(linha)
+    hash_depois = _sha256_do_arquivo(destino)
+    print(f"sha256 depois: {hash_depois}")
+    if hash_depois != hash_antes:
+        print("FALHA: o arquivo do banco mudou durante a medição")
+        return 1
+    return 0
+
+
+def _rodar_etapa(
+    etapa: reprocessamento.Etapa, leitura: sqlite3.Connection, escrita: sqlite3.Connection
+) -> reprocessamento.ResultadoReprocessamento:
+    cliente = _cliente_do_reprocessamento(escrita)
+    if etapa == "vetores":
+        return reprocessamento.reprocessar_vetores(cliente, leitura, escrita, configuracao().limiares)
+    return reprocessamento.reprocessar_cartoes(cliente, leitura, escrita)
+
+
+def reprocessar_cmd(
+    caminho: str, etapa: reprocessamento.Etapa, simular: bool, confirmo: bool, saida: str | None
+) -> int:
+    """Brief 095, 2.2: em simulação (padrão), a etapa roda numa cópia à parte e o banco dado não muda; com
+    `--confirmo`, grava no próprio banco, depois de uma cópia de segurança — recusado dentro de uma série e,
+    no banco real, sem a autorização da etapa no PLAN."""
+    if simular and confirmo:
+        print("FALHA: --simular e --confirmo juntos; escolha um")
+        return 1
+    destino = Path(caminho)
+    momento = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
+
+    if confirmo:
+        recusa = reprocessamento.recusa_para_gravar(
+            destino, caminho_banco(), caminho_plan(), etapa, os.environ
+        )
+        if recusa is None and not destino.is_file():
+            recusa = f"{destino} não existe"
+        if recusa is not None:
+            print(f"FALHA: {recusa}")
+            return 1
+        seguranca = destino.with_name(f"{destino.stem}.antes-do-reprocessar-{etapa}-{momento}.db")
+        reprocessamento.copiar_consistente(destino, seguranca)
+        print(f"Cópia de segurança antes de gravar: {seguranca}")
+        conn = conexao.abrir(destino)
+        try:
+            if reprocessamento.versao_do_esquema(conn) < reprocessamento.ESQUEMA_MINIMO:
+                print(f"FALHA: o banco está antes da migração {reprocessamento.ESQUEMA_MINIMO:03d}")
+                return 1
+            resultado = _rodar_etapa(etapa, conn, conn)
+        finally:
+            conn.close()
+        for linha in resultado.linhas:
+            print(linha)
+        print(f"Gravado em {destino}")
+        return 0
+
+    recusa = _conferir_copia("reprocessar", destino)
+    if recusa is not None:
+        print(f"FALHA: {recusa}")
+        return 1
+    arquivo_a_parte = (
+        Path(saida) if saida else destino.with_name(f"{destino.stem}.simulacao-{etapa}-{momento}.db")
+    )
+    if arquivo_a_parte.resolve() in (destino.resolve(), caminho_banco().resolve()):
+        print("FALHA: a simulação não grava no banco dado nem no banco real")
+        return 1
+    hash_antes = _sha256_do_arquivo(destino)
+    print(f"Banco: {destino}")
+    print(f"sha256 antes: {hash_antes}")
+    try:
+        reprocessamento.copiar_consistente(destino, arquivo_a_parte)
+    except FileExistsError as erro:
+        print(f"FALHA: {erro}")
+        return 1
+    leitura = reprocessamento.abrir_somente_leitura(destino)
+    escrita = conexao.abrir(arquivo_a_parte)
+    try:
+        if reprocessamento.versao_do_esquema(leitura) < reprocessamento.ESQUEMA_MINIMO:
+            print(f"FALHA: a cópia está antes da migração {reprocessamento.ESQUEMA_MINIMO:03d}; migre-a")
+            return 1
+        resultado = _rodar_etapa(etapa, leitura, escrita)
+    finally:
+        escrita.close()
+        leitura.close()
+    for linha in resultado.linhas:
+        print(linha)
+    print(f"Simulação gravada em {arquivo_a_parte}")
+    hash_depois = _sha256_do_arquivo(destino)
+    print(f"sha256 depois: {hash_depois}")
+    if hash_depois != hash_antes:
+        print("FALHA: o arquivo do banco mudou durante a simulação")
         return 1
     return 0
 
@@ -1480,6 +1621,20 @@ def _montar_parser() -> argparse.ArgumentParser:
     comparar_vetores_parser.add_argument("--amostra", type=int, required=True)
     comparar_vetores_parser.add_argument("--banco", required=True, help="caminho da cópia do banco")
 
+    medir_dano_parser = subparsers.add_parser(
+        "medir-dano", help="só leitura: o que foi gravado pelo critério antigo (numa cópia)"
+    )
+    medir_dano_parser.add_argument("--banco", required=True, help="caminho da cópia do banco")
+
+    reprocessar_parser = subparsers.add_parser(
+        "reprocessar", help="refaz uma etapa com o critério novo; simulação, salvo --confirmo"
+    )
+    reprocessar_parser.add_argument("--banco", required=True, help="caminho da cópia do banco")
+    reprocessar_parser.add_argument("--etapa", required=True, choices=reprocessamento.ETAPAS)
+    reprocessar_parser.add_argument("--simular", action="store_true", help="o padrão; grava à parte")
+    reprocessar_parser.add_argument("--confirmo", action="store_true", help="grava no banco dado")
+    reprocessar_parser.add_argument("--saida", default=None, help="arquivo à parte da simulação")
+
     restaurar_backup_parser = subparsers.add_parser("restaurar-backup")
     restaurar_backup_parser.add_argument("arquivo")
     restaurar_backup_parser.add_argument("--confirmo", action="store_true")
@@ -1613,6 +1768,10 @@ def main(argv: list[str] | None = None) -> int:
         return copiar_banco(args.destino)
     if args.comando == "comparar-vetores":
         return comparar_vetores_cmd(args.amostra, args.banco)
+    if args.comando == "medir-dano":
+        return medir_dano_cmd(args.banco)
+    if args.comando == "reprocessar":
+        return reprocessar_cmd(args.banco, args.etapa, args.simular, args.confirmo, args.saida)
     if args.comando == "restaurar-backup":
         return restaurar_backup(args.arquivo, args.confirmo)
     if args.comando == "importar-agenda":
