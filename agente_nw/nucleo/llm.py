@@ -5,6 +5,7 @@ import sqlite3
 import subprocess
 import time
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, TypeVar
@@ -13,6 +14,7 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from agente_nw.nucleo.database.queries import fila_revisao
+from agente_nw.nucleo.estimativa_tokens import estimar_tokens_conservador
 from agente_nw.nucleo.modelos.configuracao import Roteamento, TarefaRoteamento
 from agente_nw.nucleo.modelos.proveniencia import Proveniencia
 
@@ -44,6 +46,146 @@ class FalhaJsonInvalido(RuntimeError):
         self.erro = erro
 
 
+LIMITE_TOKENS_EMBEDDING = 8192
+"""Janela do `bge-m3`, o modelo de embedding dos dois perfis (`bert.context_length` em `/api/show`).
+Acima disso o Ollama corta a entrada do embedding em silêncio (brief 082, decisão 2.4)."""
+
+MotivoJanela = Literal[
+    "prompt_estimado_acima_da_janela", "prompt_cortado", "resposta_cortada", "embedding_acima_do_limite"
+]
+
+_DESCRICAO_MOTIVO: dict[str, str] = {
+    "prompt_estimado_acima_da_janela": "prompt estimado acima da janela, recusado antes da chamada",
+    "prompt_cortado": "prompt cortado pelo servidor",
+    "resposta_cortada": "resposta cortada por tamanho",
+    "embedding_acima_do_limite": "texto do embedding acima do limite do modelo",
+}
+
+
+class JanelaEstourada(Exception):
+    """O que não coube na janela do modelo (brief 082): prompt acima do `num_ctx`, resposta cortada por
+    `num_predict` ou texto de embedding acima do limite. Base comum dos dois erros concretos, para quem
+    for tratar o estouro (o brief 088, dividindo o texto) capturar um tipo só. Nunca se responde "com o
+    que coube": o resultado da chamada não é usado.
+
+    `tokens_medidos` e `tokens_estimados` são sempre da entrada (prompt ou texto do embedding); `limite`
+    é o `num_ctx` (prompt), o `num_predict` (resposta) ou `LIMITE_TOKENS_EMBEDDING`."""
+
+    tarefa: str
+    modelo: str
+    motivo: MotivoJanela
+    tokens_medidos: int | None
+    tokens_estimados: int
+    limite: int
+
+    def _guardar_medida(
+        self,
+        tarefa: str,
+        modelo: str,
+        motivo: MotivoJanela,
+        tokens_medidos: int | None,
+        tokens_estimados: int,
+        limite: int,
+    ) -> None:
+        self.tarefa = tarefa
+        self.modelo = modelo
+        self.motivo = motivo
+        self.tokens_medidos = tokens_medidos
+        self.tokens_estimados = tokens_estimados
+        self.limite = limite
+
+
+def _texto_do_estouro(
+    motivo: MotivoJanela, tokens_medidos: int | None, tokens_estimados: int, limite: int
+) -> str:
+    """Sem as palavras que `fila_revisao.classe_do_erro` lê como JSON ou transporte."""
+    if motivo == "resposta_cortada":
+        return f"janela do modelo: {_DESCRICAO_MOTIVO[motivo]} (limite de saída={limite} tokens)"
+    medida = f"medidos={tokens_medidos}" if tokens_medidos is not None else f"estimados={tokens_estimados}"
+    return f"janela do modelo: {_DESCRICAO_MOTIVO[motivo]} (tokens {medida}, limite={limite})"
+
+
+class FalhaJanela(FalhaJsonInvalido, JanelaEstourada):
+    """Estouro de janela numa chamada de geração. Subclasse de `FalhaJsonInvalido` porque é o erro que
+    todos os chamadores das 15 tarefas já tratam: o item cai no mesmo caminho de qualquer falha de LLM,
+    com a mesma linha em `fila_revisao` (e o mesmo `(fila_revisao id=N)` no texto)."""
+
+    def __init__(
+        self,
+        tarefa: str,
+        fila_revisao_id: int,
+        modelo: str,
+        motivo: MotivoJanela,
+        tokens_medidos: int | None,
+        tokens_estimados: int,
+        limite: int,
+    ) -> None:
+        erro = _texto_do_estouro(motivo, tokens_medidos, tokens_estimados, limite)
+        super().__init__(tarefa, fila_revisao_id, erro)
+        RuntimeError.__init__(self, f"tarefa '{tarefa}' recusada (fila_revisao id={fila_revisao_id}): {erro}")
+        self._guardar_medida(tarefa, modelo, motivo, tokens_medidos, tokens_estimados, limite)
+
+
+class FalhaJanelaEmbedding(ValueError, JanelaEstourada):
+    """Texto de embedding acima do limite do modelo. Subclasse de `ValueError`, o que `embeddar` já
+    levantava para vetor inválido: os chamadores tratam igual. Embedding não tem `fila_revisao`."""
+
+    def __init__(self, modelo: str, tokens_medidos: int | None, tokens_estimados: int, limite: int) -> None:
+        motivo: MotivoJanela = "embedding_acima_do_limite"
+        super().__init__(_texto_do_estouro(motivo, tokens_medidos, tokens_estimados, limite))
+        self._guardar_medida("embeddings", modelo, motivo, tokens_medidos, tokens_estimados, limite)
+
+
+@dataclass(frozen=True)
+class _RespostaBruta:
+    """O que cada provedor devolve de uma chamada: o texto e as medidas de janela que ele informa.
+    `tokens_prompt`: tokens do prompt realmente lidos (`prompt_eval_count` do Ollama), quando há.
+    `parada`: o motivo de parada cru do provedor; `cortada`: se esse motivo é "parou por tamanho"."""
+
+    texto: str
+    tokens_prompt: int | None = None
+    parada: str | None = None
+    cortada: bool = False
+
+
+def _registrar_estouro(
+    caminho_log: Path,
+    tarefa: str,
+    modelo: str,
+    perfil: str,
+    motivo: MotivoJanela,
+    tokens_medidos: int | None,
+    tokens_estimados: int,
+    num_ctx: int,
+    num_predict: int | None = None,
+    parada: str | None = None,
+) -> None:
+    """Uma linha `"janela": true` no `chamadas_llm.jsonl`, no padrão do aviso do `porteiro` (brief 077):
+    falha de escrita nunca derruba quem chamou."""
+    try:
+        caminho_log.parent.mkdir(parents=True, exist_ok=True)
+        linha = json.dumps(
+            {
+                "janela": True,
+                "tarefa": tarefa,
+                "modelo": modelo,
+                "perfil": perfil,
+                "quando": datetime.now(UTC).isoformat(),
+                "motivo": motivo,
+                "tokens_medidos": tokens_medidos,
+                "tokens_estimados": tokens_estimados,
+                "num_ctx": num_ctx,
+                "num_predict": num_predict,
+                "parada": parada,
+            },
+            ensure_ascii=False,
+        )
+        with caminho_log.open("a", encoding="utf-8") as arquivo:
+            arquivo.write(linha + "\n")
+    except Exception:
+        pass
+
+
 class _ClienteLLMBase(ABC):
     """Orquestração de `gerar_json` que não depende de provedor (brief 074): nova tentativa por
     temperatura, backoff de transporte, validação do JSON contra o esquema Pydantic, log da chamada
@@ -70,14 +212,21 @@ class _ClienteLLMBase(ABC):
         temperature: float,
         imagens: list[str] | None,
         esquema: type[BaseModel],
-    ) -> str:
-        """Uma chamada ao provedor, sem nova tentativa: devolve o texto bruto da resposta.
-        Levanta `_GeracaoDegenerada` quando o provedor avisa que a geração degenerou, e
+    ) -> _RespostaBruta:
+        """Uma chamada ao provedor, sem nova tentativa: devolve o texto bruto da resposta e as medidas de
+        janela que o provedor informa (brief 082). Levanta `_GeracaoDegenerada` quando o provedor avisa
+        que a geração degenerou, e
         `httpx.HTTPStatusError`/`httpx.RequestError` em falha de transporte — o backoff e a nova
         tentativa por temperatura ficam aqui na base, iguais para todo provedor.
 
         `esquema` está na assinatura para os clientes de API forçarem o formato de saída com
         `esquema.model_json_schema()`; o Ollama recebe o formato pelo `format` da tarefa e o ignora."""
+
+    def _janela_de_entrada(self, tarefa: TarefaRoteamento) -> int | None:
+        """Janela contra a qual o prompt é conferido, antes (estimativa) e depois (medida) da chamada.
+        `None` na base: os provedores de API não cortam o prompt em silêncio (recusam com erro HTTP) e o
+        `num_ctx` da tarefa é a janela do modelo local. O `ClienteOllama` devolve o `num_ctx`."""
+        return None
 
     def proveniencia(self, tarefa_nome: str, versao_prompt: str | None = None) -> Proveniencia:
         """Perfil ativo, modelo da tarefa e versão do prompt — o que `gerar_json` usa e registra no log,
@@ -134,7 +283,7 @@ class _ClienteLLMBase(ABC):
         temperature: float,
         imagens: list[str] | None,
         esquema: type[BaseModel],
-    ) -> tuple[str, int]:
+    ) -> tuple[_RespostaBruta, int]:
         """Nova tentativa só para erro de transporte (conexão, timeout, HTTP) — não para geração
         degenerada, que é falha de tentativa e segue para a nova tentativa por temperatura."""
         ultimo_erro: httpx.HTTPStatusError | httpx.RequestError | None = None
@@ -158,6 +307,40 @@ class _ClienteLLMBase(ABC):
         self._conexao.commit()
         return FalhaJsonInvalido(tarefa_nome, fila_id, erro)
 
+    def _recusar_por_janela(
+        self,
+        tarefa_nome: str,
+        tarefa: TarefaRoteamento,
+        proveniencia: Proveniencia,
+        prompt: str,
+        motivo: MotivoJanela,
+        tokens_medidos: int | None,
+        tokens_estimados: int,
+        parada: str | None = None,
+    ) -> FalhaJanela:
+        """Registra o estouro, põe o item na `fila_revisao` e devolve o erro de janela (2.3)."""
+        limite = tarefa.num_predict if motivo == "resposta_cortada" else tarefa.num_ctx
+        _registrar_estouro(
+            self._caminho_log,
+            tarefa_nome,
+            proveniencia.modelo,
+            proveniencia.perfil,
+            motivo,
+            tokens_medidos,
+            tokens_estimados,
+            tarefa.num_ctx,
+            tarefa.num_predict if motivo == "resposta_cortada" else None,
+            parada,
+        )
+        erro = _texto_do_estouro(motivo, tokens_medidos, tokens_estimados, limite)
+        fila_id = fila_revisao.inserir(
+            self._conexao, tarefa_nome, prompt, erro, datetime.now(UTC).isoformat()
+        )
+        self._conexao.commit()
+        return FalhaJanela(
+            tarefa_nome, fila_id, proveniencia.modelo, motivo, tokens_medidos, tokens_estimados, limite
+        )
+
     def gerar_json(
         self,
         tarefa_nome: str,
@@ -168,18 +351,29 @@ class _ClienteLLMBase(ABC):
     ) -> EsquemaT:
         """`imagens`: imagens em base64 para modelos com visão (tarefa `descrever_imagem`).
         `versao_prompt`: `VERSAO` do módulo de prompt (brief 066); só vai para o log. A latência
-        registrada é a da chamada inteira, com novas tentativas e esperas do backoff."""
+        registrada é a da chamada inteira, com novas tentativas e esperas do backoff.
+
+        Janela (brief 082): prompt estimado acima do `num_ctx` é recusado sem chamar o provedor; prompt
+        que o provedor diz ter cortado, ou resposta que parou por tamanho, é recusado sem nova tentativa
+        (o mesmo prompt corta de novo). Nos três casos, `FalhaJanela` com o item na `fila_revisao`."""
         inicio = time.monotonic()
         tarefa = self._tarefa(tarefa_nome)
         proveniencia = self.proveniencia(tarefa_nome, versao_prompt)
         nova_tentativa = self._roteamento.perfis[self._roteamento.perfil_ativo].nova_tentativa
+
+        janela = self._janela_de_entrada(tarefa)
+        estimados = estimar_tokens_conservador(prompt)
+        if janela is not None and estimados > janela:
+            raise self._recusar_por_janela(
+                tarefa_nome, tarefa, proveniencia, prompt, "prompt_estimado_acima_da_janela", None, estimados
+            )
 
         ultimo_erro = ""
         falhas_transporte_total = 0
         tentativas = (tarefa.temperature, nova_tentativa.temperature)
         for indice, temperatura in enumerate(tentativas, start=1):
             try:
-                texto, falhas_transporte = self._chamar_com_backoff(
+                resposta, falhas_transporte = self._chamar_com_backoff(
                     tarefa, prompt, temperatura, imagens, esquema
                 )
             except (httpx.HTTPStatusError, httpx.RequestError) as erro:
@@ -193,8 +387,27 @@ class _ClienteLLMBase(ABC):
                 continue
 
             falhas_transporte_total += falhas_transporte
+            motivo: MotivoJanela | None = None
+            if janela is not None and resposta.tokens_prompt is not None and resposta.tokens_prompt >= janela:
+                motivo = "prompt_cortado"
+            elif resposta.cortada:
+                motivo = "resposta_cortada"
+            if motivo is not None:
+                self._registrar_log_chamada(
+                    tarefa_nome, indice, False, falhas_transporte_total, proveniencia, inicio
+                )
+                raise self._recusar_por_janela(
+                    tarefa_nome,
+                    tarefa,
+                    proveniencia,
+                    prompt,
+                    motivo,
+                    resposta.tokens_prompt,
+                    estimados,
+                    resposta.parada,
+                )
             try:
-                bruto = json.loads(texto)
+                bruto = json.loads(resposta.texto)
                 resultado = esquema.model_validate(bruto)
                 self._registrar_log_chamada(
                     tarefa_nome, indice, True, falhas_transporte_total, proveniencia, inicio
@@ -274,6 +487,10 @@ class ClienteOllama(_ClienteLLMBase):
         (`INTEGRACAO.md §8`). Cada processo de lote cria o seu cliente, então o conjunto vazio
         equivale a "uma vez no início do lote"."""
 
+    def _janela_de_entrada(self, tarefa: TarefaRoteamento) -> int | None:
+        """O `num_ctx` da tarefa: acima dele o Ollama corta o prompt em silêncio (armadilha 1)."""
+        return tarefa.num_ctx
+
     @property
     def modelo_embedding(self) -> str:
         """Modelo de embedding do perfil ativo — gravado com cada centróide e conferido na leitura
@@ -340,9 +557,11 @@ class ClienteOllama(_ClienteLLMBase):
         temperature: float,
         imagens: list[str] | None,
         esquema: type[BaseModel],
-    ) -> str:
+    ) -> _RespostaBruta:
         """`esquema` não é usado: o formato de saída do Ollama vem do `format` da tarefa
-        (a string `"json"` do YAML), não de um esquema enviado no payload."""
+        (a string `"json"` do YAML), não de um esquema enviado no payload. As medidas de janela são
+        `prompt_eval_count` (tokens do prompt lidos) e `done_reason` (`"length"`: parou no
+        `num_predict`), conferidos numa resposta real do Ollama 0.34 no brief 082."""
         corpo: dict[str, object] = {
             "model": tarefa.modelo,
             "prompt": prompt,
@@ -372,15 +591,47 @@ class ClienteOllama(_ClienteLLMBase):
         dados: dict[str, object] = resposta.json()
         texto = dados["response"]
         assert isinstance(texto, str)
-        return texto
+        parada = dados.get("done_reason")
+        return _RespostaBruta(
+            texto=texto,
+            tokens_prompt=_inteiro_ou_none(dados.get("prompt_eval_count")),
+            parada=parada if isinstance(parada, str) else None,
+            cortada=parada == "length",
+        )
+
+    def _recusar_embedding(
+        self, modelo: str, tokens_medidos: int | None, tokens_estimados: int
+    ) -> FalhaJanelaEmbedding:
+        _registrar_estouro(
+            self._caminho_log,
+            "embeddings",
+            modelo,
+            self._roteamento.perfil_ativo,
+            "embedding_acima_do_limite",
+            tokens_medidos,
+            tokens_estimados,
+            LIMITE_TOKENS_EMBEDDING,
+        )
+        return FalhaJanelaEmbedding(modelo, tokens_medidos, tokens_estimados, LIMITE_TOKENS_EMBEDDING)
 
     def embeddar(self, textos: list[str]) -> list[list[float]]:
+        """Cada texto é conferido contra `LIMITE_TOKENS_EMBEDDING` antes (estimativa) e, quando é um texto
+        só, depois (`prompt_eval_count`, que no `/api/embed` é a soma de todos os textos do pedido):
+        acima do limite, `FalhaJanelaEmbedding` com registro, nunca um vetor do texto cortado."""
         perfil = self._roteamento.perfis[self._roteamento.perfil_ativo]
-        corpo = {"model": perfil.embeddings.modelo, "input": textos}
-        self._verificar_porteiro_antes_de_carregar(perfil.embeddings.modelo)
+        modelo = perfil.embeddings.modelo
+        for texto in textos:
+            estimados = estimar_tokens_conservador(texto)
+            if estimados > LIMITE_TOKENS_EMBEDDING:
+                raise self._recusar_embedding(modelo, None, estimados)
+        corpo = {"model": modelo, "input": textos}
+        self._verificar_porteiro_antes_de_carregar(modelo)
         resposta = self._http.post(f"{self._ollama_url}/api/embed", json=corpo)
         resposta.raise_for_status()
         dados: dict[str, object] = resposta.json()
+        medidos = _inteiro_ou_none(dados.get("prompt_eval_count"))
+        if len(textos) == 1 and medidos is not None and medidos >= LIMITE_TOKENS_EMBEDDING:
+            raise self._recusar_embedding(modelo, medidos, estimar_tokens_conservador(textos[0]))
         vetores_brutos = dados["embeddings"]
         assert isinstance(vetores_brutos, list)
         vetores: list[list[float]] = [[float(valor) for valor in vetor] for vetor in vetores_brutos]
@@ -390,6 +641,10 @@ class ClienteOllama(_ClienteLLMBase):
                 raise ValueError(f"embedding com {len(vetor)} posições, esperado 1024")
 
         return vetores
+
+
+def _inteiro_ou_none(valor: object) -> int | None:
+    return valor if isinstance(valor, int) and not isinstance(valor, bool) else None
 
 
 _MEDIA_TYPE_IMAGEM = "image/jpeg"
@@ -451,6 +706,8 @@ class ClienteAnthropic(_ClienteApiBase):
     _URL = "https://api.anthropic.com/v1/messages"
     _VERSAO_API = "2023-06-01"
     _NOME_TOOL = "responder"
+    _PARADAS_POR_TAMANHO = frozenset({"max_tokens", "model_context_window_exceeded"})
+    """`stop_reason` de resposta cortada: no `max_tokens` (= `num_predict`) ou na janela do modelo."""
 
     def _chamar(
         self,
@@ -459,7 +716,7 @@ class ClienteAnthropic(_ClienteApiBase):
         temperature: float,
         imagens: list[str] | None,
         esquema: type[BaseModel],
-    ) -> str:
+    ) -> _RespostaBruta:
         conteudo: list[dict[str, object]] = [
             {
                 "type": "image",
@@ -492,7 +749,13 @@ class ClienteAnthropic(_ClienteApiBase):
             },
         )
         resposta.raise_for_status()
-        return _texto_da_resposta_anthropic(resposta.json())
+        dados = resposta.json()
+        parada = dados.get("stop_reason") if isinstance(dados, dict) else None
+        return _RespostaBruta(
+            texto=_texto_da_resposta_anthropic(dados),
+            parada=parada if isinstance(parada, str) else None,
+            cortada=parada in self._PARADAS_POR_TAMANHO,
+        )
 
 
 class ClienteGemini(_ClienteApiBase):
@@ -508,7 +771,7 @@ class ClienteGemini(_ClienteApiBase):
         temperature: float,
         imagens: list[str] | None,
         esquema: type[BaseModel],
-    ) -> str:
+    ) -> _RespostaBruta:
         partes: list[dict[str, object]] = [
             {"inlineData": {"mimeType": _MEDIA_TYPE_IMAGEM, "data": imagem}} for imagem in imagens or []
         ]
@@ -530,7 +793,11 @@ class ClienteGemini(_ClienteApiBase):
             headers={"x-goog-api-key": self._chave, "content-type": "application/json"},
         )
         resposta.raise_for_status()
-        return _texto_da_resposta_gemini(resposta.json())
+        dados = resposta.json()
+        parada = _parada_gemini(dados)
+        return _RespostaBruta(
+            texto=_texto_da_resposta_gemini(dados), parada=parada, cortada=parada == "MAX_TOKENS"
+        )
 
 
 class ClienteOpenAI(_ClienteApiBase):
@@ -546,7 +813,7 @@ class ClienteOpenAI(_ClienteApiBase):
         temperature: float,
         imagens: list[str] | None,
         esquema: type[BaseModel],
-    ) -> str:
+    ) -> _RespostaBruta:
         conteudo: list[dict[str, object]] = [{"type": "text", "text": prompt}]
         conteudo.extend(
             {
@@ -578,7 +845,11 @@ class ClienteOpenAI(_ClienteApiBase):
             },
         )
         resposta.raise_for_status()
-        return _texto_da_resposta_openai(resposta.json())
+        dados = resposta.json()
+        parada = _parada_openai(dados)
+        return _RespostaBruta(
+            texto=_texto_da_resposta_openai(dados), parada=parada, cortada=parada == "length"
+        )
 
 
 def _texto_da_resposta_anthropic(dados: object) -> str:
@@ -630,3 +901,24 @@ def _texto_da_resposta_openai(dados: object) -> str:
         return ""
     conteudo = mensagem.get("content")
     return conteudo if isinstance(conteudo, str) else ""
+
+
+def _primeiro_da_lista(dados: object, chave: str) -> dict[str, object] | None:
+    lista = dados.get(chave) if isinstance(dados, dict) else None
+    if not isinstance(lista, list) or not lista or not isinstance(lista[0], dict):
+        return None
+    return lista[0]
+
+
+def _parada_gemini(dados: object) -> str | None:
+    """`candidates[0].finishReason` (`"MAX_TOKENS"`: parou no `maxOutputTokens`)."""
+    candidato = _primeiro_da_lista(dados, "candidates")
+    parada = candidato.get("finishReason") if candidato is not None else None
+    return parada if isinstance(parada, str) else None
+
+
+def _parada_openai(dados: object) -> str | None:
+    """`choices[0].finish_reason` (`"length"`: parou no `max_tokens`)."""
+    escolha = _primeiro_da_lista(dados, "choices")
+    parada = escolha.get("finish_reason") if escolha is not None else None
+    return parada if isinstance(parada, str) else None

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 
+from agente_nw.nucleo.estimativa_tokens import estimar_tokens as estimar_tokens  # reexporta (brief 082)
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.redacao import (
     LIMITE_PALAVRAS_MENSAGEM,
@@ -16,7 +17,6 @@ VERSAO = "2026-11-02-3"
 ESQUEMA = RespostaRedacao
 
 LIMITE_TOKENS_PADRAO = 6000
-_TOKENS_POR_PALAVRA = 1.4
 _HISTORICO_NO_CORTE = 1
 _FATOS_NO_CORTE = 5
 
@@ -94,11 +94,6 @@ class EntradaRedacao:
     moldes_comentados: list[str] = field(default_factory=list)
     # Preenchido só pelo corte: comentários das consultas que saíram do histórico.
     comentarios_preservados: list[str] = field(default_factory=list)
-
-
-def estimar_tokens(texto: str) -> int:
-    """Contagem aproximada: palavras × 1,4."""
-    return int(len(texto.split()) * _TOKENS_POR_PALAVRA)
 
 
 def _lista(valores: list[str]) -> str:
