@@ -539,8 +539,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `657edaa`
 - Justificativa existente: nenhuma.
 - Proposta do executor: o corte da mensagem em 100 caracteres é defensável (para saber que não deve repetir, o começo basta). O do comentário do usuário não: é texto que **você** escreveu para corrigir a redação, e é o único lugar do produto em que a sua palavra chega truncada ao modelo. Proponho corrigir o comentário (300 → inteiro, ou 1.200) e manter o resto. Custo: uma linha e um brief pequeno.
-- Estado: CORRIGIDO (brief 081)
-- Decisão de Sidarta: corrigir (brief 081): o comentário do usuário entra inteiro; a mensagem entregue continua em 100 caracteres e as 5 consultas, por decisão 2.1 e 2.2 do brief 081
+- Estado: CORRIGIDO (brief 099)
+- Decisão de Sidarta: corrigir em duas partes. Brief 081: o comentário do usuário entra inteiro (a mensagem entregue ficou em 100 caracteres e as 5 consultas, por decisão 2.1 e 2.2 do brief 081). Brief 099 (decisão de 2026-11-16): a mensagem já entregue também entra inteira, sem o corte de 100 caracteres; o número de consultas (5, e 3 na redação) segue como está, para o brief 100
 - Onde mais aparece: `agente_nw/nucleo/historico.py:58`, `:10`; `agente_nw/nucleo/redacao.py:157`, `:155`; `agente_nw/nucleo/consulta.py:263`; `agente_nw/nucleo/database/queries/consulta_contato.py:54`.
 
 #### P-029 — agente_nw/nucleo/redacao.py:164 — `_notas`
@@ -930,7 +930,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | agente_nw/nucleo/database/queries/temas.py | 105/105 | CERTIFICADO | Nome, descrição e sinônimos gravados e lidos inteiros; `listar_com_embedding` devolve **todos** os temas com vetor do modelo atual. | — |
 | agente_nw/nucleo/estimativa_tokens.py | 28/28 | CERTIFICADO | só conta palavras e caracteres do texto que recebe para estimar tokens (brief 082); não corta nem devolve texto | — |
 | agente_nw/nucleo/fluxo.py | 504/504 | CORTA | fluxo do pedido (status, perguntas, retomada); não lê texto de conteúdo, mas é aqui que nasce o orçamento de prompt `num_ctx * 0,73` que corta o prompt da redação | P-033 |
-| agente_nw/nucleo/historico.py | 97/97 | CORTA | o histórico que vai ao prompt `redigir_ganchos` leva a mensagem entregue cortada em 100 caracteres (o comentário do usuário entra inteiro desde o brief 081), e só as 5 consultas mais recentes | P-028, NA-001 |
+| agente_nw/nucleo/historico.py | 97/97 | CORTA | o histórico que vai ao prompt `redigir_ganchos` leva a mensagem entregue e o comentário do usuário inteiros (comentário desde o brief 081, mensagem desde o 099), e só as 5 consultas mais recentes | P-028, NA-001 |
 | agente_nw/nucleo/llm.py | 971/971 | CERTIFICADO | o prompt e o texto de embedding chegam e saem inteiros; desde o brief 082 o cliente confere a janela (estimativa antes, `prompt_eval_count` e motivo de parada depois) e recusa o que não cabe em vez de deixar o modelo responder sobre texto cortado; desde o brief 088, `num_ctx` expõe a janela da tarefa a quem divide o texto e `embeddar_em_partes` (l. 952) embedda em partes que cobrem o texto todo e devolve a média ponderada, nunca um vetor parcial; desde o brief 089, `modelo_embedding` leva a versão do critério do vetor (l. 54-64) | P-040, P-042 |
 | agente_nw/nucleo/localizacao.py | 431/431 | CORTA | localiza a pessoa nas redes; o desempate por LLM vê só o `cabecalho` de cada candidata, os parecidos param em `maximo_parecidas` e a deduplicação do fato olha 200 fatos | P-020, P-021, NA-002 |
 | agente_nw/nucleo/modelos/__init__.py | 0/0 | CERTIFICADO | Arquivo vazio (0 bytes): só marca o pacote. | — |
@@ -1196,13 +1196,13 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | tests/test_seguranca_prompt.py | 354/354 | CERTIFICADO | `cercar_dado_externo` e os 9 modulos de prompt: texto entra inteiro entre marcadores, marcador forjado neutralizado, conteudo preservado (`INJECAO in cercado`); entradas de 1 linha; `qualificar` e `rotular` com o resumo de cada item, também cercado (brief 090). | — |
 | tests/test_selecao_provedor.py | 216/216 | CERTIFICADO | `selecionar_cliente_llm` (ordem Anthropic > Gemini > OpenAI); le so `container.py`/`app.py` para contar construcoes; sem texto de conteudo. | — |
 | tests/test_sem_censura_de_tema.py | 75/75 | CERTIFICADO | Tag/fato politico ou de saude sao gravados; prompt de extracao sem "sensive"; texto de fila "texto qualquer" (curto), resposta simulada. | — |
-| tests/test_sem_corte_de_texto.py | 1157/1157 | CERTIFICADO | brief 093, guarda estática: percorre `agente_nw/` por AST e classifica cada fatia, `LIMIT` e teto em exceção aprovada, corte não analítico ou violação pendente; os testes do teste montam código e registro sintéticos em `tmp_path`. Não lê nem envia texto a modelo. | — |
+| tests/test_sem_corte_de_texto.py | 1153/1153 | CERTIFICADO | brief 093, guarda estática: percorre `agente_nw/` por AST e classifica cada fatia, `LIMIT` e teto em exceção aprovada, corte não analítico ou violação pendente; os testes do teste montam código e registro sintéticos em `tmp_path`. Não lê nem envia texto a modelo. | — |
 | tests/test_texto_extremo_ponta_a_ponta.py | 299/299 | CERTIFICADO | brief 094, prova com textos extremos: as 15 tarefas do roteamento com textos sintéticos de 34.195 e 5.000.000 caracteres e marcador no último; o cliente é o `ClienteOllama` real com o servidor falso. Não corta texto: as fatias montam o próprio texto sintético. | — |
 | tests/test_sem_objetivo_avisa.py | 38/38 | CERTIFICADO | Todos abaixo do piso -> aviso; reaproveita fixtures de `test_cruzamento_por_consulta`; fato de 1 linha, assunto so com titulo. | — |
 | tests/test_sem_redes_sociais.py | 74/74 | CERTIFICADO | Botao "sem redes sociais" no console Flask; sem texto de conteudo. | — |
 | tests/test_temas_atualizar.py | 33/33 | CERTIFICADO | `temas.atualizar` regrava descricao e sinonimos; descricoes curtas, sem corte. | — |
 | tests/test_termos_contato.py | 89/89 | CERTIFICADO | Documenta teto de 3 termos e rejeicao de termo > 5 palavras em `termos_contato.py`; os fatos de teste sao curtos e escondem os cortes de 12 fatos e 300 caracteres por fato do prompt. | — |
-| tests/test_texto_do_usuario_inteiro.py | 165/165 | CERTIFICADO | Testa que comentário do histórico, nota, comentário do molde e `evitar` chegam inteiros ao prompt e à conferência; o texto que passa é fictício e nada vai a modelo real. | — |
+| tests/test_texto_do_usuario_inteiro.py | 237/237 | CERTIFICADO | Testa que comentário do histórico, mensagem entregue (brief 099), nota, comentário do molde e `evitar` chegam inteiros ao prompt e à conferência; o texto que passa é fictício e nada vai a modelo real. | — |
 | tests/test_texto_integral.py | 602/602 | CERTIFICADO | Teste de aceite do brief 088 com clientes falsos e banco em `tmp_path`: cobertura byte a byte, prompt idêntico para texto curto, marcadores do meio e do último caractere de 300.000 caracteres, sobreposição, média ponderada, fila de revisão; as fatias do teste montam textos e reconstroem o original, nada vai a modelo real | — |
 | tests/test_validacao_base.py | 69/69 | CERTIFICADO | Documenta `validar_ganchos`: base antes, so 1 base, `MAXIMO_GANCHOS` de noticia, limite 80 palavras da base. | — |
 | tests/test_verificar_auditoria_texto.py | 556/556 | CERTIFICADO | só exercita o verificador contra árvores e relatórios sintéticos em `tmp_path`; não constrói entrada de produção | — |
@@ -1683,9 +1683,9 @@ tests/test_seguranca_prompt.py:298 tests/test_seguranca_prompt.py:341 tests/test
 tests/test_seguranca_prompt.py:91 tests/test_seguranca_prompt.py:93 tests/test_selecao_provedor.py:209 tests/test_selecao_provedor.py:210
 tests/test_selecao_provedor.py:44 tests/test_selecao_provedor.py:45 tests/test_sem_censura_de_tema.py:56 tests/test_sem_censura_de_tema.py:61
 tests/test_sem_censura_de_tema.py:63 tests/test_sem_censura_de_tema.py:64 tests/test_sem_objetivo_avisa.py:23 tests/test_sem_objetivo_avisa.py:35
-tests/test_sem_objetivo_avisa.py:36 tests/test_texto_do_usuario_inteiro.py:116 tests/test_texto_do_usuario_inteiro.py:138 tests/test_texto_do_usuario_inteiro.py:147
-tests/test_texto_do_usuario_inteiro.py:152 tests/test_texto_do_usuario_inteiro.py:155 tests/test_texto_do_usuario_inteiro.py:156 tests/test_texto_do_usuario_inteiro.py:157
-tests/test_texto_do_usuario_inteiro.py:162 tests/test_texto_do_usuario_inteiro.py:164 tests/test_texto_do_usuario_inteiro.py:165 tests/test_texto_do_usuario_inteiro.py:97
+tests/test_sem_objetivo_avisa.py:36 tests/test_texto_do_usuario_inteiro.py:210 tests/test_texto_do_usuario_inteiro.py:219
+tests/test_texto_do_usuario_inteiro.py:224 tests/test_texto_do_usuario_inteiro.py:227 tests/test_texto_do_usuario_inteiro.py:228 tests/test_texto_do_usuario_inteiro.py:229
+tests/test_texto_do_usuario_inteiro.py:234 tests/test_texto_do_usuario_inteiro.py:236 tests/test_texto_do_usuario_inteiro.py:237 tests/test_texto_do_usuario_inteiro.py:97
 tests/test_validacao_base.py:40 tests/test_validacao_base.py:47 tests/test_validacao_base.py:50 tests/test_verificar_auditoria_texto.py:104
 tests/test_verificar_auditoria_texto.py:123 tests/test_verificar_auditoria_texto.py:349 tests/test_verificar_auditoria_texto.py:350 tests/test_verificar_auditoria_texto.py:351
 tests/test_verificar_auditoria_texto.py:352 tests/test_verificar_auditoria_texto.py:353 tests/test_verificar_auditoria_texto.py:354 tests/test_verificar_auditoria_texto.py:355
@@ -2109,26 +2109,26 @@ tests/test_sem_corte_de_texto.py:670 tests/test_sem_corte_de_texto.py:671 tests/
 tests/test_sem_corte_de_texto.py:677 tests/test_sem_corte_de_texto.py:681 tests/test_sem_corte_de_texto.py:685 tests/test_sem_corte_de_texto.py:690
 tests/test_sem_corte_de_texto.py:702 tests/test_sem_corte_de_texto.py:717 tests/test_sem_corte_de_texto.py:720 tests/test_sem_corte_de_texto.py:721
 tests/test_sem_corte_de_texto.py:723 tests/test_sem_corte_de_texto.py:736 tests/test_sem_corte_de_texto.py:739 tests/test_sem_corte_de_texto.py:742
-tests/test_sem_corte_de_texto.py:743 tests/test_sem_corte_de_texto.py:754 tests/test_sem_corte_de_texto.py:757 tests/test_sem_corte_de_texto.py:768
-tests/test_sem_corte_de_texto.py:771 tests/test_sem_corte_de_texto.py:772 tests/test_sem_corte_de_texto.py:775 tests/test_sem_corte_de_texto.py:781
-tests/test_sem_corte_de_texto.py:782 tests/test_sem_corte_de_texto.py:783 tests/test_sem_corte_de_texto.py:805 tests/test_sem_corte_de_texto.py:811
-tests/test_sem_corte_de_texto.py:812 tests/test_sem_corte_de_texto.py:813 tests/test_sem_corte_de_texto.py:822 tests/test_sem_corte_de_texto.py:828
-tests/test_sem_corte_de_texto.py:835 tests/test_sem_corte_de_texto.py:836 tests/test_sem_corte_de_texto.py:839 tests/test_sem_corte_de_texto.py:840
-tests/test_sem_corte_de_texto.py:857 tests/test_sem_corte_de_texto.py:862 tests/test_sem_corte_de_texto.py:866 tests/test_sem_corte_de_texto.py:906
-tests/test_sem_corte_de_texto.py:907 tests/test_sem_corte_de_texto.py:919 tests/test_sem_corte_de_texto.py:920 tests/test_sem_corte_de_texto.py:950
-tests/test_sem_corte_de_texto.py:951 tests/test_sem_corte_de_texto.py:952 tests/test_sem_corte_de_texto.py:953 tests/test_sem_corte_de_texto.py:954
-tests/test_sem_corte_de_texto.py:955 tests/test_sem_corte_de_texto.py:956 tests/test_sem_corte_de_texto.py:957 tests/test_sem_corte_de_texto.py:959
-tests/test_sem_corte_de_texto.py:960 tests/test_sem_corte_de_texto.py:962 tests/test_sem_corte_de_texto.py:981 tests/test_sem_corte_de_texto.py:985
-tests/test_sem_corte_de_texto.py:991 tests/test_sem_corte_de_texto.py:992 tests/test_sem_corte_de_texto.py:994 tests/test_sem_corte_de_texto.py:998
-tests/test_sem_corte_de_texto.py:1002 tests/test_sem_corte_de_texto.py:1005 tests/test_sem_corte_de_texto.py:1009 tests/test_sem_corte_de_texto.py:1010
-tests/test_sem_corte_de_texto.py:1014 tests/test_sem_corte_de_texto.py:1015 tests/test_sem_corte_de_texto.py:1021 tests/test_sem_corte_de_texto.py:1022
-tests/test_sem_corte_de_texto.py:1028 tests/test_sem_corte_de_texto.py:1029 tests/test_sem_corte_de_texto.py:1037 tests/test_sem_corte_de_texto.py:1044
-tests/test_sem_corte_de_texto.py:1045 tests/test_sem_corte_de_texto.py:1050 tests/test_sem_corte_de_texto.py:1052 tests/test_sem_corte_de_texto.py:1059
-tests/test_sem_corte_de_texto.py:1060 tests/test_sem_corte_de_texto.py:1065 tests/test_sem_corte_de_texto.py:1066 tests/test_sem_corte_de_texto.py:1073
-tests/test_sem_corte_de_texto.py:1074 tests/test_sem_corte_de_texto.py:1087 tests/test_sem_corte_de_texto.py:1088 tests/test_sem_corte_de_texto.py:1096
-tests/test_sem_corte_de_texto.py:1097 tests/test_sem_corte_de_texto.py:1102 tests/test_sem_corte_de_texto.py:1109 tests/test_sem_corte_de_texto.py:1116
-tests/test_sem_corte_de_texto.py:1120 tests/test_sem_corte_de_texto.py:1126 tests/test_sem_corte_de_texto.py:1141 tests/test_sem_corte_de_texto.py:1142
-tests/test_sem_corte_de_texto.py:1146 tests/test_sem_corte_de_texto.py:1155
+tests/test_sem_corte_de_texto.py:743 tests/test_sem_corte_de_texto.py:754 tests/test_sem_corte_de_texto.py:764
+tests/test_sem_corte_de_texto.py:767 tests/test_sem_corte_de_texto.py:768 tests/test_sem_corte_de_texto.py:771 tests/test_sem_corte_de_texto.py:777
+tests/test_sem_corte_de_texto.py:778 tests/test_sem_corte_de_texto.py:779 tests/test_sem_corte_de_texto.py:801 tests/test_sem_corte_de_texto.py:807
+tests/test_sem_corte_de_texto.py:808 tests/test_sem_corte_de_texto.py:809 tests/test_sem_corte_de_texto.py:818 tests/test_sem_corte_de_texto.py:824
+tests/test_sem_corte_de_texto.py:831 tests/test_sem_corte_de_texto.py:832 tests/test_sem_corte_de_texto.py:835 tests/test_sem_corte_de_texto.py:836
+tests/test_sem_corte_de_texto.py:853 tests/test_sem_corte_de_texto.py:858 tests/test_sem_corte_de_texto.py:862 tests/test_sem_corte_de_texto.py:902
+tests/test_sem_corte_de_texto.py:903 tests/test_sem_corte_de_texto.py:915 tests/test_sem_corte_de_texto.py:916 tests/test_sem_corte_de_texto.py:946
+tests/test_sem_corte_de_texto.py:947 tests/test_sem_corte_de_texto.py:948 tests/test_sem_corte_de_texto.py:949 tests/test_sem_corte_de_texto.py:950
+tests/test_sem_corte_de_texto.py:951 tests/test_sem_corte_de_texto.py:952 tests/test_sem_corte_de_texto.py:953 tests/test_sem_corte_de_texto.py:955
+tests/test_sem_corte_de_texto.py:956 tests/test_sem_corte_de_texto.py:958 tests/test_sem_corte_de_texto.py:977 tests/test_sem_corte_de_texto.py:981
+tests/test_sem_corte_de_texto.py:987 tests/test_sem_corte_de_texto.py:988 tests/test_sem_corte_de_texto.py:990 tests/test_sem_corte_de_texto.py:994
+tests/test_sem_corte_de_texto.py:998 tests/test_sem_corte_de_texto.py:1001 tests/test_sem_corte_de_texto.py:1005 tests/test_sem_corte_de_texto.py:1006
+tests/test_sem_corte_de_texto.py:1010 tests/test_sem_corte_de_texto.py:1011 tests/test_sem_corte_de_texto.py:1017 tests/test_sem_corte_de_texto.py:1018
+tests/test_sem_corte_de_texto.py:1024 tests/test_sem_corte_de_texto.py:1025 tests/test_sem_corte_de_texto.py:1033 tests/test_sem_corte_de_texto.py:1040
+tests/test_sem_corte_de_texto.py:1041 tests/test_sem_corte_de_texto.py:1046 tests/test_sem_corte_de_texto.py:1048 tests/test_sem_corte_de_texto.py:1055
+tests/test_sem_corte_de_texto.py:1056 tests/test_sem_corte_de_texto.py:1061 tests/test_sem_corte_de_texto.py:1062 tests/test_sem_corte_de_texto.py:1069
+tests/test_sem_corte_de_texto.py:1070 tests/test_sem_corte_de_texto.py:1083 tests/test_sem_corte_de_texto.py:1084 tests/test_sem_corte_de_texto.py:1092
+tests/test_sem_corte_de_texto.py:1093 tests/test_sem_corte_de_texto.py:1098 tests/test_sem_corte_de_texto.py:1105 tests/test_sem_corte_de_texto.py:1112
+tests/test_sem_corte_de_texto.py:1116 tests/test_sem_corte_de_texto.py:1122 tests/test_sem_corte_de_texto.py:1137 tests/test_sem_corte_de_texto.py:1138
+tests/test_sem_corte_de_texto.py:1142 tests/test_sem_corte_de_texto.py:1151
 ```
 
 **Brief 094 (sem ponto novo)** — 5 linha(s) citada(s), todas descartadas. O brief 094 criou a prova permanente `tests/test_texto_extremo_ponta_a_ponta.py` e não alterou código de produção. As ocorrências são do próprio teste: a docstring que cita os cortes de seleção (l. 14-15), o nome do esquema `RespostaCartao` (l. 61) e a docstring e a chamada de `cartoes.resumir_item` (l. 169-170); a única fatia do arquivo monta o texto sintético e não corta texto de terceiros.
@@ -2151,6 +2151,12 @@ tests/test_reprocessamento.py:461 tests/test_reprocessamento.py:477
 ```
 
 ---
+
+**Brief 099 (sem ponto novo)** — 5 linha(s) nascidas, todas descartadas. O brief 099 tirou o corte de 100 caracteres da mensagem entregue em `agente_nw/nucleo/historico.py` (P-028) e reescreveu o teste que o fixava em `tests/test_texto_do_usuario_inteiro.py`; as linhas deslocadas das citações antigas desse teste e de `tests/test_sem_corte_de_texto.py` (que perdeu a chave da fatia `mensagem[:100]`) foram renumeradas pela correspondência entre a versão anterior e a atual, e as que eram do trecho reescrito saíram. As que nasceram são os `LIMIT`/`limite` dos testes novos (o orçamento de tokens do `cortar_por_tamanho`) e listas de comentários; nenhuma corta texto:
+
+```
+tests/test_texto_do_usuario_inteiro.py:150 tests/test_texto_do_usuario_inteiro.py:165 tests/test_texto_do_usuario_inteiro.py:168 tests/test_texto_do_usuario_inteiro.py:169 tests/test_texto_do_usuario_inteiro.py:175
+```
 
 ## Lacunas
 

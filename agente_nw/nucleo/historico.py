@@ -53,7 +53,7 @@ def _formatar_ganchos(conexao: sqlite3.Connection, consulta_id: int) -> str | No
             titulo = "mensagem base"
         if isinstance(titulo, str) and titulo:
             mensagem = dados.get("mensagem")
-            trecho = f' — mensagem: "{mensagem[:100]}"' if isinstance(mensagem, str) and mensagem else ""
+            trecho = f' — mensagem: "{mensagem}"' if isinstance(mensagem, str) and mensagem else ""
             comentario = comentarios.get(assunto_id)
             nota = f' — comentário do usuário: "{comentario}"' if comentario else ""
             partes.append(f"{titulo} ({status}){trecho}{nota}")

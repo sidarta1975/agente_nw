@@ -101,19 +101,91 @@ def test_nota_de_1500_e_comentario_de_molde_de_1000_chegam_inteiros(conn: sqlite
     assert nota in texto and comentario in texto
 
 
-def test_mensagem_entregue_de_500_caracteres_chega_com_100(conn: sqlite3.Connection) -> None:
-    perfil_id = _contato(conn, "Vera")
+def _consulta_com_mensagem(conn: sqlite3.Connection, perfil_id: int, mensagem: str) -> int:
     consulta = consulta_contato.inserir(conn, perfil_id, AGORA, "{}", None, "[]")
     assert consulta.id is not None
-    mensagem = "a" * 100 + "b" * 400
     gancho = json.dumps({"assunto_id": None, "mensagem": mensagem})
     gancho_uso.inserir_entregues(conn, consulta.id, [(None, gancho)], AGORA)
+    conn.commit()
+    return consulta.id
+
+
+def test_mensagem_entregue_de_500_caracteres_chega_inteira(conn: sqlite3.Connection) -> None:
+    # Muda de intenção por decisão de Sidarta (brief 099): antes exigia só os 100 primeiros caracteres.
+    perfil_id = _contato(conn, "Vera")
+    mensagem = "a" * 100 + "b" * 399 + "!"
+    _consulta_com_mensagem(conn, perfil_id, mensagem)
+
+    texto = historico.historico_recente_para_prompt(conn, perfil_id)
+
+    assert f'mensagem: "{mensagem}"' in texto
+
+
+def test_mensagem_entregue_de_3000_caracteres_chega_inteira_com_o_ultimo_caractere(
+    conn: sqlite3.Connection,
+) -> None:
+    perfil_id = _contato(conn, "Vera")
+    mensagem = "".join(str(i % 10) for i in range(2999)) + "Z"
+    _consulta_com_mensagem(conn, perfil_id, mensagem)
+
+    texto = historico.historico_recente_para_prompt(conn, perfil_id)
+
+    assert f'mensagem: "{mensagem}"' in texto
+    assert len(mensagem) == 3000
+
+
+def test_marcador_no_fim_da_mensagem_aparece_no_prompt_de_redigir_ganchos(conn: sqlite3.Connection) -> None:
+    perfil_id = _contato(conn, "Vera")
+    mensagem = "início " + "x" * 2900 + " MARCADOR-FINAL-099"
+    _consulta_com_mensagem(conn, perfil_id, mensagem)
+    linhas = [historico.historico_recente_para_prompt(conn, perfil_id)]
+    entrada = replace(_entrada(), historico=linhas)
+
+    texto = prompt.construir_prompt(entrada)
+
+    assert "MARCADOR-FINAL-099" in texto
+    assert mensagem in texto
+
+
+def test_prompt_que_estoura_o_orcamento_nao_corta_a_mensagem_e_sacrifica_outros_blocos(
+    conn: sqlite3.Connection,
+) -> None:
+    perfil_id = _contato(conn, "Vera")
+    mensagem = "m" * 2999 + "Z"
+    _consulta_com_mensagem(conn, perfil_id, mensagem)
+    entregue = historico.historico_recente_para_prompt(conn, perfil_id)
+    nota = "nota " + "N" * 300
+    comentario = 'comentário do usuário: "' + "H" * 300 + '"'
+    base = _entrada(fatos=30, historico=2, palavras_por_linha=60)
+    entrada = replace(
+        base,
+        notas=[nota],
+        historico=[entregue, "[2026-10-02] consulta dois sem mensagem"],
+        historico_comentarios=["", f"[2026-10-02] {comentario}"],
+        trocas_whatsapp=["troca " + "w" * 50] * 5,
+    )
+
+    for limite in (1500, 200, 1):
+        texto = prompt.construir_prompt(entrada, limite)
+
+        assert mensagem in texto
+        assert nota in texto
+        assert comentario in texto
+        assert "fato 29:" not in texto
+    assert prompt.cortar_por_tamanho(entrada, 1).trocas_whatsapp == []
+
+
+def test_comentario_do_usuario_continua_inteiro_ao_lado_da_mensagem(conn: sqlite3.Connection) -> None:
+    perfil_id = _contato(conn, "Vera")
+    consulta_id = _consulta_com_mensagem(conn, perfil_id, "m" * 800)
+    comentario = "c" * 1999 + "!"
+    gancho_uso.comentar(conn, consulta_id, None, comentario, AGORA)
     conn.commit()
 
     texto = historico.historico_recente_para_prompt(conn, perfil_id)
 
-    assert f'mensagem: "{"a" * 100}"' in texto
-    assert "b" not in texto.split("mensagem:")[1]
+    assert f'mensagem: "{"m" * 800}"' in texto
+    assert f'comentário do usuário: "{comentario}"' in texto
 
 
 def test_evitar_mantem_oito_termos_e_interessa_continua_em_cinco() -> None:

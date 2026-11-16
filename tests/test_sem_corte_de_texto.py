@@ -753,10 +753,6 @@ VIOLACOES_PENDENTES: dict[Chave, tuple[str, str]] = _achatar(
                 "def historico_recente_para_prompt( conexao: sqlite3.Connection, perfil"
                 "_id: int, limite: int = LIMITE_PADRAO ) -> str:"
             ): ("P-028", "[093-3]"),
-            (
-                "trecho = f' — mensagem: \"{mensagem[:100]}\"' if isinstance(mensagem, st"
-                'r) and mensagem else ""'
-            ): ("P-028", "[093-3]"),
         },
         "agente_nw/nucleo/localizacao.py": {
             ("recentes = fatos.listar_recentes(conexao, perfil_id, _FATOS_NA_DEDUPLICACAO)"): (
