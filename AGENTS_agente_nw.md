@@ -45,6 +45,7 @@ Descrição (perfis `air16`/`pro48`, tarefas de LLM, embeddings): `docs/ARQUITET
 - Toda alteração de tabela é uma migração numerada em `scripts/migracoes/`. Nenhum brief cria ou altera tabela fora de migração.
 - Quem decide que tema cabe numa mensagem é o usuário (brief 046): o programa não descarta conteúdo por tema (política, saúde, religião…). Em troca, a redação nunca afirma sobre a pessoa o que ela não disse (opinião, posição, adesão), trata fato `[antigo]` ou `[de imagem]` como não atual, e o motor só entrega assunto com relação com o objetivo do pedido (`conector.consulta.minima` é piso necessário).
 - **Texto por inteiro (brief 079).** Quando o projeto analisa um texto (notícia, página, mensagem, comentário, histórico, fato, pedido), analisa o texto inteiro. O princípio é do dono do projeto: só Sidarta aprova exceção, e só ele (ou um brief escrito por ele) escreve em `docs/EXCECOES_TEXTO_INTEGRAL.md`. O executor não aprova exceção nem marca ponto como aprovado. Sem linha no registro, o corte é violação. O verificador é `scripts/verificar_auditoria_texto.py`. Todo brief que lê, monta ou envia texto a modelo, embedding ou filtro responde, no relatório: **"algum texto é analisado só em parte?"** (sim, onde e com que aprovação; ou não, e a prova).
+- Cada brief pode atualizar as listas de `tests/test_sem_corte_de_texto.py` e a tabela de cortes não analíticos do registro para os trechos que ele mesmo criar ou alterar, sem aprovar exceção nova — aprovar exceção continua sendo só de Sidarta.
 
 ## 5. Git
 

@@ -125,7 +125,10 @@ do brief 086 somam 683 linhas, e as duas contagens corrigidas na seção 6 mudar
 Nenhum arquivo ficou `NÃO CONFERIDO`.
 
 O princípio não está sendo cumprido em **45 lugares**, e nenhum deles tinha aprovação sua registrada.
-Em 2026-11-08 você aprovou a exceção de 19 deles (brief 080); **26 continuam sem aprovação**.
+Em 2026-11-08 você aprovou a exceção de 19 deles (brief 080) e, em 2026-11-16, a de mais 6 (brief 100: P-013, P-028,
+P-029, P-030, P-034 e P-039; e, no P-009, já aprovado em parte, os 40 assuntos por rodada); os briefs 081 a 099
+corrigiram outros. Hoje: 25 com exceção aprovada, 15 corrigidos e **5 aguardando decisão** (P-003, P-031, P-032, P-035
+e P-036).
 Os cinco mais graves, em uma linha cada:
 
 1. **P-013 — a página da rede social é cortada na origem, dentro do seu Chrome** (`extensao/conteudo.js:203`,
@@ -154,7 +157,7 @@ mecânica, todas com destino; e nenhuma exceção aprovada por quem não pode. S
 1272 ocorrência(s) da varredura mecânica, todas com destino no relatório
 ```
 
-**O que você decide:** cada um dos 26 pontos ainda em aberto da seção 3 tem, em branco, a linha
+**O que você decide:** cada um dos 5 pontos ainda em aberto da seção 3 tem, em branco, a linha
 `Decisão de Sidarta: ____`.
 Aprovar a exceção significa escrever a linha correspondente em `docs/EXCECOES_TEXTO_INTEGRAL.md`;
 mandar corrigir significa pedir um brief. O executor não pode fazer nem um nem outro.
@@ -228,8 +231,9 @@ tocado por isso. Apagar esse arquivo é operação sua, se incomodar.
 ## 3. Pontos que cortam o texto — aguardando decisão
 
 45 pontos. Todos nasceram com o estado `AGUARDANDO DECISÃO DE SIDARTA`: o executor não aprova exceção.
-Em 2026-11-08 Sidarta aprovou 19 (brief 080: estado `EXCEÇÃO APROVADA`, com a linha no registro);
-26 aguardam.
+Em 2026-11-08 Sidarta aprovou 19 (brief 080: estado `EXCEÇÃO APROVADA`, com a linha no registro) e, em 2026-11-16,
+mais 6 (brief 100); outros foram corrigidos (estado `CORRIGIDO (brief NNN)`). Hoje: 25 aprovados, 15 corrigidos,
+5 aguardam.
 A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 
 ### 3.a. Notícia (coleta por RSS)
@@ -329,7 +333,7 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Justificativa existente: parcial — a docstring de `selecionar_por_consulta` explica que os evitados saem antes do corte "para não ocupar vaga", o que reconhece o corte; os números têm comentário em `limiares.yaml`.
 - Proposta do executor: o teto do menu é decisão de produto (quantos ganchos uma pessoa quer ver) e eu a aprovaria. O teto de 10 candidatos é diferente: ele decide, por cosseno, o que o modelo nunca vai julgar — e o brief 049 existe porque o cosseno erra. Proponho manter 5 no menu e revisar o 10 de candidatos com medição (quantos dos 10 passam o gate hoje). Custo: um brief de medição, sem risco.
 - Estado: EXCEÇÃO APROVADA
-- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro; e aprovar exceção (2026-11-16), alcance conforme o registro: os 40 assuntos por rodada da qualificação e do cartão (`qualificacao.teto_por_dia`, segunda linha do P-009 no registro, gravada pelo brief 100). O teto de 10 candidatos continua não aprovado
 - Onde mais aparece: `agente_nw/nucleo/relevancia/candidatos.py:83`; `agente_nw/nucleo/relevancia/cruzamento.py:272`, `:481`; `agente_nw/nucleo/database/queries/assuntos.py:179`, `:271`; `agente_nw/nucleo/consulta.py:221`; `agente_nw/cli.py:582`; `config/limiares.yaml:10,18,19,46`.
 
 #### P-010 — agente_nw/nucleo/relevancia/cruzamento.py:155 — `_aplicar_gate_objetivo`
@@ -372,8 +376,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `906d759`
 - Justificativa existente: nenhuma no JavaScript nem no YAML (a chave só tem o nome).
 - Proposta do executor: 200.000 caracteres é generoso para um perfil comum, então o risco prático é baixo — mas o corte é silencioso e é o único do projeto que acontece fora do programa. Proponho não mudar o número e, sim, fazer a extensão devolver `len(texto)` junto com o recorte, para o programa registrar quando cortou (uma linha de aviso em `chamadas_llm.jsonl`, no padrão do brief 077). Custo: um brief pequeno; nenhuma mudança de comportamento.
-- Estado: CORRIGIDO (brief 083)
-- Decisão de Sidarta: corrigir (brief 083, decisão 2.2): o teto de 200.000 não muda, mas o corte deixa de ser silencioso — a extensão devolve `tamanho_original` e `cortado`, e o programa (o corte dentro do Chrome ou o seu próprio, `extensao_backend.py:142`) grava uma linha `"corte_pagina": true` no `chamadas_llm.jsonl` e põe "página cortada em 200.000 de N caracteres" no resumo da leitura
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-16), alcance conforme o registro: o teto de 200.000 caracteres, enquanto o aviso do corte continuar visível (brief 100). Antes, corrigir (brief 083, decisão 2.2): o teto de 200.000 não muda, mas o corte deixa de ser silencioso — a extensão devolve `tamanho_original` e `cortado`, e o programa (o corte dentro do Chrome ou o seu próprio, `extensao_backend.py:142`) grava uma linha `"corte_pagina": true` no `chamadas_llm.jsonl` e põe "página cortada em 200.000 de N caracteres" no resumo da leitura
 - Onde mais aparece: `agente_nw/coleta/capturas/extensao_backend.py:131`, `:137`, `:142`; `extensao/background.js:148`; `config/limiares.yaml:59`; `agente_nw/nucleo/modelos/configuracao.py:244`.
 
 #### P-014 — agente_nw/coleta/capturas/navegador.py:125 — `_extrair_blocos`
@@ -428,7 +432,7 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Justificativa existente: sim, e é de produto, não de custo: o AGENTS §3 manda não gravar a imagem, só a descrição.
 - Proposta do executor: aprovar. É o desenho do produto, decidido por você, e a alternativa (guardar a imagem) é justamente o que o AGENTS proíbe. O que caberia pedir num brief futuro é descrição mais longa quando a imagem tem texto legível.
 - Estado: EXCEÇÃO APROVADA
-- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro. Decisão tomada em 2026-11-16 (registrada pelo brief 100, item 2.5): a descrição continua em 2 a 5 frases e, quando houver texto legível na imagem, ele é transcrito inteiro em campo separado; a implementação é brief do segundo conjunto
 
 #### P-019 — agente_nw/coleta/capturas/extrator.py:108 — `extrair`
 - Classe: P
@@ -539,8 +543,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `657edaa`
 - Justificativa existente: nenhuma.
 - Proposta do executor: o corte da mensagem em 100 caracteres é defensável (para saber que não deve repetir, o começo basta). O do comentário do usuário não: é texto que **você** escreveu para corrigir a redação, e é o único lugar do produto em que a sua palavra chega truncada ao modelo. Proponho corrigir o comentário (300 → inteiro, ou 1.200) e manter o resto. Custo: uma linha e um brief pequeno.
-- Estado: CORRIGIDO (brief 099)
-- Decisão de Sidarta: corrigir em duas partes. Brief 081: o comentário do usuário entra inteiro (a mensagem entregue ficou em 100 caracteres e as 5 consultas, por decisão 2.1 e 2.2 do brief 081). Brief 099 (decisão de 2026-11-16): a mensagem já entregue também entra inteira, sem o corte de 100 caracteres; o número de consultas (5, e 3 na redação) segue como está, para o brief 100
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-16), alcance conforme o registro: o número de consultas (5 lidas, 3 na redação), gravado pelo brief 100; o corte de 100 caracteres da mensagem não foi aprovado. Antes, corrigir em duas partes. Brief 081: o comentário do usuário entra inteiro (a mensagem entregue ficou em 100 caracteres e as 5 consultas, por decisão 2.1 e 2.2 do brief 081). Brief 099 (decisão de 2026-11-16): a mensagem já entregue também entra inteira, sem o corte de 100 caracteres; o número de consultas (5, e 3 na redação) segue como está, para o brief 100
 - Onde mais aparece: `agente_nw/nucleo/historico.py:58`, `:10`; `agente_nw/nucleo/redacao.py:157`, `:155`; `agente_nw/nucleo/consulta.py:263`; `agente_nw/nucleo/database/queries/consulta_contato.py:54`.
 
 #### P-029 — agente_nw/nucleo/redacao.py:164 — `_notas`
@@ -550,8 +554,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `2c31eac`
 - Justificativa existente: nenhuma.
 - Proposta do executor: mesmo argumento do P-028, e aqui é mais forte: a nota é o canal pelo qual você conserta o que o programa entendeu errado. Proponho que a nota entre inteira e que `cortar_por_tamanho` continue protegendo-a (ele já protege: a nota é o único bloco que ele nunca remove). Custo: uma linha.
-- Estado: CORRIGIDO (brief 081)
-- Decisão de Sidarta: corrigir (brief 081): a nota entra inteira (decisão 2.1 do brief 081); `cortar_por_tamanho` continua protegendo-a
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-16), alcance conforme o registro: as 5 notas (teto de itens), gravado pelo brief 100. Antes, corrigir (brief 081): a nota entra inteira (decisão 2.1 do brief 081); `cortar_por_tamanho` continua protegendo-a
 - Onde mais aparece: `agente_nw/nucleo/database/queries/nota_contato.py:49`.
 
 #### P-030 — agente_nw/nucleo/redacao.py:190 — `_moldes`
@@ -561,8 +565,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `0bdd9be`
 - Justificativa existente: o `moldes.maximo` está no YAML com comentário; o 300 do comentário não tem nenhuma.
 - Proposta do executor: manter os 2 moldes (mais do que isso empurra o modelo a copiar) e corrigir o 300, junto com P-028 e P-029 — os três são a mesma decisão: "o que o usuário escreve não é cortado".
-- Estado: CORRIGIDO (brief 081)
-- Decisão de Sidarta: corrigir (brief 081): o comentário do molde entra inteiro e `cortar_por_tamanho` o protege; os 2 moldes ficam (decisões 2.1, 2.2 e 2.4 do brief 081)
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-16), alcance conforme o registro: os 2 moldes (teto de itens), gravado pelo brief 100; o arranque a frio com 1 molde `entregue` (`consulta_contato.py:124`) não estava na decisão e fica em aberto. Antes, corrigir (brief 081): o comentário do molde entra inteiro e `cortar_por_tamanho` o protege; os 2 moldes ficam (decisões 2.1, 2.2 e 2.4 do brief 081)
 - Onde mais aparece: `agente_nw/nucleo/database/queries/consulta_contato.py:123`; `config/limiares.yaml:77`.
 
 #### P-031 — agente_nw/nucleo/redacao.py:71 — `_assunto_para_redacao`
@@ -605,8 +609,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `322341c`
 - Justificativa existente: nenhuma.
 - Proposta do executor: corrigir, pelo menos para o `evitar`. Cortar o que o usuário manda evitar é a falha mais difícil de defender desta auditoria: o programa promete não falar de X e pode falar de X porque X era o sexto item. O custo é baixo (o `evitar` não vai para prompt grande; é correspondência literal). Para `interessa` e `termos_busca` o teto é razoável, porque eles viram buscas e já há teto de buscas (P-005).
-- Estado: CORRIGIDO (brief 081)
-- Decisão de Sidarta: corrigir (brief 081): `evitar` sem teto; `interessa` (5), `sobre_o_usuario` (5) e `termos_busca` (6) não mudam (decisão 2.3 do brief 081)
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-16), alcance conforme o registro: só os 6 `termos_busca`, como custo de rede (brief 100); `interessa` e `sobre_o_usuario` em 5 seguem sem aprovação (lacuna [091-1]). Antes, corrigir (brief 081): `evitar` sem teto; `interessa` (5), `sobre_o_usuario` (5) e `termos_busca` (6) não mudam (decisão 2.3 do brief 081)
 - Onde mais aparece: `agente_nw/nucleo/modelos/pedido.py:107`.
 
 #### P-035 — agente_nw/nucleo/pedido.py:39 — `extrair`
@@ -658,8 +662,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `05eaf18`
 - Justificativa existente: nenhuma.
 - Proposta do executor: efeito pequeno e o `interessa` já vem cortado em 5 pelo contrato (P-034), então este teto é redundante hoje. Proponho tratar como consequência do P-034: resolvido lá, cai aqui.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-16), alcance conforme o registro: os 5 interesses do ponto de apoio, enquanto o contrato do pedido mantiver `interessa` em 5 (brief 100)
 
 ### 3.f. Janela do modelo — ninguém mede
 
@@ -1196,7 +1200,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | tests/test_seguranca_prompt.py | 354/354 | CERTIFICADO | `cercar_dado_externo` e os 9 modulos de prompt: texto entra inteiro entre marcadores, marcador forjado neutralizado, conteudo preservado (`INJECAO in cercado`); entradas de 1 linha; `qualificar` e `rotular` com o resumo de cada item, também cercado (brief 090). | — |
 | tests/test_selecao_provedor.py | 216/216 | CERTIFICADO | `selecionar_cliente_llm` (ordem Anthropic > Gemini > OpenAI); le so `container.py`/`app.py` para contar construcoes; sem texto de conteudo. | — |
 | tests/test_sem_censura_de_tema.py | 75/75 | CERTIFICADO | Tag/fato politico ou de saude sao gravados; prompt de extracao sem "sensive"; texto de fila "texto qualquer" (curto), resposta simulada. | — |
-| tests/test_sem_corte_de_texto.py | 1153/1153 | CERTIFICADO | brief 093, guarda estática: percorre `agente_nw/` por AST e classifica cada fatia, `LIMIT` e teto em exceção aprovada, corte não analítico ou violação pendente; os testes do teste montam código e registro sintéticos em `tmp_path`. Não lê nem envia texto a modelo. | — |
+| tests/test_sem_corte_de_texto.py | 1144/1144 | CERTIFICADO | brief 093, guarda estática: percorre `agente_nw/` por AST e classifica cada fatia, `LIMIT` e teto em exceção aprovada, corte não analítico ou violação pendente; os testes do teste montam código e registro sintéticos em `tmp_path`. Não lê nem envia texto a modelo. | — |
 | tests/test_texto_extremo_ponta_a_ponta.py | 299/299 | CERTIFICADO | brief 094, prova com textos extremos: as 15 tarefas do roteamento com textos sintéticos de 34.195 e 5.000.000 caracteres e marcador no último; o cliente é o `ClienteOllama` real com o servidor falso. Não corta texto: as fatias montam o próprio texto sintético. | — |
 | tests/test_sem_objetivo_avisa.py | 38/38 | CERTIFICADO | Todos abaixo do piso -> aviso; reaproveita fixtures de `test_cruzamento_por_consulta`; fato de 1 linha, assunto so com titulo. | — |
 | tests/test_sem_redes_sociais.py | 74/74 | CERTIFICADO | Botao "sem redes sociais" no console Flask; sem texto de conteudo. | — |
@@ -2087,7 +2091,7 @@ tests/test_pequenos_ajustes_texto.py:299 tests/test_pequenos_ajustes_texto.py:30
 tests/test_pequenos_ajustes_texto.py:307
 ```
 
-**Brief 093 (sem ponto novo)** — 154 linha(s) citada(s), todas descartadas. O brief 093 criou a guarda permanente `tests/test_sem_corte_de_texto.py` e não alterou código de produção. As ocorrências são do próprio teste: os padrões que ele procura (fatia, `LIMIT`, `max_chars`, `truncate`, `cortar`, `sample`, `limite`, `maximo`), escritos como expressão regular, como código sintético dos testes do teste e como chave das listas de exceção aprovada e de violação pendente (cópia normalizada de linhas de `agente_nw/` que já têm destino neste relatório). Nenhuma corta texto do usuário nem de fonte externa.
+**Brief 093 (sem ponto novo)** — 154 linha(s) citada(s), todas descartadas. O brief 093 criou a guarda permanente `tests/test_sem_corte_de_texto.py` e não alterou código de produção. As ocorrências são do próprio teste: os padrões que ele procura (fatia, `LIMIT`, `max_chars`, `truncate`, `cortar`, `sample`, `limite`, `maximo`), escritos como expressão regular, como código sintético dos testes do teste e como chave das listas de exceção aprovada e de violação pendente (cópia normalizada de linhas de `agente_nw/` que já têm destino neste relatório). Nenhuma corta texto do usuário nem de fonte externa. As linhas foram renumeradas pelo brief 100, que moveu chaves da lista de violação pendente para a de exceção aprovada no mesmo arquivo (mesmo destino, mesmo motivo).
 
 ```
 tests/test_sem_corte_de_texto.py:4 tests/test_sem_corte_de_texto.py:5 tests/test_sem_corte_de_texto.py:6 tests/test_sem_corte_de_texto.py:9
@@ -2096,39 +2100,39 @@ tests/test_sem_corte_de_texto.py:59 tests/test_sem_corte_de_texto.py:66 tests/te
 tests/test_sem_corte_de_texto.py:148 tests/test_sem_corte_de_texto.py:153 tests/test_sem_corte_de_texto.py:174 tests/test_sem_corte_de_texto.py:205
 tests/test_sem_corte_de_texto.py:206 tests/test_sem_corte_de_texto.py:237 tests/test_sem_corte_de_texto.py:263 tests/test_sem_corte_de_texto.py:280
 tests/test_sem_corte_de_texto.py:371 tests/test_sem_corte_de_texto.py:372 tests/test_sem_corte_de_texto.py:503 tests/test_sem_corte_de_texto.py:513
-tests/test_sem_corte_de_texto.py:520 tests/test_sem_corte_de_texto.py:525 tests/test_sem_corte_de_texto.py:526 tests/test_sem_corte_de_texto.py:536
-tests/test_sem_corte_de_texto.py:537 tests/test_sem_corte_de_texto.py:540 tests/test_sem_corte_de_texto.py:544 tests/test_sem_corte_de_texto.py:545
-tests/test_sem_corte_de_texto.py:554 tests/test_sem_corte_de_texto.py:559 tests/test_sem_corte_de_texto.py:560 tests/test_sem_corte_de_texto.py:561
-tests/test_sem_corte_de_texto.py:564 tests/test_sem_corte_de_texto.py:567 tests/test_sem_corte_de_texto.py:568 tests/test_sem_corte_de_texto.py:574
-tests/test_sem_corte_de_texto.py:579 tests/test_sem_corte_de_texto.py:582 tests/test_sem_corte_de_texto.py:583 tests/test_sem_corte_de_texto.py:586
-tests/test_sem_corte_de_texto.py:604 tests/test_sem_corte_de_texto.py:607 tests/test_sem_corte_de_texto.py:608 tests/test_sem_corte_de_texto.py:616
-tests/test_sem_corte_de_texto.py:618 tests/test_sem_corte_de_texto.py:623 tests/test_sem_corte_de_texto.py:629 tests/test_sem_corte_de_texto.py:633
-tests/test_sem_corte_de_texto.py:636 tests/test_sem_corte_de_texto.py:637 tests/test_sem_corte_de_texto.py:646 tests/test_sem_corte_de_texto.py:654
-tests/test_sem_corte_de_texto.py:659 tests/test_sem_corte_de_texto.py:663 tests/test_sem_corte_de_texto.py:667 tests/test_sem_corte_de_texto.py:668
-tests/test_sem_corte_de_texto.py:670 tests/test_sem_corte_de_texto.py:671 tests/test_sem_corte_de_texto.py:672 tests/test_sem_corte_de_texto.py:674
-tests/test_sem_corte_de_texto.py:677 tests/test_sem_corte_de_texto.py:681 tests/test_sem_corte_de_texto.py:685 tests/test_sem_corte_de_texto.py:690
-tests/test_sem_corte_de_texto.py:702 tests/test_sem_corte_de_texto.py:717 tests/test_sem_corte_de_texto.py:720 tests/test_sem_corte_de_texto.py:721
-tests/test_sem_corte_de_texto.py:723 tests/test_sem_corte_de_texto.py:736 tests/test_sem_corte_de_texto.py:739 tests/test_sem_corte_de_texto.py:742
-tests/test_sem_corte_de_texto.py:743 tests/test_sem_corte_de_texto.py:754 tests/test_sem_corte_de_texto.py:764
-tests/test_sem_corte_de_texto.py:767 tests/test_sem_corte_de_texto.py:768 tests/test_sem_corte_de_texto.py:771 tests/test_sem_corte_de_texto.py:777
-tests/test_sem_corte_de_texto.py:778 tests/test_sem_corte_de_texto.py:779 tests/test_sem_corte_de_texto.py:801 tests/test_sem_corte_de_texto.py:807
-tests/test_sem_corte_de_texto.py:808 tests/test_sem_corte_de_texto.py:809 tests/test_sem_corte_de_texto.py:818 tests/test_sem_corte_de_texto.py:824
-tests/test_sem_corte_de_texto.py:831 tests/test_sem_corte_de_texto.py:832 tests/test_sem_corte_de_texto.py:835 tests/test_sem_corte_de_texto.py:836
-tests/test_sem_corte_de_texto.py:853 tests/test_sem_corte_de_texto.py:858 tests/test_sem_corte_de_texto.py:862 tests/test_sem_corte_de_texto.py:902
-tests/test_sem_corte_de_texto.py:903 tests/test_sem_corte_de_texto.py:915 tests/test_sem_corte_de_texto.py:916 tests/test_sem_corte_de_texto.py:946
-tests/test_sem_corte_de_texto.py:947 tests/test_sem_corte_de_texto.py:948 tests/test_sem_corte_de_texto.py:949 tests/test_sem_corte_de_texto.py:950
-tests/test_sem_corte_de_texto.py:951 tests/test_sem_corte_de_texto.py:952 tests/test_sem_corte_de_texto.py:953 tests/test_sem_corte_de_texto.py:955
-tests/test_sem_corte_de_texto.py:956 tests/test_sem_corte_de_texto.py:958 tests/test_sem_corte_de_texto.py:977 tests/test_sem_corte_de_texto.py:981
-tests/test_sem_corte_de_texto.py:987 tests/test_sem_corte_de_texto.py:988 tests/test_sem_corte_de_texto.py:990 tests/test_sem_corte_de_texto.py:994
-tests/test_sem_corte_de_texto.py:998 tests/test_sem_corte_de_texto.py:1001 tests/test_sem_corte_de_texto.py:1005 tests/test_sem_corte_de_texto.py:1006
-tests/test_sem_corte_de_texto.py:1010 tests/test_sem_corte_de_texto.py:1011 tests/test_sem_corte_de_texto.py:1017 tests/test_sem_corte_de_texto.py:1018
-tests/test_sem_corte_de_texto.py:1024 tests/test_sem_corte_de_texto.py:1025 tests/test_sem_corte_de_texto.py:1033 tests/test_sem_corte_de_texto.py:1040
-tests/test_sem_corte_de_texto.py:1041 tests/test_sem_corte_de_texto.py:1046 tests/test_sem_corte_de_texto.py:1048 tests/test_sem_corte_de_texto.py:1055
-tests/test_sem_corte_de_texto.py:1056 tests/test_sem_corte_de_texto.py:1061 tests/test_sem_corte_de_texto.py:1062 tests/test_sem_corte_de_texto.py:1069
-tests/test_sem_corte_de_texto.py:1070 tests/test_sem_corte_de_texto.py:1083 tests/test_sem_corte_de_texto.py:1084 tests/test_sem_corte_de_texto.py:1092
-tests/test_sem_corte_de_texto.py:1093 tests/test_sem_corte_de_texto.py:1098 tests/test_sem_corte_de_texto.py:1105 tests/test_sem_corte_de_texto.py:1112
-tests/test_sem_corte_de_texto.py:1116 tests/test_sem_corte_de_texto.py:1122 tests/test_sem_corte_de_texto.py:1137 tests/test_sem_corte_de_texto.py:1138
-tests/test_sem_corte_de_texto.py:1142 tests/test_sem_corte_de_texto.py:1151
+tests/test_sem_corte_de_texto.py:516 tests/test_sem_corte_de_texto.py:519 tests/test_sem_corte_de_texto.py:520 tests/test_sem_corte_de_texto.py:522
+tests/test_sem_corte_de_texto.py:527 tests/test_sem_corte_de_texto.py:532 tests/test_sem_corte_de_texto.py:533 tests/test_sem_corte_de_texto.py:543
+tests/test_sem_corte_de_texto.py:544 tests/test_sem_corte_de_texto.py:547 tests/test_sem_corte_de_texto.py:551 tests/test_sem_corte_de_texto.py:552
+tests/test_sem_corte_de_texto.py:561 tests/test_sem_corte_de_texto.py:566 tests/test_sem_corte_de_texto.py:567 tests/test_sem_corte_de_texto.py:568
+tests/test_sem_corte_de_texto.py:571 tests/test_sem_corte_de_texto.py:574 tests/test_sem_corte_de_texto.py:575 tests/test_sem_corte_de_texto.py:581
+tests/test_sem_corte_de_texto.py:586 tests/test_sem_corte_de_texto.py:589 tests/test_sem_corte_de_texto.py:590 tests/test_sem_corte_de_texto.py:593
+tests/test_sem_corte_de_texto.py:611 tests/test_sem_corte_de_texto.py:614 tests/test_sem_corte_de_texto.py:615 tests/test_sem_corte_de_texto.py:627
+tests/test_sem_corte_de_texto.py:630 tests/test_sem_corte_de_texto.py:633 tests/test_sem_corte_de_texto.py:638 tests/test_sem_corte_de_texto.py:640
+tests/test_sem_corte_de_texto.py:645 tests/test_sem_corte_de_texto.py:651 tests/test_sem_corte_de_texto.py:655 tests/test_sem_corte_de_texto.py:658
+tests/test_sem_corte_de_texto.py:659 tests/test_sem_corte_de_texto.py:668 tests/test_sem_corte_de_texto.py:676 tests/test_sem_corte_de_texto.py:682
+tests/test_sem_corte_de_texto.py:686 tests/test_sem_corte_de_texto.py:689 tests/test_sem_corte_de_texto.py:695 tests/test_sem_corte_de_texto.py:696
+tests/test_sem_corte_de_texto.py:697 tests/test_sem_corte_de_texto.py:702 tests/test_sem_corte_de_texto.py:706 tests/test_sem_corte_de_texto.py:710
+tests/test_sem_corte_de_texto.py:711 tests/test_sem_corte_de_texto.py:713 tests/test_sem_corte_de_texto.py:714 tests/test_sem_corte_de_texto.py:715
+tests/test_sem_corte_de_texto.py:717 tests/test_sem_corte_de_texto.py:720 tests/test_sem_corte_de_texto.py:724 tests/test_sem_corte_de_texto.py:730
+tests/test_sem_corte_de_texto.py:736 tests/test_sem_corte_de_texto.py:737 tests/test_sem_corte_de_texto.py:738 tests/test_sem_corte_de_texto.py:753
+tests/test_sem_corte_de_texto.py:755 tests/test_sem_corte_de_texto.py:761 tests/test_sem_corte_de_texto.py:773 tests/test_sem_corte_de_texto.py:780
+tests/test_sem_corte_de_texto.py:784 tests/test_sem_corte_de_texto.py:799 tests/test_sem_corte_de_texto.py:802 tests/test_sem_corte_de_texto.py:821
+tests/test_sem_corte_de_texto.py:823 tests/test_sem_corte_de_texto.py:825 tests/test_sem_corte_de_texto.py:826 tests/test_sem_corte_de_texto.py:829
+tests/test_sem_corte_de_texto.py:830 tests/test_sem_corte_de_texto.py:849 tests/test_sem_corte_de_texto.py:853 tests/test_sem_corte_de_texto.py:893
+tests/test_sem_corte_de_texto.py:894 tests/test_sem_corte_de_texto.py:906 tests/test_sem_corte_de_texto.py:907 tests/test_sem_corte_de_texto.py:937
+tests/test_sem_corte_de_texto.py:938 tests/test_sem_corte_de_texto.py:939 tests/test_sem_corte_de_texto.py:940 tests/test_sem_corte_de_texto.py:941
+tests/test_sem_corte_de_texto.py:942 tests/test_sem_corte_de_texto.py:943 tests/test_sem_corte_de_texto.py:944 tests/test_sem_corte_de_texto.py:946
+tests/test_sem_corte_de_texto.py:947 tests/test_sem_corte_de_texto.py:949 tests/test_sem_corte_de_texto.py:968 tests/test_sem_corte_de_texto.py:972
+tests/test_sem_corte_de_texto.py:978 tests/test_sem_corte_de_texto.py:979 tests/test_sem_corte_de_texto.py:981 tests/test_sem_corte_de_texto.py:985
+tests/test_sem_corte_de_texto.py:989 tests/test_sem_corte_de_texto.py:992 tests/test_sem_corte_de_texto.py:996 tests/test_sem_corte_de_texto.py:997
+tests/test_sem_corte_de_texto.py:1001 tests/test_sem_corte_de_texto.py:1002 tests/test_sem_corte_de_texto.py:1008 tests/test_sem_corte_de_texto.py:1009
+tests/test_sem_corte_de_texto.py:1015 tests/test_sem_corte_de_texto.py:1016 tests/test_sem_corte_de_texto.py:1024 tests/test_sem_corte_de_texto.py:1031
+tests/test_sem_corte_de_texto.py:1032 tests/test_sem_corte_de_texto.py:1037 tests/test_sem_corte_de_texto.py:1039 tests/test_sem_corte_de_texto.py:1046
+tests/test_sem_corte_de_texto.py:1047 tests/test_sem_corte_de_texto.py:1052 tests/test_sem_corte_de_texto.py:1053 tests/test_sem_corte_de_texto.py:1060
+tests/test_sem_corte_de_texto.py:1061 tests/test_sem_corte_de_texto.py:1074 tests/test_sem_corte_de_texto.py:1075 tests/test_sem_corte_de_texto.py:1083
+tests/test_sem_corte_de_texto.py:1084 tests/test_sem_corte_de_texto.py:1089 tests/test_sem_corte_de_texto.py:1096 tests/test_sem_corte_de_texto.py:1103
+tests/test_sem_corte_de_texto.py:1107 tests/test_sem_corte_de_texto.py:1113 tests/test_sem_corte_de_texto.py:1128 tests/test_sem_corte_de_texto.py:1129
+tests/test_sem_corte_de_texto.py:1133 tests/test_sem_corte_de_texto.py:1142
 ```
 
 **Brief 094 (sem ponto novo)** — 5 linha(s) citada(s), todas descartadas. O brief 094 criou a prova permanente `tests/test_texto_extremo_ponta_a_ponta.py` e não alterou código de produção. As ocorrências são do próprio teste: a docstring que cita os cortes de seleção (l. 14-15), o nome do esquema `RespostaCartao` (l. 61) e a docstring e a chamada de `cartoes.resumir_item` (l. 169-170); a única fatia do arquivo monta o texto sintético e não corta texto de terceiros.

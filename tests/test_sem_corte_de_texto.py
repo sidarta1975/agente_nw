@@ -513,8 +513,15 @@ EXCECOES_APROVADAS: dict[Chave, str] = _achatar(
                 'ador=RAIZ / "dados" / "navegador", limite_tokens=int(num_ctx * FRACAO_'
                 "DO_CONTEXTO_NO_PROMPT), rodar_coleta=True, ler_redes_sociais=True, )"
             ): "P-033",
+            "return qualificar_cmd(args.limite)": "P-009",
         },
         "agente_nw/coleta/capturas/extensao_backend.py": {
+            "maximo = self._limiares.maximo_caracteres_pagina": "P-013",
+            "return url, texto[:maximo]": "P-013",
+            (
+                '{"acao": "estado", "aba_id": self._aba_id, "maximo": self._limiares.ma'
+                "ximo_caracteres_pagina}"
+            ): "P-013",
             (
                 "def __init__( self, ponte: Ponte, limiares: ExtensaoLimiares, dorme: C"
                 "allable[[float], None] = time.sleep, maximo_entradas: int = 2000, cami"
@@ -609,6 +616,21 @@ EXCECOES_APROVADAS: dict[Chave, str] = _achatar(
                 "aximo_imagens_por_rede, largura_minima_imagem=limiares.coleta.largura_"
                 "minima_imagem, avisar=avisar, )"
             ): "P-016 P-017",
+            (
+                "qualificador.qualificar_pendentes( cliente_llm, conexao, limiares.qual"
+                "ificacao.teto_por_dia, vetores_extras=[centroide_consulta] )"
+            ): "P-009",
+        },
+        "agente_nw/nucleo/database/queries/assuntos.py": {
+            (
+                'f"SELECT {_COLUNAS} FROM assunto " "WHERE substancial IS NOT NULL AND '
+                'conversavel IS NOT NULL AND resumo_cartao IS NULL " "ORDER BY id LIMIT'
+                ' ?",'
+            ): "P-009",
+            "return [assunto for _, assunto in candidatos[:limite]]": "P-009",
+        },
+        "agente_nw/nucleo/database/queries/consulta_contato.py": {
+            "return usados[:maximo]": "P-030",
         },
         "agente_nw/nucleo/database/queries/conversa.py": {
             (
@@ -648,11 +670,32 @@ EXCECOES_APROVADAS: dict[Chave, str] = _achatar(
                 "sociais=not correcao, )"
             ): "P-033",
         },
+        "agente_nw/nucleo/historico.py": {
+            (
+                "def historico_recente_para_prompt( conexao: sqlite3.Connection, perfil"
+                "_id: int, limite: int = LIMITE_PADRAO ) -> str:"
+            ): "P-028",
+        },
         "agente_nw/nucleo/localizacao.py": {
             (
                 "achadas = queries_listas.buscar_parecidos( conexao, rede, nome, limiar"
                 "es.similaridade_minima, limiares.maximo_parecidas )"
             ): "P-021",
+        },
+        "agente_nw/nucleo/modelos/configuracao.py": {
+            "maximo_caracteres_pagina: int = Field(default=200000, ge=1000)": "P-013",
+        },
+        "agente_nw/nucleo/modelos/pedido.py": {
+            "return unicos[:_MAXIMO_TERMOS_BUSCA]": "P-034",
+        },
+        "agente_nw/nucleo/orquestracao.py": {
+            (
+                "redacao = redacao_mod.redigir( cliente_llm, conexao, extraido, consult"
+                "a, perfil, pedido_mod.garantir_usuario(conexao, agora_redacao), agora_"
+                "redacao, frase=texto, limite_tokens=limite_tokens, meses_fato_antigo=l"
+                "imiares.redacao.meses_fato_antigo, trocas_whatsapp_no_prompt=limiares."
+                "whatsapp.trocas_no_prompt, maximo_moldes=limiares.moldes.maximo, )"
+            ): "P-023 P-030",
         },
         "agente_nw/nucleo/prompts/redigir_ganchos.py": {
             (
@@ -680,9 +723,37 @@ EXCECOES_APROVADAS: dict[Chave, str] = _achatar(
             (
                 "molde_origem_id = prompt_mod.cortar_por_tamanho(entrada, limite_tokens).molde_origem_id"
             ): "P-033",
+            (
+                "def montar_entrada( conexao: sqlite3.Connection, cliente_llm: ClienteR"
+                "edacao, pedido: PedidoExtraido, frase: str, resultado_consulta: Result"
+                "adoConsulta, contato: Perfil, usuario: Perfil, assuntos: list[ItemMenu"
+                "], meses_fato_antigo: int = 12, trocas_whatsapp_no_prompt: int = 10, m"
+                "aximo_moldes: int = 2, ) -> EntradaRedacao:"
+            ): "P-023 P-030",
+            (
+                "def redigir( cliente_llm: ClienteRedacao, conexao: sqlite3.Connection,"
+                " pedido: PedidoExtraido, resultado_consulta: ResultadoConsulta, perfil"
+                ': Perfil, usuario: Perfil, agora: str, frase: str = "", limite_tokens:'
+                " int = prompt_mod.LIMITE_TOKENS_PADRAO, meses_fato_antigo: int = 12, t"
+                "rocas_whatsapp_no_prompt: int = 10, maximo_moldes: int = 2, ) -> Redac"
+                "ao:"
+            ): "P-023 P-030",
+            (
+                "for c in consulta_contato_q.listar_por_perfil(conexao, perfil_id, _CON"
+                "SULTAS_NO_HISTORICO + 1)"
+            ): "P-028",
+            (
+                "return [ c for c in consulta_contato_q.listar_por_perfil(conexao, perf"
+                "il_id, _CONSULTAS_NO_HISTORICO + 1) if c.id != consulta_id ][:_CONSULT"
+                "AS_NO_HISTORICO]"
+            ): "P-028",
+            ("for nota in nota_contato_q.listar_por_perfil(conexao, perfil_id, _NOTAS_NO_PROMPT)"): "P-029",
         },
         "agente_nw/nucleo/relevancia/cruzamento.py": {
             "selecionados_para_menu = demais[: limiares.conector.itens_no_menu]": "P-009",
+            (
+                "t for t in [contexto.assunto, *contexto.interessa[:_MAXIMO_INTERESSA_NO_APOIO]] if t.strip()"
+            ): "P-039",
         },
         "agente_nw/perfil/extrator.py": {
             (
@@ -702,45 +773,15 @@ EXCECOES_APROVADAS: dict[Chave, str] = _achatar(
 # falha até o trecho ser corrigido ou reclassificado.
 #   [080-5] P-009  os 10 candidatos (`conector.candidatos_por_contato`), escolhidos por cosseno
 #   [089-1] P-025  os 20 fatos mais recentes do centróide do contato
-#   [091-1] P-034 e P-039  `interessa` com 5 itens no contrato e no ponto de apoio
+#   [091-1] P-034  `interessa` (e `sobre_o_usuario`) com 5 itens no contrato do pedido
 #   [091-2] P-026, P-027 e P-031  10 de 40 fatos na redação, 12 de 30 nos termos, 3 itens por assunto
 #   [092-3] P-032 e P-035  ganchos além do teto, contatos do prompt do pedido além dos parecidos
 #   [092-5] P-021  os 200 fatos mais recentes na deduplicação da localização
-#   [093-1] P-013  a página da rede social cortada em 200.000 caracteres (agora com aviso)
-#   [093-2] P-009  `qualificacao.teto_por_dia` (40) assuntos por rodada na qualificação e no cartão
-#   [093-3] P-028  o histórico: 5 consultas lidas, 3 na redação, mensagem anterior em 100 caracteres
-#   [093-4] P-029 e P-030  5 notas e 2 moldes na redação
-#   [093-5] P-034  `termos_busca` com 6 itens no contrato do pedido
+#   [100-1] P-030  o arranque a frio com no máximo 1 molde `entregue`, fora da decisão de 2 moldes
 VIOLACOES_PENDENTES: dict[Chave, tuple[str, str]] = _achatar(
     {
-        "agente_nw/cli.py": {
-            "return qualificar_cmd(args.limite)": ("P-009", "[093-2]"),
-        },
-        "agente_nw/coleta/capturas/extensao_backend.py": {
-            "maximo = self._limiares.maximo_caracteres_pagina": ("P-013", "[093-1]"),
-            "return url, texto[:maximo]": ("P-013", "[093-1]"),
-            (
-                '{"acao": "estado", "aba_id": self._aba_id, "maximo": self._limiares.ma'
-                "ximo_caracteres_pagina}"
-            ): ("P-013", "[093-1]"),
-        },
-        "agente_nw/nucleo/consulta.py": {
-            (
-                "qualificador.qualificar_pendentes( cliente_llm, conexao, limiares.qual"
-                "ificacao.teto_por_dia, vetores_extras=[centroide_consulta] )"
-            ): ("P-009", "[093-2]"),
-        },
-        "agente_nw/nucleo/database/queries/assuntos.py": {
-            (
-                'f"SELECT {_COLUNAS} FROM assunto " "WHERE substancial IS NOT NULL AND '
-                'conversavel IS NOT NULL AND resumo_cartao IS NULL " "ORDER BY id LIMIT'
-                ' ?",'
-            ): ("P-009", "[093-2]"),
-            "return [assunto for _, assunto in candidatos[:limite]]": ("P-009", "[093-2]"),
-        },
         "agente_nw/nucleo/database/queries/consulta_contato.py": {
-            "return candidatos[:1]": ("P-030", "[093-4]"),
-            "return usados[:maximo]": ("P-030", "[093-4]"),
+            "return candidatos[:1]": ("P-030", "[100-1]"),
         },
         "agente_nw/nucleo/database/queries/perfis.py": {
             ("fatos_recentes = fatos.listar_recentes(conexao, perfil_id, _MAXIMO_FATOS_NO_CENTROIDE)"): (
@@ -748,36 +789,17 @@ VIOLACOES_PENDENTES: dict[Chave, tuple[str, str]] = _achatar(
                 "[089-1]",
             ),
         },
-        "agente_nw/nucleo/historico.py": {
-            (
-                "def historico_recente_para_prompt( conexao: sqlite3.Connection, perfil"
-                "_id: int, limite: int = LIMITE_PADRAO ) -> str:"
-            ): ("P-028", "[093-3]"),
-        },
         "agente_nw/nucleo/localizacao.py": {
             ("recentes = fatos.listar_recentes(conexao, perfil_id, _FATOS_NA_DEDUPLICACAO)"): (
                 "P-021",
                 "[092-5]",
             ),
         },
-        "agente_nw/nucleo/modelos/configuracao.py": {
-            "maximo_caracteres_pagina: int = Field(default=200000, ge=1000)": ("P-013", "[093-1]"),
-        },
         "agente_nw/nucleo/modelos/pedido.py": {
             "return _sem_duplicatas(valor)[:_MAXIMO_INTERESSA]": ("P-034", "[091-1]"),
-            "return unicos[:_MAXIMO_TERMOS_BUSCA]": ("P-034", "[093-5]"),
         },
         "agente_nw/nucleo/modelos/redacao.py": {
             "return [*base, *aceitos[:MAXIMO_GANCHOS]], motivos": ("P-032", "[092-3]"),
-        },
-        "agente_nw/nucleo/orquestracao.py": {
-            (
-                "redacao = redacao_mod.redigir( cliente_llm, conexao, extraido, consult"
-                "a, perfil, pedido_mod.garantir_usuario(conexao, agora_redacao), agora_"
-                "redacao, frase=texto, limite_tokens=limite_tokens, meses_fato_antigo=l"
-                "imiares.redacao.meses_fato_antigo, trocas_whatsapp_no_prompt=limiares."
-                "whatsapp.trocas_no_prompt, maximo_moldes=limiares.moldes.maximo, )"
-            ): ("P-030", "[093-4]"),
         },
         "agente_nw/nucleo/pedido.py": {
             ("for contato in perfis.listar_contatos_recentes(conexao, _MAXIMO_CONTATOS_NO_PROMPT)"): (
@@ -795,39 +817,11 @@ VIOLACOES_PENDENTES: dict[Chave, tuple[str, str]] = _achatar(
                 "[091-2]",
             ),
             (
-                "def montar_entrada( conexao: sqlite3.Connection, cliente_llm: ClienteR"
-                "edacao, pedido: PedidoExtraido, frase: str, resultado_consulta: Result"
-                "adoConsulta, contato: Perfil, usuario: Perfil, assuntos: list[ItemMenu"
-                "], meses_fato_antigo: int = 12, trocas_whatsapp_no_prompt: int = 10, m"
-                "aximo_moldes: int = 2, ) -> EntradaRedacao:"
-            ): ("P-030", "[093-4]"),
-            (
-                "def redigir( cliente_llm: ClienteRedacao, conexao: sqlite3.Connection,"
-                " pedido: PedidoExtraido, resultado_consulta: ResultadoConsulta, perfil"
-                ': Perfil, usuario: Perfil, agora: str, frase: str = "", limite_tokens:'
-                " int = prompt_mod.LIMITE_TOKENS_PADRAO, meses_fato_antigo: int = 12, t"
-                "rocas_whatsapp_no_prompt: int = 10, maximo_moldes: int = 2, ) -> Redac"
-                "ao:"
-            ): ("P-030", "[093-4]"),
-            (
-                "for c in consulta_contato_q.listar_por_perfil(conexao, perfil_id, _CON"
-                "SULTAS_NO_HISTORICO + 1)"
-            ): ("P-028", "[093-3]"),
-            (
                 "for com_dominio in itens_q.listar_por_assunto(conexao, item.assunto_id"
                 ", com_corpo=True)[ :_MANCHETES_POR_ASSUNTO ]:"
             ): ("P-031", "[091-2]"),
-            ("for nota in nota_contato_q.listar_por_perfil(conexao, perfil_id, _NOTAS_NO_PROMPT)"): (
-                "P-029",
-                "[093-4]",
-            ),
             "garantidos = candidatos[:_FATOS_RECENTES_GARANTIDOS]": ("P-026", "[091-2]"),
             "resto = candidatos[_FATOS_RECENTES_GARANTIDOS:]": ("P-026", "[091-2]"),
-            (
-                "return [ c for c in consulta_contato_q.listar_por_perfil(conexao, perf"
-                "il_id, _CONSULTAS_NO_HISTORICO + 1) if c.id != consulta_id ][:_CONSULT"
-                "AS_NO_HISTORICO]"
-            ): ("P-028", "[093-3]"),
             "return [*garantidos, *(resto[i] for i in sorted(ordem[:vagas]))]": ("P-026", "[091-2]"),
             "return candidatos[:_FATOS_NO_PROMPT]": ("P-026", "[091-2]"),
         },
@@ -849,9 +843,6 @@ VIOLACOES_PENDENTES: dict[Chave, tuple[str, str]] = _achatar(
                 ".conversavel_minimo, limiares.conector.candidatos_por_contato, modelo_"
                 "embedding, )"
             ): ("P-009", "[080-5]"),
-            (
-                "t for t in [contexto.assunto, *contexto.interessa[:_MAXIMO_INTERESSA_NO_APOIO]] if t.strip()"
-            ): ("P-039", "[091-1]"),
         },
         "agente_nw/nucleo/termos_contato.py": {
             "for f in fatos.listar_recentes(conexao, perfil_id, _FATOS_LIDOS)": ("P-027", "[091-2]"),
