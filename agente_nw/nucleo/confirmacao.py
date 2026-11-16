@@ -191,6 +191,6 @@ def conduzir(
     if escolhida is None:
         saida("Sem rede social nesta consulta.")
         return None
-    localizacao_mod.confirmar(conexao, perfil_id, escolhida, agora, substituir=substituir)
+    localizacao_mod.confirmar(conexao, perfil_id, escolhida, agora, substituir=substituir, avisar=saida)
     saida(f"Gravado no contato: {escolhida.rede} {escolhida.link}")
     return escolhida

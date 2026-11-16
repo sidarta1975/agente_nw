@@ -36,6 +36,9 @@
   <p>Escreva em texto livre: o que você sabe ou gosta ("sou advogado tributarista", "gosto de vela"),
   o que não lhe interessa ("não me interessa futebol"), seu nome ("me chamo Sidarta") ou para remover um
   tema inferido ("não tenho mais interesse em X").</p>
+  {% for frase in frases_ignoradas %}
+    <p class="aviso">Não entendi esta frase e não a usei: “{{ frase }}”. Escreva de outro jeito (por exemplo “sou …”, “gosto de …” ou “não me interessa …”).</p>
+  {% endfor %}
   <form class="bloco" method="post" action="{{ url_for('eu_contar') }}">
     <textarea name="texto" placeholder="Conte algo sobre você" required></textarea>
     <p><button type="submit">Contar</button></p>

@@ -248,10 +248,10 @@ def parse_links(rede: str, links: list[tuple[str, str]]) -> list[EntradaLista]:
         linhas = _linhas_uteis(texto)
         if not linhas:
             continue
-        nome, cabecalho = linhas[0], linhas[1:4]
+        nome, cabecalho = linhas[0], linhas[1:]
         if rede == "instagram" and len(linhas) > 1:
             # O Instagram mostra o @usuário primeiro e o nome de exibição em seguida.
-            nome, cabecalho = linhas[1], [f"@{linhas[0].lstrip('@')}", *linhas[2:4]]
+            nome, cabecalho = linhas[1], [f"@{linhas[0].lstrip('@')}", *linhas[2:]]
         entradas.append(EntradaLista(rede=rede, nome=nome, cabecalho=" · ".join(cabecalho), link=chave))
     return entradas
 
@@ -377,6 +377,7 @@ class ResultadoAtualizacao:
     usou_cache: bool
     total: int
     motivo: str | None = None
+    truncada: bool = False  # a leitura parou no teto de entradas (brief 092, P-015)
 
 
 def resolver_usuario(

@@ -38,7 +38,7 @@ from agente_nw.nucleo.database.queries import listas as queries_listas
 from agente_nw.nucleo.database.queries import temas as queries_temas
 from agente_nw.nucleo.fluxo import FRACAO_DO_CONTEXTO_NO_PROMPT
 from agente_nw.nucleo.llm import ClienteOllama
-from agente_nw.nucleo.localizacao import ContextoNavegacao, atualizar_lista
+from agente_nw.nucleo.localizacao import ContextoNavegacao, atualizar_lista, aviso_de_lista_truncada
 from agente_nw.nucleo.modelos.configuracao import PerfilRoteamento, Roteamento, TemasArquivo
 from agente_nw.nucleo.modelos.pedido import ResultadoPedido
 from agente_nw.nucleo.modelos.redacao import Redacao
@@ -347,6 +347,10 @@ def coletar() -> int:
     print(f"Duplicados: {resumo.duplicados}")
     print(f"Descartados por ruído: {resumo.descartados_ruido}")
     print(f"Só com manchete (corpo não lido, fora do cartão e dos ganchos): {resumo.itens_so_manchete}")
+    if resumo.termos_nao_buscados:
+        print(f"AVISO: a coleta parou por teto e {resumo.termos_nao_buscados} busca(s) ficaram de fora")
+    if resumo.itens_fora_do_teto_do_feed:
+        print(f"AVISO: {resumo.itens_fora_do_teto_do_feed} notícia(s) de feed não examinadas (teto por feed)")
     if resumo.alertas_feed_vazio:
         nomes = ", ".join(resumo.alertas_feed_vazio)
         print(f"ALERTA — sem novidade em duas execuções seguidas: {nomes}")
@@ -892,6 +896,8 @@ class CanalTerminal:
             print(f"Rede social gravada a partir do link do pedido: {resultado.link_gravado.link}")
         for nao_reconhecido in resultado.links_nao_reconhecidos:
             print(f"AVISO: link não reconhecido em --perfil: {nao_reconhecido}")
+        for ignorada in resultado.frases_ignoradas:
+            print(f'AVISO: não entendi esta frase sobre você e não a usei: "{ignorada}"')
 
     def localizacoes(self, resultado: ResultadoPedido) -> Desfecho:
         from agente_nw.nucleo import confirmacao
@@ -1142,6 +1148,8 @@ def listas_atualizar_cmd(rede: str | None, forcar: bool) -> int:
             print(f"{nome_rede}: cache válido de {quando}, {resultado.total} entradas (--forcar relê)")
         else:
             print(f"{nome_rede}: {resultado.total} entradas lidas")
+            if resultado.truncada:
+                print(f"AVISO: {aviso_de_lista_truncada(resultado)}")
     return 0
 
 

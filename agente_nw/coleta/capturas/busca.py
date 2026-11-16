@@ -109,7 +109,7 @@ def _filtrar_candidatos(rede: str, links: list[tuple[str, str]]) -> list[Candida
         nome_exibido = linhas[0] if linhas else ""
         if not nome_exibido:
             continue  # link sem texto (ícone, menu): não é uma pessoa para o usuário escolher
-        descricao = " · ".join(linhas[1:5]) if len(linhas) > 1 else ""
+        descricao = " · ".join(linhas[1:]) if len(linhas) > 1 else ""
         candidatos.append(Candidato(nome_exibido=nome_exibido, descricao=descricao, link=href))
     return candidatos
 

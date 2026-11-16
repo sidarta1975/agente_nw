@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from typing import Protocol
 
@@ -214,10 +215,13 @@ def aplicar_declaracoes(
     frases: list[str],
     agora: str,
     limiares: TemasUsuarioLimiares,
-) -> None:
+    avisar: Callable[[str], None] | None = None,
+) -> list[str]:
     """O que o usuário disse sobre si vale mais (brief 040, 3.2/3.3): nome, autodeclaração positiva
     (tema `declarada`/`dominio`) ou negativa (`nao_me_interessa`, e remove o tema se ele já existia).
-    Cada frase de `frases` é tratada sozinha; frase sem padrão reconhecido é ignorada."""
+    Cada frase de `frases` é tratada sozinha. A frase sem padrão reconhecido continua sem efeito, mas
+    deixa de sumir em silêncio (brief 092, P-036): volta na lista devolvida e vai a `avisar`."""
+    ignoradas: list[str] = []
     for frase in frases:
         limpa = frase.strip()
         if not limpa:
@@ -240,7 +244,12 @@ def aplicar_declaracoes(
 
         casamento_positivo = _PADRAO_POSITIVO.match(limpa)
         termo = casamento_positivo.group(1).strip() if casamento_positivo is not None else ""
-        if not termo or getattr(cliente_llm, "embeddar", None) is None:
+        if not termo:
+            ignoradas.append(limpa)
+            if avisar is not None:
+                avisar(f'AVISO: não entendi esta frase sobre você e não a usei: "{limpa}"')
+            continue
+        if getattr(cliente_llm, "embeddar", None) is None:
             continue
         tema = _tema_parecido(conexao, cliente_llm, termo, limiares.similaridade_mesmo_tema)
         if tema is None:
@@ -251,6 +260,7 @@ def aplicar_declaracoes(
         )
         perfil_tema_q.registrar_uso(conexao, usuario_id, tema.id, agora)
     conexao.commit()
+    return ignoradas
 
 
 def decair(conexao: sqlite3.Connection, hoje: date, limiares: TemasUsuarioLimiares) -> None:

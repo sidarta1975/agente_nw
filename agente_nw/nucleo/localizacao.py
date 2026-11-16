@@ -26,6 +26,7 @@ from agente_nw.nucleo.texto import sem_acento_e_caixa, variantes_do_nome
 
 _EsquemaT = TypeVar("_EsquemaT", bound=BaseModel)
 _CONFIANCA_MINIMA = 0.7
+_FATOS_NA_DEDUPLICACAO = 200  # fatos mais recentes conferidos antes de regravar o fato de lista
 TIPO_FATO_LISTA = "lista_rede_social"
 _HOSTS_POR_REDE: dict[str, str] = {
     "linkedin.com": "linkedin",
@@ -185,7 +186,17 @@ def atualizar_lista(
         )
     queries_listas.substituir_lista(conexao, rede, resultado.entradas, agora)
     conexao.commit()
-    return ResultadoAtualizacao(rede=rede, lida=True, usou_cache=False, total=len(resultado.entradas))
+    return ResultadoAtualizacao(
+        rede=rede, lida=True, usou_cache=False, total=len(resultado.entradas), truncada=resultado.truncada
+    )
+
+
+def aviso_de_lista_truncada(atualizacao: ResultadoAtualizacao) -> str:
+    """A leitura da lista parou no teto de entradas: quem estiver além dele não aparece (brief 092)."""
+    return (
+        f"{atualizacao.rede}: a leitura da lista parou no teto de {atualizacao.total} entradas; "
+        "quem está além dele não foi lido"
+    )
 
 
 def _o_que_a_pagina_mostra(pagina: PaginaLista) -> str:
@@ -285,6 +296,8 @@ def localizar(
             avisos.append(f"{rede}: {atualizacao.motivo}")
             sem_sessao.add(rede)
             continue
+        if atualizacao.truncada:
+            avisos.append(aviso_de_lista_truncada(atualizacao))
         candidatas = _candidatas_da_lista(conexao, rede, nomes, contexto.limiares)
         if not candidatas:
             continue
@@ -356,8 +369,11 @@ def confirmar(
     opcao: Opcao,
     agora: str,
     substituir: bool = False,
+    avisar: Callable[[str], None] | None = None,
 ) -> None:
-    """Grava a escolha confirmada no contato: rede social, notas (se vazias), vínculo na lista e fato."""
+    """Grava a escolha confirmada no contato: rede social, notas (se vazias), vínculo na lista e fato.
+    A deduplicação do fato de lista olha os `_FATOS_NA_DEDUPLICACAO` fatos mais recentes; se o contato já
+    tem tantos, avisa que um fato de lista antigo pode ser regravado (brief 092, P-021)."""
     atuais = redes_sociais.listar_por_perfil(conexao, perfil_id)
     if substituir:
         for existente in atuais:
@@ -371,10 +387,13 @@ def confirmar(
 
     if opcao.cabecalho:
         perfis.preencher_lacunas(conexao, perfil_id, {"notas": opcao.cabecalho}, agora)
-        ja_tem = any(
-            f.conteudo == opcao.cabecalho and f.tipo == TIPO_FATO_LISTA
-            for f in fatos.listar_recentes(conexao, perfil_id, 200)
-        )
+        recentes = fatos.listar_recentes(conexao, perfil_id, _FATOS_NA_DEDUPLICACAO)
+        if len(recentes) >= _FATOS_NA_DEDUPLICACAO and avisar is not None:
+            avisar(
+                f"AVISO: o contato tem {_FATOS_NA_DEDUPLICACAO} fatos ou mais e só os "
+                f"{_FATOS_NA_DEDUPLICACAO} mais recentes foram conferidos para não repetir o fato da lista"
+            )
+        ja_tem = any(f.conteudo == opcao.cabecalho and f.tipo == TIPO_FATO_LISTA for f in recentes)
         if not ja_tem:
             fatos.inserir(
                 conexao,

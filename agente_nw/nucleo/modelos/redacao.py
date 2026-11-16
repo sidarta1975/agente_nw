@@ -138,4 +138,8 @@ def validar_ganchos(
                 else:
                     vistos.add(gancho.assunto_id)
                     aceitos.append(gancho)
+    if len(aceitos) > MAXIMO_GANCHOS:
+        motivos.append(
+            f"o modelo devolveu {len(aceitos)} ganchos de notícia válidos; mostro {MAXIMO_GANCHOS}"
+        )
     return [*base, *aceitos[:MAXIMO_GANCHOS]], motivos

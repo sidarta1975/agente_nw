@@ -49,6 +49,9 @@ class CapturaBlocos:
     blocos: list[str] = field(default_factory=list)
     imagens: list[ImagemCapturada] = field(default_factory=list)
     blocos_partidos: int = 0  # blocos acima de `_BLOCO_TAMANHO_MAXIMO` lidos em pedaços (brief 083)
+    # A última rolagem ainda trouxe texto novo: a página tinha mais do que o teto de rolagens leu (brief 092).
+    parou_no_teto_de_rolagens: bool = False
+    teto_de_rolagens: int = 0
 
 
 def _chave_da_imagem(src: str) -> str:
@@ -176,13 +179,22 @@ def ler(
     _acumular(texto)
     _capturar_imagens(pagina, maximo_imagens, largura_minima_imagem, imagens)
 
+    ultima_trouxe_texto_novo = False
     for _ in range(max(0, max_rolagens - 1)):
         dorme(rnd.uniform(intervalo_min_s, intervalo_max_s))
         pagina.rolar()
         _url, texto = pagina.estado()
+        antes = len(blocos)
         _acumular(texto)
+        ultima_trouxe_texto_novo = len(blocos) > antes
         _capturar_imagens(pagina, maximo_imagens, largura_minima_imagem, imagens)
 
     return CapturaBlocos(
-        autenticado=True, motivo=None, blocos=blocos, imagens=imagens, blocos_partidos=partidos
+        autenticado=True,
+        motivo=None,
+        blocos=blocos,
+        imagens=imagens,
+        blocos_partidos=partidos,
+        parou_no_teto_de_rolagens=ultima_trouxe_texto_novo,
+        teto_de_rolagens=max_rolagens,
     )

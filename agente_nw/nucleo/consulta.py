@@ -201,6 +201,16 @@ def preparar(
                 etapa("AVISO: a coleta de notícias passou do tempo máximo e parou com o que já tinha.")
             elif resumo_coleta.feeds_com_erro:
                 etapa(f"AVISO: {len(resumo_coleta.feeds_com_erro)} busca(s) de notícia falharam.")
+            if resumo_coleta.termos_nao_buscados:
+                etapa(
+                    "AVISO: a coleta parou por teto (candidatos suficientes ou tempo) e "
+                    f"{resumo_coleta.termos_nao_buscados} busca(s) do pedido ficaram de fora."
+                )
+            if resumo_coleta.itens_fora_do_teto_do_feed:
+                etapa(
+                    f"AVISO: {resumo_coleta.itens_fora_do_teto_do_feed} notícia(s) de feed não foram "
+                    "examinadas por causa do teto de itens novos por feed."
+                )
 
     etapa("Extraindo texto das notícias novas...")
     extrator_perfil.processar_fila(cliente_llm, conexao)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import sys
 from pathlib import Path
 
 from agente_nw.perfil.importador import ContatoBruto
@@ -14,8 +15,19 @@ def _campo(linha: dict[str, str], *prefixos: str) -> str | None:
 
 
 def ler_contatos(caminho: Path) -> list[ContatoBruto]:
+    """O limite padrão do `csv` (131.072 caracteres por campo) derrubaria a leitura de uma agenda com um
+    campo longo (notas); sobe o limite durante a leitura e o devolve ao valor anterior (brief 092, P-044)."""
     contatos: list[ContatoBruto] = []
 
+    limite_anterior = csv.field_size_limit(sys.maxsize)
+    try:
+        _ler_linhas(caminho, contatos)
+    finally:
+        csv.field_size_limit(limite_anterior)
+    return contatos
+
+
+def _ler_linhas(caminho: Path, contatos: list[ContatoBruto]) -> None:
     with open(caminho, encoding="utf-8-sig", newline="") as arquivo:
         for linha in csv.DictReader(arquivo):
             nome = linha.get("Name") or " ".join(
@@ -42,5 +54,3 @@ def ler_contatos(caminho: Path) -> list[ContatoBruto]:
                     marcadores=marcadores,
                 )
             )
-
-    return contatos

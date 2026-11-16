@@ -64,6 +64,8 @@ class ResumoColeta:
     fonte_usada: FonteUsada = "nenhuma"
     tempo_segundos: float = 0.0
     tempo_esgotado: bool = False
+    termos_nao_buscados: int = 0  # buscas do pedido que a coleta nem abriu por teto (brief 092, P-005)
+    itens_fora_do_teto_do_feed: int = 0  # entradas de feed não examinadas por `maximo_itens_novos_por_feed`
 
 
 @dataclass
@@ -272,11 +274,16 @@ def coletar(
         conexao_bd.commit()
         resumo.fontes_processadas += 1
 
-    for termo in termos or []:
-        if caminho_sentinela.exists() or resumo.itens_novos >= limiares.candidatos_suficientes:
+    lista_de_termos = termos or []
+    for indice, termo in enumerate(lista_de_termos):
+        if caminho_sentinela.exists():
+            break
+        if resumo.itens_novos >= limiares.candidatos_suficientes:
+            resumo.termos_nao_buscados = len(lista_de_termos) - indice
             break
         if time.monotonic() > limite:
             resumo.tempo_esgotado = True
+            resumo.termos_nao_buscados = len(lista_de_termos) - indice
             break
         if _termo_recente(conexao_bd, normalizar_termo(termo), limiares, momento):
             resumo.termos_reaproveitados += 1
@@ -312,7 +319,7 @@ def _processar_fonte(
         resumo.feeds_com_erro.append(fonte.nome)
         return _ResultadoFeed(None)
 
-    for entrada in analisado.entries:
+    for posicao, entrada in enumerate(analisado.entries):
         titulo = str(entrada.get("title", "")).strip()
         link = entrada.get("link")
         if not titulo or not link:
@@ -363,6 +370,7 @@ def _processar_fonte(
             resumo.itens_so_manchete += 1  # gravado (conta e aparece), mas fora do cartão e do gancho
         n_itens_novos_da_fonte += 1
         if n_itens_novos_da_fonte >= limiares.maximo_itens_novos_por_feed:
+            resumo.itens_fora_do_teto_do_feed += len(analisado.entries) - (posicao + 1)
             break
 
     return _ResultadoFeed(n_itens_novos_da_fonte)

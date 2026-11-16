@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import dataclass
 
 from agente_nw.nucleo.modelos.assunto_contato import AssuntoContato
 from agente_nw.nucleo.modelos.proveniencia import Proveniencia, colunas_gerado_por
@@ -148,3 +149,21 @@ def contar_orfaos(conexao: sqlite3.Connection) -> int:
         "WHERE a.id IS NULL"
     ).fetchone()
     return int(contagem)
+
+
+@dataclass(frozen=True)
+class MedicaoDoGate:
+    rodadas: int  # pares (contato, dia) em que houve avaliação
+    candidatos: int  # linhas avaliadas nessas rodadas
+    passaram: int  # as que não foram descartadas no gate
+
+
+def medir_passagem_do_gate(conexao: sqlite3.Connection) -> MedicaoDoGate:
+    """Brief 092, P-009: de quantos candidatos avaliados por rodada quantos passam o gate (status
+    diferente de `descartado`). Só mede; não decide o teto de `candidatos_por_contato`."""
+    linha = conexao.execute(
+        "SELECT COUNT(*) AS candidatos, "
+        "COALESCE(SUM(CASE WHEN status != 'descartado' THEN 1 ELSE 0 END), 0) AS passaram, "
+        "COUNT(DISTINCT perfil_id || '|' || gerado_em) AS rodadas FROM assunto_contato"
+    ).fetchone()
+    return MedicaoDoGate(rodadas=linha["rodadas"], candidatos=linha["candidatos"], passaram=linha["passaram"])

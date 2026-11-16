@@ -899,6 +899,7 @@ def criar_app(
             temas_por_nivel=temas_por_nivel,
             niveis=_NIVEIS,
             nao_me_interessa=perfis.listar_nao_me_interessa(conn, usuario.id),
+            frases_ignoradas=request.args.getlist("ignorada"),
         )
 
     @app.route("/eu/contar", methods=["POST"])
@@ -909,11 +910,12 @@ def criar_app(
             abort(400)
         assert usuario.id is not None
         texto = request.form.get("texto", "").strip()
+        ignoradas: list[str] = []
         if texto:
             agora = datetime.now(UTC).isoformat()
             pedido_extraido = pedido_mod.extrair(_cliente_llm(), conn, texto)
             if pedido_extraido.sobre_o_usuario:
-                inferencia.aplicar_declaracoes(
+                ignoradas = inferencia.aplicar_declaracoes(
                     conn,
                     _cliente_llm(),
                     usuario.id,
@@ -921,7 +923,7 @@ def criar_app(
                     agora,
                     limiares.temas_usuario,
                 )
-        return redirect(url_for("eu"))
+        return redirect(url_for("eu", ignorada=ignoradas))
 
     @app.route("/eu/esquecer", methods=["POST"])
     def eu_esquecer() -> Response:

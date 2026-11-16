@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import getpass
+import re
 import sqlite3
 from collections.abc import Callable, Sequence
 from datetime import datetime
@@ -33,10 +34,35 @@ class ClientePedido(Protocol):
     def modelo_embedding(self) -> str: ...
 
 
+def _contatos_para_o_prompt(conexao: sqlite3.Connection, frase: str) -> list[Perfil]:
+    """Todo contato cujo nome (ou apelido) tem uma palavra que aparece na frase vem primeiro, sem teto;
+    os mais recentes completam até `_MAXIMO_CONTATOS_NO_PROMPT` (brief 092, P-035). Assim o contato
+    parecido com o nome do pedido nunca fica de fora por ser antigo."""
+    palavras_da_frase = {p for p in re.findall(r"\w+", sem_acento_e_caixa(frase)) if len(p) >= 3}
+    parecidos = [
+        contato
+        for contato in perfis.listar_todos(conexao)
+        if contato.tipo == "contato"
+        and palavras_da_frase
+        & {
+            p
+            for nome in (contato.nome, contato.apelido or "")
+            for p in re.findall(r"\w+", sem_acento_e_caixa(nome))
+            if len(p) >= 3
+        }
+    ]
+    ids = {contato.id for contato in parecidos}
+    completam = [
+        contato
+        for contato in perfis.listar_contatos_recentes(conexao, _MAXIMO_CONTATOS_NO_PROMPT)
+        if contato.id not in ids
+    ]
+    return [*parecidos, *completam[: max(0, _MAXIMO_CONTATOS_NO_PROMPT - len(parecidos))]]
+
+
 def extrair(cliente_llm: ClientePedido, conexao: sqlite3.Connection, frase: str) -> PedidoExtraido:
     conhecidos = [
-        (contato.nome, contato.empresa, contato.cargo)
-        for contato in perfis.listar_contatos_recentes(conexao, _MAXIMO_CONTATOS_NO_PROMPT)
+        (contato.nome, contato.empresa, contato.cargo) for contato in _contatos_para_o_prompt(conexao, frase)
     ]
     prompt = extrair_pedido.construir_prompt(frase, conhecidos)
     return cliente_llm.gerar_json(
@@ -163,6 +189,7 @@ def processar(
     real (via `orquestracao.entender_pedido`)."""
     if pedido_id is None:
         pedido_id = registrar(conexao, frase, agora)
+    frases_ignoradas: list[str] = []
 
     pedido = extrair(cliente_llm, conexao, frase)
     pedidos.gravar_extracao(conexao, pedido_id, pedido.model_dump_json(), pedido.confianca)
@@ -175,7 +202,7 @@ def processar(
         if pedido.sobre_o_usuario:
             usuario = perfis.obter_usuario(conexao)
             assert usuario is not None and usuario.id is not None
-            inferencia.aplicar_declaracoes(
+            frases_ignoradas = inferencia.aplicar_declaracoes(
                 conexao, cliente_llm, usuario.id, pedido.sobre_o_usuario, agora, limiares_temas_usuario
             )
     perfil, criado, ambiguo, candidatos = resolver_contato(conexao, pedido, agora, contato_id_forcado)
@@ -199,6 +226,7 @@ def processar(
         contato_ambiguo=ambiguo,
         contato_divergente=divergente,
         candidatos=candidatos,
+        frases_ignoradas=frases_ignoradas,
     )
     _localizar_na_rede(cliente_llm, conexao, resultado, agora, navegacao, trocar_perfil, perfis_informados)
     return resultado

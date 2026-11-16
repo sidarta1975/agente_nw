@@ -191,7 +191,15 @@ class CanalWeb:
         _etapa(self._conexao, self._pedido_id, texto)
 
     def pedido_entendido(self, resultado: ResultadoPedido) -> None:
-        """A página do pedido já mostra o que foi entendido."""
+        """A página do pedido já mostra o que foi entendido. A frase sobre o usuário que o programa não
+        entendeu (brief 092, P-036) vai para os avisos do pedido; `_escrever` os mantém."""
+        if resultado.frases_ignoradas:
+            avisos = [
+                f'{_PREFIXO_AVISO}: não entendi esta frase sobre você e não a usei: "{frase}"'
+                for frase in resultado.frases_ignoradas
+            ]
+            pedidos.gravar_avisos(self._conexao, self._pedido_id, json.dumps(avisos, ensure_ascii=False))
+            self._conexao.commit()
 
     def _esperar(self, perguntas: list[dict[str, Any]]) -> Desfecho:
         if not perguntas:
@@ -366,7 +374,8 @@ def _escrever(deps: Dependencias, conexao: sqlite3.Connection, pedido_id: int) -
             ler_redes_sociais=not correcao,
         )
     assert entrega is not None  # o console sempre segue para a redação
-    avisos = canal.avisos
+    anteriores: list[str] = json.loads(pedido.avisos_json) if pedido.avisos_json else []
+    avisos = [*anteriores, *(a for a in canal.avisos if a not in anteriores)]
     if entrega.redacao.aviso:
         avisos.append(entrega.redacao.aviso)
     pedidos.gravar_avisos(conexao, pedido_id, json.dumps(avisos, ensure_ascii=False) if avisos else None)
@@ -375,6 +384,13 @@ def _escrever(deps: Dependencias, conexao: sqlite3.Connection, pedido_id: int) -
 
 
 # ---- respostas do usuário --------------------------------------------------------------------------
+
+
+def _acrescentar_aviso(conexao: sqlite3.Connection, pedido_id: int, texto: str) -> None:
+    atual = pedidos.obter_por_id(conexao, pedido_id)
+    avisos: list[str] = json.loads(atual.avisos_json) if atual is not None and atual.avisos_json else []
+    if texto not in avisos:
+        pedidos.gravar_avisos(conexao, pedido_id, json.dumps([*avisos, texto], ensure_ascii=False))
 
 
 def decidir_rede(
@@ -415,7 +431,13 @@ def decidir_rede(
     elif acao != "pular":
         return "Ação inválida."
     if escolhida is not None:
-        localizacao_mod.confirmar(conexao, pedido.perfil_id, escolhida, agora)
+        localizacao_mod.confirmar(
+            conexao,
+            pedido.perfil_id,
+            escolhida,
+            agora,
+            avisar=lambda texto: _acrescentar_aviso(conexao, pedido_id, texto),
+        )
 
     _gravar_perguntas(conexao, pedido_id, [p for p in perguntas if p is not pergunta])
     return None

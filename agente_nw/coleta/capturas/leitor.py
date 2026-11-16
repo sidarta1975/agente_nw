@@ -142,6 +142,22 @@ def ler_redes_sociais_do_contato(
             if maximo_blocos is None
             else captura.blocos[: maximo_blocos * _BLOCOS_EXAMINADOS_POR_PUBLICACAO]
         )
+        avisos_de_teto: list[str] = []
+        if captura.parou_no_teto_de_rolagens:
+            avisos_de_teto.append(
+                f"a leitura parou no teto de {captura.teto_de_rolagens} rolagens e a última ainda trouxe "
+                "texto novo; o que está mais abaixo na página não foi lido"
+            )
+        ficaram_de_fora = len(captura.blocos) - len(blocos)
+        if ficaram_de_fora > 0:
+            avisos_de_teto.append(
+                f"{ficaram_de_fora} bloco(s) da página ficaram de fora "
+                f"do teto de {maximo_blocos} publicações por rede"
+            )
+        for aviso_de_teto in avisos_de_teto:
+            resumo.avisos.append(f"{rede.rede}: {aviso_de_teto}")
+            if avisar is not None:
+                avisar(f"AVISO: {rede.rede}: {aviso_de_teto}")
         if avisar is not None:
             avisar(f"{rede.rede}: {len(captura.blocos)} blocos na página; examino até {len(blocos)}...")
             if captura.blocos_partidos:
