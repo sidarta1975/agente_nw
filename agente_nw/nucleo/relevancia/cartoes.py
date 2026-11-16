@@ -45,7 +45,7 @@ def gerar_cartao(cliente_llm: ClienteCartao, conexao: sqlite3.Connection, assunt
     if assunto is None:
         raise ValueError(f"assunto {assunto_id} não existe")
 
-    itens_do_assunto = itens.listar_por_assunto(conexao, assunto_id)
+    itens_do_assunto = itens.listar_por_assunto(conexao, assunto_id, com_corpo=True)  # brief 083
     recentes = itens_do_assunto[-_MAX_ITENS_CARTAO:]
     itens_resumidos = [
         (ic.item.titulo, ic.dominio, (ic.item.texto or "")[:_TRUNCAMENTO_TRECHO]) for ic in recentes

@@ -52,6 +52,7 @@ class ResumoColeta:
     itens_novos: int = 0
     duplicados: int = 0
     descartados_ruido: int = 0
+    itens_so_manchete: int = 0  # gravados sem corpo (a página não abriu ou não deu texto; brief 083)
     alertas_feed_vazio: list[str] = field(default_factory=list)
     feeds_com_erro: list[str] = field(default_factory=list)
     bloqueio: str | None = None  # o site recusou por excesso de pedidos (429/503) nesta coleta
@@ -335,7 +336,7 @@ def _processar_fonte(
         try:
             pagina = cliente_http.get(url_final, timeout=15.0)
             pagina.raise_for_status()
-            corpo = trafilatura.extract(pagina.text)
+            corpo = trafilatura.extract(pagina.text) or None  # texto vazio é extração que falhou
         except Exception:
             corpo = None
 
@@ -358,6 +359,8 @@ def _processar_fonte(
         )
         queries_itens.inserir(conexao_bd, item)
         resumo.itens_novos += 1
+        if corpo is None:
+            resumo.itens_so_manchete += 1  # gravado (conta e aparece), mas fora do cartão e do gancho
         n_itens_novos_da_fonte += 1
         if n_itens_novos_da_fonte >= limiares.maximo_itens_novos_por_feed:
             break

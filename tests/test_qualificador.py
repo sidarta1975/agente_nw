@@ -74,6 +74,7 @@ def _criar_assunto_com_item(conn: sqlite3.Connection, titulo_gerado: str | None)
         fonte_id=fonte.id,
         url_canonica=f"https://exemplo.com/{assunto_id}",
         titulo="Título do item",
+        texto="Corpo da notícia.",  # item sem corpo não chega à qualificação (brief 083)
         coletado_em=AGORA,
         hash_titulo=f"hash-{assunto_id}",
         assunto_id=assunto_id,

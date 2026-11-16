@@ -36,9 +36,24 @@ _TERMOS_PATROCINADO = (
 )
 
 
+_LINHA_DE_DECLARACAO = 80
+"""Tamanho máximo, em caracteres, da linha do corpo em que a marca de patrocinado vale (brief 083):
+o formato de uma declaração ("Publicidade", "Conteúdo patrocinado", "Patrocinado por X"), não de um
+parágrafo de reportagem que fala de publicidade."""
+
+
 def _tem_termo_patrocinado(texto: str) -> bool:
     texto_lower = texto.lower()
     return any(termo in texto_lower for termo in _TERMOS_PATROCINADO)
+
+
+def _corpo_declara_patrocinio(corpo: str) -> bool:
+    """A marca é procurada em todas as linhas do corpo, mas só conta em linha curta (brief 083, P-004)."""
+    return any(
+        _tem_termo_patrocinado(linha)
+        for linha in corpo.splitlines()
+        if len(linha.strip()) <= _LINHA_DE_DECLARACAO
+    )
 
 
 def e_ruido(
@@ -48,14 +63,16 @@ def e_ruido(
     coletado_em: str,
     limiares: ColetaLimiares,
 ) -> tuple[bool, str | None]:
-    if corpo is None or len(corpo) < limiares.teaser_minimo_caracteres:
+    """`corpo=None` é o item cuja extração do corpo falhou (brief 083): ele não é ruído por isso — é
+    gravado sem corpo e não alimenta cartão, qualificação nem gancho. Os filtros de título e de data
+    valem para ele também."""
+    if corpo is not None and len(corpo) < limiares.teaser_minimo_caracteres:
         return True, "corpo abaixo do teaser mínimo"
 
     if _PADRAO_LISTA.match(titulo):
         return True, "título de lista"
 
-    primeiras_linhas_corpo = "\n".join(corpo.splitlines()[:3])
-    if _tem_termo_patrocinado(titulo) or _tem_termo_patrocinado(primeiras_linhas_corpo):
+    if _tem_termo_patrocinado(titulo) or (corpo is not None and _corpo_declara_patrocinio(corpo)):
         return True, "marcado como patrocinado"
 
     if publicado_em:

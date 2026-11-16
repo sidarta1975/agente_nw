@@ -22,6 +22,8 @@ class ResumoLeitura:
     imagens_descritas: int = 0
     fatos_gravados: int = 0
     motivos_sem_sessao: list[str] = field(default_factory=list)
+    blocos_partidos: int = 0  # blocos acima de 5.000 caracteres lidos em pedaços (brief 083)
+    avisos: list[str] = field(default_factory=list)  # "<rede>: página cortada em N de M caracteres"
 
 
 # Os primeiros blocos de uma página costumam ser menu e cabeçalho: o limite de `maximo_blocos` vale
@@ -121,6 +123,10 @@ def ler_redes_sociais_do_contato(
         aviso_imagens = getattr(pagina, "aviso_imagens", None)
         if aviso_imagens and avisar is not None:
             avisar(f"AVISO: {rede.rede}: a extensão não leu as imagens ({aviso_imagens}). Recarregue-a.")
+        for aviso_corte in getattr(pagina, "avisos_corte", None) or []:
+            resumo.avisos.append(f"{rede.rede}: {aviso_corte}")
+            if avisar is not None:
+                avisar(f"AVISO: {rede.rede}: {aviso_corte}")
 
         if not captura.autenticado:
             resumo.redes_sem_sessao += 1
@@ -129,6 +135,7 @@ def ler_redes_sociais_do_contato(
 
         resumo.redes_lidas += 1
         resumo.blocos_capturados += len(captura.blocos)
+        resumo.blocos_partidos += captura.blocos_partidos
 
         blocos = (
             captura.blocos
@@ -137,6 +144,8 @@ def ler_redes_sociais_do_contato(
         )
         if avisar is not None:
             avisar(f"{rede.rede}: {len(captura.blocos)} blocos na página; examino até {len(blocos)}...")
+            if captura.blocos_partidos:
+                avisar(f"{rede.rede}: {captura.blocos_partidos} bloco(s) longo(s) partido(s) em pedaços")
         gravados_na_rede = 0
         descartados = 0
         for numero, bloco in enumerate(blocos, start=1):

@@ -43,6 +43,8 @@ class ResumoRedeSocial:
     blocos_capturados: int = 0
     fatos_gravados: int = 0
     motivos_sem_sessao: list[str] = field(default_factory=list)
+    blocos_partidos: int = 0  # brief 083
+    avisos: list[str] = field(default_factory=list)  # página cortada no teto (brief 083)
 
 
 @dataclass
@@ -77,12 +79,15 @@ def _resumo_rede_para_texto(resumo: ResumoRedeSocial) -> str | None:
     partes = [f"redes lidas: {resumo.redes_lidas}"]
     if resumo.blocos_capturados:
         partes.append(f"blocos capturados: {resumo.blocos_capturados}")
+    if resumo.blocos_partidos:
+        partes.append(f"blocos longos partidos: {resumo.blocos_partidos}")
     if resumo.fatos_gravados:
         partes.append(f"fatos gravados: {resumo.fatos_gravados}")
     if resumo.redes_sem_sessao:
         partes.append(f"sem sessão: {resumo.redes_sem_sessao}")
     for motivo in resumo.motivos_sem_sessao:
         partes.append(motivo)
+    partes.extend(resumo.avisos)
     return " · ".join(partes)
 
 
@@ -157,6 +162,8 @@ def preparar(
         blocos_capturados=resumo_leitor.blocos_capturados,
         fatos_gravados=resumo_leitor.fatos_gravados,
         motivos_sem_sessao=list(resumo_leitor.motivos_sem_sessao),
+        blocos_partidos=resumo_leitor.blocos_partidos,
+        avisos=list(resumo_leitor.avisos),
     )
 
     fonte_noticias = "reaproveitada"  # sem coleta nova, valem as notícias que já estavam guardadas

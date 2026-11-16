@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import shutil
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -11,10 +13,48 @@ from agente_nw.coleta.capturas.navegador import MIN_CHARS_AUTENTICADO, URL_LOGIN
 from agente_nw.nucleo.modelos.configuracao import ExtensaoLimiares
 from agente_nw.ponte import ErroDaExtensao, Ponte, PonteIndisponivel, obter_ponte
 
-__all__ = ["PaginaExtensao", "PonteIndisponivel", "abrir_pagina_extensao", "arquivar_navegador_antigo"]
+__all__ = [
+    "PaginaExtensao",
+    "PonteIndisponivel",
+    "abrir_pagina_extensao",
+    "arquivar_navegador_antigo",
+    "aviso_de_corte",
+]
 
 _PASSO_RENDER_S = 1.0
 _URL_INDISPONIVEL = "ponte://indisponivel"  # lido como "sem sessão" por quem consome a página
+
+
+def _milhar(numero: int) -> str:
+    return f"{numero:,}".replace(",", ".")
+
+
+def aviso_de_corte(maximo: int, tamanho_original: int) -> str:
+    """A frase do resumo da leitura quando a página passou do teto (brief 083, P-013)."""
+    return f"página cortada em {_milhar(maximo)} de {_milhar(tamanho_original)} caracteres"
+
+
+def _registrar_corte(caminho_log: Path, origem: str, url: str, maximo: int, tamanho_original: int) -> None:
+    """Uma linha `"corte_pagina": true` no `chamadas_llm.jsonl`, no padrão do aviso do `porteiro`
+    (brief 077): falha de escrita nunca derruba a leitura."""
+    try:
+        caminho_log.parent.mkdir(parents=True, exist_ok=True)
+        linha = json.dumps(
+            {
+                "corte_pagina": True,
+                "origem": origem,  # "extensao": cortado dentro do Chrome; "programa": cortado aqui
+                "url": url,
+                "quando": datetime.now(UTC).isoformat(),
+                "maximo": maximo,
+                "tamanho_original": tamanho_original,
+                "aviso": aviso_de_corte(maximo, tamanho_original),
+            },
+            ensure_ascii=False,
+        )
+        with caminho_log.open("a", encoding="utf-8") as arquivo:
+            arquivo.write(linha + "\n")
+    except Exception:
+        pass
 
 
 class PaginaExtensao:
@@ -30,8 +70,11 @@ class PaginaExtensao:
         limiares: ExtensaoLimiares,
         dorme: Callable[[float], None] = time.sleep,
         maximo_entradas: int = 2000,
+        caminho_log: Path | None = None,
     ) -> None:
         self._maximo_entradas = maximo_entradas
+        self._caminho_log = caminho_log
+        self.avisos_corte: list[str] = []  # "página cortada em N de M caracteres", sem repetição
         self._ponte = ponte
         self._dorme = dorme
         self._limiares = limiares
@@ -89,8 +132,24 @@ class PaginaExtensao:
         )
         if dados is None:
             return _URL_INDISPONIVEL, ""
+        url = str(dados.get("url", ""))
         texto = str(dados.get("texto", ""))
-        return str(dados.get("url", "")), texto[: self._limiares.maximo_caracteres_pagina]
+        maximo = self._limiares.maximo_caracteres_pagina
+        if dados.get("cortado") is True:
+            self._avisar_corte("extensao", url, maximo, int(dados.get("tamanho_original") or len(texto)))
+        elif len(texto) > maximo:  # extensão sem o campo `cortado` (versão antiga): o corte é daqui
+            self._avisar_corte("programa", url, maximo, len(texto))
+        return url, texto[:maximo]
+
+    def _avisar_corte(self, origem: str, url: str, maximo: int, tamanho_original: int) -> None:
+        """O corte da página nunca é silencioso (brief 083): vira aviso no resumo da leitura e linha no
+        `chamadas_llm.jsonl`, uma vez por página e tamanho (a mesma página relida não repete)."""
+        aviso = aviso_de_corte(maximo, tamanho_original)
+        if aviso in self.avisos_corte:
+            return
+        self.avisos_corte.append(aviso)
+        if self._caminho_log is not None:
+            _registrar_corte(self._caminho_log, origem, url, maximo, tamanho_original)
 
     def rolar(self) -> None:
         if self._aba_id is None:
@@ -169,7 +228,7 @@ def arquivar_navegador_antigo(pasta_navegador: Path) -> Path | None:
 def abrir_pagina_extensao(pasta_ignorada: Path) -> PaginaExtensao:
     """Mesma assinatura do antigo `abrir_pagina_playwright`: o argumento (pasta do perfil do
     navegador separado) não é mais usado, a não ser para arquivar o perfil antigo na primeira vez."""
-    from config.container import configuracao
+    from config.container import caminho_log_chamadas_llm, configuracao
 
     todos = configuracao().limiares
     limiares = todos.extensao
@@ -178,4 +237,5 @@ def abrir_pagina_extensao(pasta_ignorada: Path) -> PaginaExtensao:
         obter_ponte(limiares.espera_extensao_s, limiares.navegador_app, limiares.navegador_perfil),
         limiares,
         maximo_entradas=todos.listas.maximo_entradas,
+        caminho_log=caminho_log_chamadas_llm(),
     )

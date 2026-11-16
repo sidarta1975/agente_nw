@@ -80,6 +80,7 @@ def _preparar_falso(**kwargs: Any) -> ResultadoConsulta:
             fonte_id=fonte.id,
             url_canonica="https://gazeta.test/reajuste",
             titulo="Seguradora muda regra de reajuste",
+            texto="Corpo da notícia.",  # item sem corpo não vira gancho (brief 083)
             coletado_em=AGORA,
             hash_titulo="h-reajuste",
             assunto_id=assunto_id,

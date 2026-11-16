@@ -86,11 +86,16 @@ def vincular_assunto(conexao: sqlite3.Connection, item_id: int, assunto_id: int)
     conexao.execute("UPDATE item SET assunto_id = ? WHERE id = ?", (assunto_id, item_id))
 
 
-def listar_por_assunto(conexao: sqlite3.Connection, assunto_id: int) -> list[ItemComDominio]:
+def listar_por_assunto(
+    conexao: sqlite3.Connection, assunto_id: int, com_corpo: bool = False
+) -> list[ItemComDominio]:
+    """Itens do assunto, em ordem de chegada. `com_corpo=True` deixa de fora o item gravado sem corpo
+    (`texto` nulo: a extração falhou), que não alimenta cartão, qualificação nem gancho (brief 083)."""
     colunas_item = ", ".join(f"i.{coluna}" for coluna in _COLUNAS.split(", "))
+    filtro = " AND i.texto IS NOT NULL" if com_corpo else ""
     linhas = conexao.execute(
         f"SELECT {colunas_item}, f.dominio AS dominio FROM item i "
-        "JOIN fonte f ON f.id = i.fonte_id WHERE i.assunto_id = ? ORDER BY i.id",
+        f"JOIN fonte f ON f.id = i.fonte_id WHERE i.assunto_id = ?{filtro} ORDER BY i.id",
         (assunto_id,),
     ).fetchall()
     return [ItemComDominio(item=_para_item(linha), dominio=linha["dominio"]) for linha in linhas]

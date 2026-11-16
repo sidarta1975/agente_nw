@@ -344,6 +344,7 @@ def coletar() -> int:
     print(f"Itens novos: {resumo.itens_novos}")
     print(f"Duplicados: {resumo.duplicados}")
     print(f"Descartados por ruído: {resumo.descartados_ruido}")
+    print(f"Só com manchete (corpo não lido, fora do cartão e dos ganchos): {resumo.itens_so_manchete}")
     if resumo.alertas_feed_vazio:
         nomes = ", ".join(resumo.alertas_feed_vazio)
         print(f"ALERTA — sem novidade em duas execuções seguidas: {nomes}")
@@ -689,6 +690,10 @@ def preparar_cmd(
     )
     for motivo in resumo_rede.motivos_sem_sessao:
         print(f"  - {motivo}")
+    if resumo_rede.blocos_partidos:
+        print(f"  - blocos longos partidos em pedaços: {resumo_rede.blocos_partidos}")
+    for aviso in resumo_rede.avisos:
+        print(f"  - AVISO: {aviso}")
 
     if resultado.aviso:
         print(f"AVISO: {resultado.aviso}")
@@ -1111,8 +1116,11 @@ def ler_rede_social_cmd(telefone: str) -> int:
     print(f"Redes sem sessão: {resumo.redes_sem_sessao}")
     print(f"Blocos capturados: {resumo.blocos_capturados}")
     print(f"Fatos gravados: {resumo.fatos_gravados}")
+    print(f"Blocos longos partidos em pedaços: {resumo.blocos_partidos}")
     for motivo in resumo.motivos_sem_sessao:
         print(f"  - {motivo}")
+    for aviso in resumo.avisos:
+        print(f"  - AVISO: {aviso}")
     return 0
 
 

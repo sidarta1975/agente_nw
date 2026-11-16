@@ -194,9 +194,16 @@
     return achadas;
   }
 
+  // O teto `maximo` não muda (brief 083), mas o corte deixa de ser silencioso: o programa recebe o
+  // tamanho original da página e se ela foi cortada, e registra o aviso.
   function estado(maximo) {
     const texto = document.body ? document.body.innerText : "";
-    return { url: location.href, texto: texto.slice(0, maximo) };
+    return {
+      url: location.href,
+      texto: texto.slice(0, maximo),
+      tamanho_original: texto.length,
+      cortado: texto.length > maximo,
+    };
   }
 
   globalThis.agenteNw = { casaTexto, ehRolavel, ehCaminhoDeLista, rolar, links, estado, listarImagens };

@@ -68,7 +68,9 @@ def _assunto_para_redacao(conexao: sqlite3.Connection, item: ItemMenu) -> Assunt
     assunto = assuntos_q.obter_por_id(conexao, item.assunto_id)
     manchetes: list[str] = []
     links: list[LinkNoticia] = []
-    for com_dominio in itens_q.listar_por_assunto(conexao, item.assunto_id)[:_MANCHETES_POR_ASSUNTO]:
+    for com_dominio in itens_q.listar_por_assunto(conexao, item.assunto_id, com_corpo=True)[
+        :_MANCHETES_POR_ASSUNTO
+    ]:
         data = (com_dominio.item.publicado_em or "")[:10]
         origem = f"{com_dominio.dominio}, {data}" if data else com_dominio.dominio
         manchetes.append(f"{origem}: {com_dominio.item.titulo}")

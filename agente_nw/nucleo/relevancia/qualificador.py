@@ -36,10 +36,11 @@ class ResumoQualificacao:
     titulos_gerados: int = 0
     qualificados: int = 0
     erros: int = 0
+    sem_corpo: int = 0  # assunto só com itens sem corpo: não é julgado pela manchete (brief 083)
 
 
 def _itens_recentes_resumidos(conexao: sqlite3.Connection, assunto_id: int) -> list[tuple[str, str]]:
-    itens_do_assunto = itens.listar_por_assunto(conexao, assunto_id)
+    itens_do_assunto = itens.listar_por_assunto(conexao, assunto_id, com_corpo=True)  # brief 083
     recentes = itens_do_assunto[-_MAX_ITENS_RESUMO:]
     return [(ic.item.titulo, ic.dominio) for ic in recentes]
 
@@ -61,6 +62,9 @@ def qualificar_pendentes(
     for candidato in candidatos:
         assert candidato.id is not None
         itens_resumidos = _itens_recentes_resumidos(conexao, candidato.id)
+        if not itens_resumidos:
+            resumo.sem_corpo += 1
+            continue
 
         if candidato.titulo_gerado is None:
             prompt_rotulo = rotular.construir_prompt(itens_resumidos)
