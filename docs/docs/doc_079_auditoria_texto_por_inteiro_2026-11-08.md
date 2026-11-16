@@ -1194,6 +1194,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | tests/test_selecao_provedor.py | 216/216 | CERTIFICADO | `selecionar_cliente_llm` (ordem Anthropic > Gemini > OpenAI); le so `container.py`/`app.py` para contar construcoes; sem texto de conteudo. | — |
 | tests/test_sem_censura_de_tema.py | 75/75 | CERTIFICADO | Tag/fato politico ou de saude sao gravados; prompt de extracao sem "sensive"; texto de fila "texto qualquer" (curto), resposta simulada. | — |
 | tests/test_sem_corte_de_texto.py | 1157/1157 | CERTIFICADO | brief 093, guarda estática: percorre `agente_nw/` por AST e classifica cada fatia, `LIMIT` e teto em exceção aprovada, corte não analítico ou violação pendente; os testes do teste montam código e registro sintéticos em `tmp_path`. Não lê nem envia texto a modelo. | — |
+| tests/test_texto_extremo_ponta_a_ponta.py | 299/299 | CERTIFICADO | brief 094, prova com textos extremos: as 15 tarefas do roteamento com textos sintéticos de 34.195 e 5.000.000 caracteres e marcador no último; o cliente é o `ClienteOllama` real com o servidor falso. Não corta texto: as fatias montam o próprio texto sintético. | — |
 | tests/test_sem_objetivo_avisa.py | 38/38 | CERTIFICADO | Todos abaixo do piso -> aviso; reaproveita fixtures de `test_cruzamento_por_consulta`; fato de 1 linha, assunto so com titulo. | — |
 | tests/test_sem_redes_sociais.py | 74/74 | CERTIFICADO | Botao "sem redes sociais" no console Flask; sem texto de conteudo. | — |
 | tests/test_temas_atualizar.py | 33/33 | CERTIFICADO | `temas.atualizar` regrava descricao e sinonimos; descricoes curtas, sem corte. | — |
@@ -2118,6 +2119,13 @@ tests/test_sem_corte_de_texto.py:1074 tests/test_sem_corte_de_texto.py:1087 test
 tests/test_sem_corte_de_texto.py:1097 tests/test_sem_corte_de_texto.py:1102 tests/test_sem_corte_de_texto.py:1109 tests/test_sem_corte_de_texto.py:1116
 tests/test_sem_corte_de_texto.py:1120 tests/test_sem_corte_de_texto.py:1126 tests/test_sem_corte_de_texto.py:1141 tests/test_sem_corte_de_texto.py:1142
 tests/test_sem_corte_de_texto.py:1146 tests/test_sem_corte_de_texto.py:1155
+```
+
+**Brief 094 (sem ponto novo)** — 5 linha(s) citada(s), todas descartadas. O brief 094 criou a prova permanente `tests/test_texto_extremo_ponta_a_ponta.py` e não alterou código de produção. As ocorrências são do próprio teste: a docstring que cita os cortes de seleção (l. 14-15), o nome do esquema `RespostaCartao` (l. 61) e a docstring e a chamada de `cartoes.resumir_item` (l. 169-170); a única fatia do arquivo monta o texto sintético e não corta texto de terceiros.
+
+```
+tests/test_texto_extremo_ponta_a_ponta.py:14 tests/test_texto_extremo_ponta_a_ponta.py:15 tests/test_texto_extremo_ponta_a_ponta.py:61 tests/test_texto_extremo_ponta_a_ponta.py:169
+tests/test_texto_extremo_ponta_a_ponta.py:170
 ```
 
 ---
