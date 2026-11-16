@@ -13,7 +13,6 @@ _EsquemaT = TypeVar("_EsquemaT", bound=BaseModel)
 MAXIMO_TERMOS = 3
 _FATOS_LIDOS = 30
 _FATOS_NO_PROMPT = 12
-_CARACTERES_POR_FATO = 300
 _MAXIMO_PALAVRAS_DO_TERMO = 5
 _TIPO_LISTA = "lista_rede_social"
 
@@ -57,7 +56,7 @@ def termos_do_contato(cliente_llm: ClienteTermos, conexao: sqlite3.Connection, p
         for f in fatos.listar_recentes(conexao, perfil_id, _FATOS_LIDOS)
         if f.tipo != _TIPO_LISTA and f.conteudo.strip()
     ]
-    publicacoes = [f.conteudo.strip()[:_CARACTERES_POR_FATO] for f in registros[:_FATOS_NO_PROMPT]]
+    publicacoes = [f.conteudo.strip() for f in registros[:_FATOS_NO_PROMPT]]
     if not publicacoes:
         return []
     try:

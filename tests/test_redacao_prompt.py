@@ -79,13 +79,13 @@ def test_prompt_pequeno_nao_e_cortado() -> None:
     assert "consulta 2:" in texto
 
 
-def test_prompt_grande_corta_historico_para_um_e_fatos_para_cinco() -> None:
+def test_prompt_grande_corta_historico_para_um_e_fatos_para_quatro() -> None:
     entrada = _entrada(fatos=10, historico=3, palavras_por_linha=700)
     assert prompt.estimar_tokens(prompt.construir_prompt(entrada, limite_tokens=10**9)) > 6000
 
     texto = prompt.construir_prompt(entrada, limite_tokens=6000)
 
-    assert "fato 4:" in texto and "fato 5:" not in texto
+    assert "fato 3:" in texto and "fato 4:" not in texto
     assert "consulta 0:" in texto and "consulta 1:" not in texto
 
 

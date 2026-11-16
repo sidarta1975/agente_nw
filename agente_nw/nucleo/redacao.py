@@ -39,7 +39,6 @@ _EsquemaT = TypeVar("_EsquemaT", bound=BaseModel)
 
 _FATOS_NO_PROMPT = 10
 _FATOS_CANDIDATOS = 40
-_TRECHO_DO_FATO_NO_PROMPT = 600  # o fato fica inteiro no banco; o prompt leva o começo
 _FATOS_RECENTES_GARANTIDOS = 4
 _CONSULTAS_NO_HISTORICO = 3
 _NOTAS_NO_PROMPT = 5
@@ -109,7 +108,7 @@ def _escolher_fatos(cliente_llm: ClienteRedacao, candidatos: list[Fato], consult
     if embeddar is None:
         return candidatos[:_FATOS_NO_PROMPT]
     try:
-        vetores = embeddar([consulta, *(f.conteudo[:_TRECHO_DO_FATO_NO_PROMPT] for f in resto)])
+        vetores = embeddar([consulta, *(f.conteudo for f in resto)])
     except Exception:
         return candidatos[:_FATOS_NO_PROMPT]
     alvo, vetores_resto = vetores[0], vetores[1:]
@@ -147,7 +146,7 @@ def _fatos(
         if fato.tipo.startswith("imagem"):
             marcas.append(_MARCA_DE_IMAGEM)
         sufixo = f" {' '.join(marcas)}" if marcas else ""
-        linhas.append(f"{data[:10]} ({fato.tipo}){sufixo}: {fato.conteudo[:_TRECHO_DO_FATO_NO_PROMPT]}")
+        linhas.append(f"{data[:10]} ({fato.tipo}){sufixo}: {fato.conteudo}")
     return linhas
 
 
@@ -323,6 +322,13 @@ def redigir(
         informativos.append("Pouca informação sobre a pessoa; mensagem mais geral.")
     # Se o molde sair do prompt por corte de tamanho, a mensagem não grava proveniência dele (065).
     molde_origem_id = prompt_mod.cortar_por_tamanho(entrada, limite_tokens).molde_origem_id
+    nao_incluidos = prompt_mod.fatos_nao_incluidos(entrada, limite_tokens)
+    if nao_incluidos:
+        # Fato fora do prompt por tamanho nunca some em silêncio (brief 091): fica no aviso da redação.
+        informativos.append(
+            f"{len(nao_incluidos)} fato(s) não incluído(s) na redação por tamanho do prompt: "
+            + " | ".join(fato[:40] for fato in nao_incluidos)
+        )
     prompt = prompt_mod.construir_prompt(entrada, limite_tokens)
     validos = {item.assunto_id for item in disponiveis}
     resposta = cliente_llm.gerar_json(

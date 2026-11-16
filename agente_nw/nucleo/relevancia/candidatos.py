@@ -3,7 +3,7 @@ from __future__ import annotations
 import sqlite3
 import unicodedata
 
-from agente_nw.nucleo.database.queries import assunto_contato, assuntos
+from agente_nw.nucleo.database.queries import assunto_contato, assuntos, itens
 from agente_nw.nucleo.modelos.assunto import Assunto
 from agente_nw.nucleo.modelos.configuracao import ConsultaLimiares
 from agente_nw.nucleo.vetores import cosseno
@@ -36,9 +36,24 @@ def _sem_acento_e_caixa(texto: str) -> str:
     return "".join(c for c in decomposto if not unicodedata.combining(c)).casefold()
 
 
-def termo_evitado(assunto: Assunto, evitar: list[str]) -> bool:
-    """Correspondência literal, sem acento e sem caixa, no título e no resumo do assunto."""
-    texto = _sem_acento_e_caixa(f"{assunto.titulo_gerado or ''} {assunto.resumo_cartao or ''}")
+def _texto_do_assunto(assunto: Assunto, conexao: sqlite3.Connection | None) -> str:
+    """Título e resumo do assunto e, com a conexão, o título (a manchete) e o resumo de **todos** os itens
+    dele (brief 091). Sem a conexão, só o título e o resumo do assunto."""
+    partes = [assunto.titulo_gerado or "", assunto.resumo_cartao or ""]
+    if conexao is not None and assunto.id is not None:
+        for com_dominio in itens.listar_por_assunto(conexao, assunto.id):
+            partes.append(com_dominio.item.titulo)
+            if com_dominio.item.id is not None:
+                gravado = itens.obter_resumo(conexao, com_dominio.item.id)
+                if gravado is not None:
+                    partes.append(gravado.resumo)
+    return _sem_acento_e_caixa(" ".join(partes))
+
+
+def termo_evitado(assunto: Assunto, evitar: list[str], conexao: sqlite3.Connection | None = None) -> bool:
+    """Correspondência literal, sem acento e sem caixa, no título e no resumo do assunto e, com a conexão,
+    nas manchetes e nos resumos de todos os itens dele. Achou o termo, o assunto é evitado."""
+    texto = _texto_do_assunto(assunto, conexao)
     return any(
         termo_normalizado in texto
         for termo_normalizado in (_sem_acento_e_caixa(t.strip()) for t in evitar)
@@ -67,7 +82,7 @@ def selecionar_por_consulta(
         conexao, substancial_minimo, conversavel_minimo, ids_vistos, modelo_embedding
     )
 
-    evitados = [assunto for assunto, _ in candidatos_com_centroide if termo_evitado(assunto, evitar)]
+    evitados = [assunto for assunto, _ in candidatos_com_centroide if termo_evitado(assunto, evitar, conexao)]
     ids_evitados = {assunto.id for assunto in evitados}
     restantes = [par for par in candidatos_com_centroide if par[0].id not in ids_evitados]
 

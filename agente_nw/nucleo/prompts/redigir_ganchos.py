@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field, replace
 
 from agente_nw.nucleo.estimativa_tokens import estimar_tokens as estimar_tokens  # reexporta (brief 082)
@@ -13,12 +14,13 @@ from agente_nw.nucleo.modelos.redacao import (
 )
 from agente_nw.nucleo.prompts.seguranca import INSTRUCAO_DADO_EXTERNO, MARCADOR_INICIO, cercar_dado_externo
 
-VERSAO = "2026-11-02-3"
+VERSAO = "2026-11-16-1"
 ESQUEMA = RespostaRedacao
 
 LIMITE_TOKENS_PADRAO = 6000
 _HISTORICO_NO_CORTE = 1
-_FATOS_NO_CORTE = 5
+_DATA_NO_INICIO = re.compile(r"\d{4}-\d{2}-\d{2}")
+_FATOS_NO_CORTE = 4  # os mais recentes têm prioridade (brief 091)
 
 # Cenário do exemplo deliberadamente distante de qualquer entrada real de teste (armadilha 24,
 # docs/PLAN_agente_nw.md): evita que o modelo copie o exemplo em vez de ler os dados. Os textos do exemplo
@@ -279,8 +281,30 @@ def _montar(entrada: EntradaRedacao) -> str:
     return "\n\n".join(bloco for bloco in blocos if bloco)
 
 
+def _mais_recentes(fatos: list[str]) -> list[str]:
+    """Os `_FATOS_NO_CORTE` fatos de data mais nova, inteiros, da mais nova para a mais antiga. Cada linha
+    começa pela data (`AAAA-MM-DD`); a ordenação é estável, então datas iguais ficam na ordem recebida."""
+    if not all(_DATA_NO_INICIO.match(fato) for fato in fatos):
+        return fatos[:_FATOS_NO_CORTE]  # sem data em alguma linha, vale a ordem recebida (já é a de recência)
+    return sorted(fatos, key=lambda fato: fato[:10], reverse=True)[:_FATOS_NO_CORTE]
+
+
+def fatos_nao_incluidos(entrada: EntradaRedacao, limite_tokens: int = LIMITE_TOKENS_PADRAO) -> list[str]:
+    """Os fatos que o corte por tamanho deixou fora do prompt, na ordem recebida; vazio se coube tudo. Quem
+    chama registra a lista: fato fora do prompt nunca some em silêncio (brief 091)."""
+    mantidos = list(cortar_por_tamanho(entrada, limite_tokens).fatos)
+    fora: list[str] = []
+    for fato in entrada.fatos:
+        if fato in mantidos:
+            mantidos.remove(fato)
+        else:
+            fora.append(fato)
+    return fora
+
+
 def cortar_por_tamanho(entrada: EntradaRedacao, limite_tokens: int = LIMITE_TOKENS_PADRAO) -> EntradaRedacao:
-    """Se o prompt estimado passa de `limite_tokens`, fica com 1 consulta de histórico e 5 fatos; se
+    """Se o prompt estimado passa de `limite_tokens`, fica com 1 consulta de histórico e os 4 fatos mais
+    recentes, inteiros e em ordem de data (o que sai é listado por `fatos_nao_incluidos`); se
     ainda passar, saem os moldes de outro contato; se ainda passar, sai a conversa do WhatsApp. O que o
     usuário escreveu nunca é sacrificado nem cortado: as notas, o comentário de cada consulta do histórico e
     o comentário de cada molde ficam, byte a byte (brief 050/061/048/081). Se ainda estourar, o prompt
@@ -291,7 +315,7 @@ def cortar_por_tamanho(entrada: EntradaRedacao, limite_tokens: int = LIMITE_TOKE
     cortada = replace(
         entrada,
         historico=entrada.historico[:_HISTORICO_NO_CORTE],
-        fatos=entrada.fatos[:_FATOS_NO_CORTE],
+        fatos=_mais_recentes(entrada.fatos),
         comentarios_preservados=perdidas,
     )
     if estimar_tokens(_montar(cortada)) <= limite_tokens:
