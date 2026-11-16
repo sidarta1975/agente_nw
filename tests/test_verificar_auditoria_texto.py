@@ -498,3 +498,59 @@ def test_sql_sh_e_json_da_extensao_entram_no_universo(arvore: Path) -> None:
 
     assert resultado.returncode == 0, resultado.stdout
     assert "8 arquivos" in resultado.stdout
+
+
+# --------------------------------------------------------------------------------------
+# Brief 081: o estado `CORRIGIDO (brief NNN)`, autorizado por Sidarta em 2026-11-16
+# --------------------------------------------------------------------------------------
+
+
+def _tabela_com_ponto(raiz: Path) -> list[str]:
+    tabela = _tabela_limpa(raiz)
+    tabela[0] = _linha_tabela(
+        "agente_nw/alfa.py", _linhas(raiz, "agente_nw/alfa.py"), "CORTA", "corta o texto", "P-001"
+    )
+    return tabela
+
+
+def test_corrigido_com_brief_no_disco_passa(arvore: Path) -> None:
+    _arvore(arvore, {"docs/briefs/brief_081_exemplo_2026-11-08.md": "# brief 081\n"})
+    pontos = [_ponto("P-001", "agente_nw/alfa.py:2", "T", estado="CORRIGIDO (brief 081)")]
+
+    resultado = _rodar(arvore, _relatorio(_tabela_com_ponto(arvore), pontos))
+
+    assert resultado.returncode == 0, resultado.stdout
+
+
+def test_corrigido_nao_conta_como_aguardando(arvore: Path) -> None:
+    _arvore(arvore, {"docs/briefs/brief_081_exemplo_2026-11-08.md": "# brief 081\n"})
+    pontos = [_ponto("P-001", "agente_nw/alfa.py:2", "T", estado="CORRIGIDO (brief 081)")]
+
+    resultado = _rodar(arvore, _relatorio(_tabela_com_ponto(arvore), pontos))
+
+    assert resultado.returncode == 0, resultado.stdout
+    assert "0 ponto(s) aguardando" in resultado.stdout
+
+
+def test_corrigido_citando_brief_que_nao_existe_falha(arvore: Path) -> None:
+    pontos = [_ponto("P-001", "agente_nw/alfa.py:2", "T", estado="CORRIGIDO (brief 777)")]
+
+    resultado = _rodar(arvore, _relatorio(_tabela_com_ponto(arvore), pontos))
+
+    assert resultado.returncode == 1
+    assert "P-001" in resultado.stdout
+    assert "777" in resultado.stdout
+
+
+@pytest.mark.parametrize(
+    "estado",
+    ["CORRIGIDO", "CORRIGIDO (brief)", "CORRIGIDO (brief 81)", "CORRIGIDO pelo brief 081", "RESOLVIDO"],
+)
+def test_estado_fora_dos_tres_continua_recusado(arvore: Path, estado: str) -> None:
+    _arvore(arvore, {"docs/briefs/brief_081_exemplo_2026-11-08.md": "# brief 081\n"})
+    pontos = [_ponto("P-001", "agente_nw/alfa.py:2", "T", estado=estado)]
+
+    resultado = _rodar(arvore, _relatorio(_tabela_com_ponto(arvore), pontos))
+
+    assert resultado.returncode == 1
+    assert "P-001" in resultado.stdout

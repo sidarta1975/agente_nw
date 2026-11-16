@@ -19,6 +19,7 @@ from agente_nw.nucleo.database.queries import itens as itens_q
 from agente_nw.nucleo.database.queries import listas as listas_q
 from agente_nw.nucleo.database.queries import nota_contato as nota_contato_q
 from agente_nw.nucleo.database.queries import perfil_tema as perfil_tema_q
+from agente_nw.nucleo.modelos.consulta_contato import ConsultaContato
 from agente_nw.nucleo.modelos.fato import Fato
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.perfil import Perfil
@@ -42,9 +43,10 @@ _TRECHO_DO_FATO_NO_PROMPT = 600  # o fato fica inteiro no banco; o prompt leva o
 _FATOS_RECENTES_GARANTIDOS = 4
 _CONSULTAS_NO_HISTORICO = 3
 _NOTAS_NO_PROMPT = 5
-_TRECHO_DA_NOTA = 400
 _MANCHETES_POR_ASSUNTO = 3
 _DIAS_POR_MES = 30
+# Rótulo que `_moldes` põe antes do comentário do usuário; o corte por tamanho usa para saber quais ficam.
+_ROTULO_COMENTARIO_DO_MOLDE = " — comentário do usuário: "
 _MARCA_ANTIGO = "[antigo]"
 _MARCA_DE_IMAGEM = "[de imagem]"
 # Lembrança do Facebook ("Há 4 anos", "Veja suas lembranças"): a data do fato é a da leitura.
@@ -147,19 +149,29 @@ def _fatos(
     return linhas
 
 
-def _historico(conexao: sqlite3.Connection, perfil_id: int, consulta_id: int) -> list[str]:
-    anteriores = [
+def _anteriores(conexao: sqlite3.Connection, perfil_id: int, consulta_id: int) -> list[ConsultaContato]:
+    return [
         c
         for c in consulta_contato_q.listar_por_perfil(conexao, perfil_id, _CONSULTAS_NO_HISTORICO + 1)
         if c.id != consulta_id
     ][:_CONSULTAS_NO_HISTORICO]
+
+
+def _historico(conexao: sqlite3.Connection, perfil_id: int, consulta_id: int) -> list[str]:
+    anteriores = _anteriores(conexao, perfil_id, consulta_id)
     return [historico_mod.formatar_uma(c, conexao) for c in anteriores]
+
+
+def _comentarios_do_historico(conexao: sqlite3.Connection, perfil_id: int, consulta_id: int) -> list[str]:
+    """Um item por consulta de `_historico`, na mesma ordem: só o comentário do usuário (brief 081)."""
+    anteriores = _anteriores(conexao, perfil_id, consulta_id)
+    return [historico_mod.comentarios_da_consulta(c, conexao) for c in anteriores]
 
 
 def _notas(conexao: sqlite3.Connection, perfil_id: int) -> list[str]:
     """As notas mais recentes do usuário sobre o contato, com a data (brief 050)."""
     return [
-        f"[{nota.criado_em[:10]}] {nota.texto[:_TRECHO_DA_NOTA]}"
+        f"[{nota.criado_em[:10]}] {nota.texto}"
         for nota in nota_contato_q.listar_por_perfil(conexao, perfil_id, _NOTAS_NO_PROMPT)
     ]
 
@@ -185,7 +197,7 @@ def _moldes(
     linhas = []
     for molde in moldes:
         marca = "usei" if molde.bom else "entreguei, ainda não confirmado se funcionou"
-        sufixo = f' — comentário do usuário: "{molde.comentario[:300]}"' if molde.comentario else ""
+        sufixo = f'{_ROTULO_COMENTARIO_DO_MOLDE}"{molde.comentario}"' if molde.comentario else ""
         linhas.append(f'[{marca}] "{molde.mensagem}"{sufixo}')
     molde_origem_id = moldes[0].id if moldes else None
     return linhas, molde_origem_id
@@ -236,6 +248,7 @@ def montar_entrada(
         pedido=pedido,
         frase=frase,
         historico=_historico(conexao, contato.id, resultado_consulta.consulta_id),
+        historico_comentarios=_comentarios_do_historico(conexao, contato.id, resultado_consulta.consulta_id),
         assuntos=[_assunto_para_redacao(conexao, item) for item in assuntos],
         contexto_relacao=perfil_tema_q.listar_nomes_do_contato(conexao, contato.id),
         notas=_notas(conexao, contato.id),
@@ -243,6 +256,7 @@ def montar_entrada(
             conexao, contato.id, contato.apelido or contato.nome, trocas_whatsapp_no_prompt
         ),
         moldes=linhas_moldes,
+        moldes_comentados=[linha for linha in linhas_moldes if _ROTULO_COMENTARIO_DO_MOLDE in linha],
         molde_origem_id=molde_origem_id,
         genero_gramatical=contato.genero_gramatical,
     )

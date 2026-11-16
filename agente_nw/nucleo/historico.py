@@ -55,9 +55,21 @@ def _formatar_ganchos(conexao: sqlite3.Connection, consulta_id: int) -> str | No
             mensagem = dados.get("mensagem")
             trecho = f' — mensagem: "{mensagem[:100]}"' if isinstance(mensagem, str) and mensagem else ""
             comentario = comentarios.get(assunto_id)
-            nota = f' — comentário do usuário: "{comentario[:300]}"' if comentario else ""
+            nota = f' — comentário do usuário: "{comentario}"' if comentario else ""
             partes.append(f"{titulo} ({status}){trecho}{nota}")
     return " · ".join(partes) or None
+
+
+def comentarios_da_consulta(consulta: ConsultaContato, conexao: sqlite3.Connection) -> str:
+    """Só o que o usuário escreveu sobre as mensagens da consulta, inteiro (brief 081): é o que
+    `cortar_por_tamanho` conserva quando sacrifica o resto do histórico. Vazio se não houve comentário."""
+    if consulta.id is None:
+        return ""
+    comentarios = gancho_uso_queries.comentarios_por_consulta(conexao, consulta.id)
+    if not comentarios:
+        return ""
+    partes = [f'comentário do usuário: "{comentario}"' for comentario in comentarios.values() if comentario]
+    return f"[{consulta.criado_em[:10]}] " + " · ".join(partes) if partes else ""
 
 
 def formatar_uma(consulta: ConsultaContato, conexao: sqlite3.Connection | None = None) -> str:

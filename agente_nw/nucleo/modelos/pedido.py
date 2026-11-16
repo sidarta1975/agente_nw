@@ -85,10 +85,16 @@ class PedidoExtraido(BaseModel):
             if chave in CHAVES_DE_PISTA and isinstance(texto, str) and texto.strip()
         }
 
-    @field_validator("interessa", "evitar", "sobre_o_usuario")
+    @field_validator("interessa", "sobre_o_usuario")
     @classmethod
     def lista_sem_duplicatas(cls, valor: list[str]) -> list[str]:
         return _sem_duplicatas(valor)[:_MAXIMO_INTERESSA]
+
+    @field_validator("evitar")
+    @classmethod
+    def evitar_inteiro(cls, valor: list[str]) -> list[str]:
+        """Sem teto: o termo cortado deixaria de ser conferido (brief 081)."""
+        return _sem_duplicatas(valor)
 
     @field_validator("termos_busca")
     @classmethod

@@ -63,6 +63,11 @@ RESULTADOS = ("CERTIFICADO", "CORTA", "NÃO ANALÍTICO", "NÃO CONFERIDO")
 
 ESTADO_ABERTO = "AGUARDANDO DECISÃO DE SIDARTA"
 ESTADO_APROVADO = "EXCEÇÃO APROVADA"
+# Terceiro estado, autorizado por Sidarta em 2026-11-16: o ponto foi corrigido por um brief, que
+# precisa ser citado pelo número e existir em `docs/briefs/`. Não é exceção (nada a aprovar) e não
+# espera decisão, então sai da contagem de "aguardando".
+ESTADO_CORRIGIDO = "CORRIGIDO (brief NNN)"
+_ESTADO_CORRIGIDO = re.compile(r"^CORRIGIDO \(brief (?P<numero>\d{3})\)$", re.IGNORECASE)
 
 CAMPOS_DO_PONTO = (
     "Classe",
@@ -242,7 +247,17 @@ def _campo(ponto: Ponto, rotulo: str) -> str | None:
     return None
 
 
-def _conferir_ponto(ponto: Ponto, texto_excecoes: str) -> list[str]:
+def numeros_de_brief(raiz: Path) -> frozenset[str]:
+    """Os números dos briefs que existem em `docs/briefs/`, para conferir o estado `CORRIGIDO`."""
+    numeros: set[str] = set()
+    for caminho in (raiz / "docs" / "briefs").glob("brief_*.md"):
+        achado = re.match(r"brief_(\d{3})_", caminho.name)
+        if achado is not None:
+            numeros.add(achado.group(1))
+    return frozenset(numeros)
+
+
+def _conferir_ponto(ponto: Ponto, texto_excecoes: str, briefs: frozenset[str]) -> list[str]:
     erros: list[str] = []
     if _ARQUIVO_LINHA.search(ponto.titulo) is None:
         erros.append(f"ponto {ponto.identificador}: o título não traz `arquivo:linha`")
@@ -271,9 +286,17 @@ def _conferir_ponto(ponto: Ponto, texto_excecoes: str) -> list[str]:
                 "registro de exceções (docs/EXCECOES_TEXTO_INTEGRAL.md) com "
                 '"Aprovado por Sidarta em AAAA-MM-DD"'
             )
+    elif (corrigido := _ESTADO_CORRIGIDO.match(estado)) is not None:
+        numero = corrigido.group("numero")
+        if numero not in briefs:
+            erros.append(
+                f"ponto {ponto.identificador}: estado {estado!r} cita o brief {numero}, que não existe "
+                "em docs/briefs/"
+            )
     elif _normalizar(estado) != _normalizar(ESTADO_ABERTO):
         erros.append(
-            f"ponto {ponto.identificador}: estado {estado!r} não é {ESTADO_ABERTO!r} nem {ESTADO_APROVADO!r}"
+            f"ponto {ponto.identificador}: estado {estado!r} não é {ESTADO_ABERTO!r}, "
+            f"{ESTADO_APROVADO!r} nem {ESTADO_CORRIGIDO!r}"
         )
     return erros
 
@@ -338,8 +361,9 @@ def verificar(raiz: Path, caminho_relatorio: Path, caminho_excecoes: Path) -> tu
                 if identificador not in pontos:
                     erros.append(f"{arquivo}: cita o ponto {identificador}, que não existe no relatório")
 
+    briefs = numeros_de_brief(raiz)
     for identificador in sorted(pontos):
-        erros.extend(_conferir_ponto(pontos[identificador], texto_excecoes))
+        erros.extend(_conferir_ponto(pontos[identificador], texto_excecoes, briefs))
 
     ocorrencias = varrer(raiz, universo)
     erros.extend(_conferir_citacoes(ocorrencias, texto_relatorio))

@@ -116,9 +116,10 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 
 ## 1. Resumo para Sidarta
 
-Li **todos os 319 arquivos de código do projeto, do início ao fim** (315 que já existiam, mais os 2
-criados por este brief e os 2 que o brief 086 criou depois, `scripts/executar_serie.sh` e
-`tests/test_executar_serie.py`, recertificados pelo brief 080): 15.288 linhas em `agente_nw/`, 2.903 em `cli.py`/console/ponte, 1.551 em
+Li **todos os 320 arquivos de código do projeto, do início ao fim** (315 que já existiam, mais os 2
+criados por este brief, os 2 que o brief 086 criou depois, `scripts/executar_serie.sh` e
+`tests/test_executar_serie.py`, recertificados pelo brief 080, e o `tests/test_texto_do_usuario_inteiro.py`
+do brief 081): 15.288 linhas em `agente_nw/`, 2.903 em `cli.py`/console/ponte, 1.551 em
 `scripts/`, `config/` e `extensao/`, e 21.323 nos 158 arquivos de teste — 38.289 linhas no total (medidas em 2026-11-08; os dois arquivos
 do brief 086 somam 683 linhas, e as duas contagens corrigidas na seção 6 mudaram em 142).
 Nenhum arquivo ficou `NÃO CONFERIDO`.
@@ -144,8 +145,8 @@ Os cinco mais graves, em uma linha cada:
 Além dos 45, há 7 cortes que **não** alimentam análise (data, log, tela) na seção 4, com a prova de
 cada um; se você discordar de qualquer linha dessa seção, ela volta para a seção 3.
 
-O verificador (`scripts/verificar_auditoria_texto.py`) confere que nada ficou fora: 319 arquivos na
-tabela, um por arquivo, com a contagem de linhas batendo com o disco; 1.275 ocorrências da varredura
+O verificador (`scripts/verificar_auditoria_texto.py`) confere que nada ficou fora: 320 arquivos na
+tabela, um por arquivo, com a contagem de linhas batendo com o disco; 1.290 ocorrências da varredura
 mecânica, todas com destino; e nenhuma exceção aprovada por quem não pode. Saída dele:
 
 ```
@@ -169,7 +170,7 @@ e o `manifest.json`, os `*.py` da raiz (não há nenhum) e `tests/**/*.py`. Fica
 `node_modules/`, `__pycache__/`, `dados/`, `logs/`, `docs/` e `.git/`. Duas inclusões vão além da
 letra do brief, de propósito, porque cobrir mais nunca cobre menos: `agente_nw/**/*.yaml` (por causa
 de `nucleo/prompts/exemplos_conversavel.yaml`, que é dado de prompt) e o `extensao/manifest.json`
-(citado no próprio item 3.7). Deu **317** arquivos em 2026-11-08 e **319** depois do brief 086. Ficaram fora da tabela, por serem dados e não
+(citado no próprio item 3.7). Deu **317** arquivos em 2026-11-08, **319** depois do brief 086 e **320** depois do brief 081. Ficaram fora da tabela, por serem dados e não
 código: os templates HTML do console (18 arquivos, só apresentação) e as 8 fixturas de dados de
 `tests/fixtures/` — estas estão cobertas na linha de certificação do teste que as lê.
 
@@ -482,7 +483,7 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Proposta do executor: aprovar. Dez trocas bastam para o tom e é o bloco que `cortar_por_tamanho` sacrifica primeiro quando o prompt estoura (P-033) — o que é coerente: tom é o que menos se perde.
 - Estado: EXCEÇÃO APROVADA
 - Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
-- Onde mais aparece: `agente_nw/nucleo/redacao.py:242`; `config/limiares.yaml:73`.
+- Onde mais aparece: `agente_nw/nucleo/redacao.py:255`; `config/limiares.yaml:73`.
 
 #### P-024 — agente_nw/coleta/whatsapp/leitor.py:102 — o que da exportação é lido
 - Classe: C
@@ -508,7 +509,7 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Decisão de Sidarta: ____
 - Onde mais aparece: `agente_nw/nucleo/database/queries/perfis.py:613`, `:614`.
 
-#### P-026 — agente_nw/nucleo/redacao.py:101 — `_escolher_fatos` e `_fatos`
+#### P-026 — agente_nw/nucleo/redacao.py:103 — `_escolher_fatos` e `_fatos`
 - Classe: C e T
 - O que é cortado e quanto: 40 fatos candidatos lidos do banco (`_FATOS_CANDIDATOS`), 10 no prompt (`_FATOS_NO_PROMPT`), dos quais 4 garantidos por recência; a escolha dos outros 6 é por cosseno sobre `f.conteudo[:600]` (l. 108) e cada fato entra no prompt com 600 caracteres (l. 146).
 - Qual decisão do produto depende desse corte: a "peculiaridade" concreta que abre a mensagem base — o coração do produto (AGENTS §7).
@@ -517,7 +518,7 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Proposta do executor: o teto de 10 fatos tem justificativa de janela (o prompt de redação é o maior do produto). O corte em 600 caracteres é o que eu questionaria: a peculiaridade útil costuma estar no meio de um post. Proponho um brief que troque "600 caracteres de 10 fatos" por "o que couber no orçamento de tokens, fato inteiro, priorizando os 4 recentes" — o orçamento do P-033 já existe para isso.
 - Estado: AGUARDANDO DECISÃO DE SIDARTA
 - Decisão de Sidarta: ____
-- Onde mais aparece: `agente_nw/nucleo/redacao.py:108`, `:136`, `:146`; `agente_nw/nucleo/database/queries/fatos.py:34`.
+- Onde mais aparece: `agente_nw/nucleo/redacao.py:110`, `:136`, `:146`; `agente_nw/nucleo/database/queries/fatos.py:34`.
 
 #### P-027 — agente_nw/nucleo/termos_contato.py:60 — `termos_do_contato`
 - Classe: C e T
@@ -537,9 +538,9 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `657edaa`
 - Justificativa existente: nenhuma.
 - Proposta do executor: o corte da mensagem em 100 caracteres é defensável (para saber que não deve repetir, o começo basta). O do comentário do usuário não: é texto que **você** escreveu para corrigir a redação, e é o único lugar do produto em que a sua palavra chega truncada ao modelo. Proponho corrigir o comentário (300 → inteiro, ou 1.200) e manter o resto. Custo: uma linha e um brief pequeno.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
-- Onde mais aparece: `agente_nw/nucleo/historico.py:58`, `:10`; `agente_nw/nucleo/redacao.py:153`, `:155`; `agente_nw/nucleo/consulta.py:246`; `agente_nw/nucleo/database/queries/consulta_contato.py:54`.
+- Estado: CORRIGIDO (brief 081)
+- Decisão de Sidarta: corrigir (brief 081): o comentário do usuário entra inteiro; a mensagem entregue continua em 100 caracteres e as 5 consultas, por decisão 2.1 e 2.2 do brief 081
+- Onde mais aparece: `agente_nw/nucleo/historico.py:58`, `:10`; `agente_nw/nucleo/redacao.py:155`, `:155`; `agente_nw/nucleo/consulta.py:246`; `agente_nw/nucleo/database/queries/consulta_contato.py:54`.
 
 #### P-029 — agente_nw/nucleo/redacao.py:162 — `_notas`
 - Classe: T e C
@@ -548,8 +549,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `2c31eac`
 - Justificativa existente: nenhuma.
 - Proposta do executor: mesmo argumento do P-028, e aqui é mais forte: a nota é o canal pelo qual você conserta o que o programa entendeu errado. Proponho que a nota entre inteira e que `cortar_por_tamanho` continue protegendo-a (ele já protege: a nota é o único bloco que ele nunca remove). Custo: uma linha.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: CORRIGIDO (brief 081)
+- Decisão de Sidarta: corrigir (brief 081): a nota entra inteira (decisão 2.1 do brief 081); `cortar_por_tamanho` continua protegendo-a
 - Onde mais aparece: `agente_nw/nucleo/database/queries/nota_contato.py:49`.
 
 #### P-030 — agente_nw/nucleo/redacao.py:188 — `_moldes`
@@ -559,11 +560,11 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `0bdd9be`
 - Justificativa existente: o `moldes.maximo` está no YAML com comentário; o 300 do comentário não tem nenhuma.
 - Proposta do executor: manter os 2 moldes (mais do que isso empurra o modelo a copiar) e corrigir o 300, junto com P-028 e P-029 — os três são a mesma decisão: "o que o usuário escreve não é cortado".
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: CORRIGIDO (brief 081)
+- Decisão de Sidarta: corrigir (brief 081): o comentário do molde entra inteiro e `cortar_por_tamanho` o protege; os 2 moldes ficam (decisões 2.1, 2.2 e 2.4 do brief 081)
 - Onde mais aparece: `agente_nw/nucleo/database/queries/consulta_contato.py:123`; `config/limiares.yaml:77`.
 
-#### P-031 — agente_nw/nucleo/redacao.py:69 — `_assunto_para_redacao`
+#### P-031 — agente_nw/nucleo/redacao.py:71 — `_assunto_para_redacao`
 - Classe: C e R
 - O que é cortado e quanto: 3 itens por assunto (`_MANCHETES_POR_ASSUNTO`) e, desses, só a manchete ("veículo, data: título"). O corpo da notícia é carregado em `LinkNoticia.texto` (l. 78) e usado na tela, mas **não entra no prompt**: `_bloco_assuntos` (`prompts/redigir_ganchos.py:176-190`) usa título, `por_que`, resumo do cartão e manchetes.
 - Qual decisão do produto depende desse corte: o texto da notícia que a mensagem leva ao contato. O modelo escreve "duas frases de notícia" a partir de título e resumo do cartão (que é o P-007).
@@ -592,7 +593,7 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Proposta do executor: aprovar o mecanismo — é o que impede o estouro de janela na única tarefa em que alguém olhou para isso — e pedir duas coisas num brief: que a estimativa de 1,4 token por palavra seja conferida contra o tokenizador real uma vez (um erro de 20% aqui é um prompt cortado em silêncio) e que a ordem de sacrifício fique documentada na ARQUITETURA, porque é decisão de produto: hoje o projeto prefere perder histórico e fatos a perder molde e tom.
 - Estado: EXCEÇÃO APROVADA
 - Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
-- Onde mais aparece: `agente_nw/nucleo/prompts/redigir_ganchos.py:294`, `:93`; `agente_nw/cli.py:921`; `agente_nw/nucleo/fluxo.py:364`; `agente_nw/console/app.py:164`.
+- Onde mais aparece: `agente_nw/nucleo/prompts/redigir_ganchos.py:309`, `:93`; `agente_nw/cli.py:921`; `agente_nw/nucleo/fluxo.py:364`; `agente_nw/console/app.py:164`.
 
 ### 3.e. O que o próprio usuário escreve
 
@@ -603,9 +604,9 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `322341c`
 - Justificativa existente: nenhuma.
 - Proposta do executor: corrigir, pelo menos para o `evitar`. Cortar o que o usuário manda evitar é a falha mais difícil de defender desta auditoria: o programa promete não falar de X e pode falar de X porque X era o sexto item. O custo é baixo (o `evitar` não vai para prompt grande; é correspondência literal). Para `interessa` e `termos_busca` o teto é razoável, porque eles viram buscas e já há teto de buscas (P-005).
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
-- Onde mais aparece: `agente_nw/nucleo/modelos/pedido.py:101`.
+- Estado: CORRIGIDO (brief 081)
+- Decisão de Sidarta: corrigir (brief 081): `evitar` sem teto; `interessa` (5), `sobre_o_usuario` (5) e `termos_busca` (6) não mudam (decisão 2.3 do brief 081)
+- Onde mais aparece: `agente_nw/nucleo/modelos/pedido.py:107`.
 
 #### P-035 — agente_nw/nucleo/pedido.py:39 — `extrair`
 - Classe: C
@@ -739,7 +740,7 @@ Você pode contestar qualquer linha desta seção: contestada, ela vira ponto da
 - Classe: NA
 - O que é cortado e quanto: `[:10]` (o dia) e `[:7]` (o mês) sobre uma data ISO 8601, em 10 lugares.
 - Prova de que não entra em decisão: o valor cortado é uma data, não um texto de conteúdo: `agora[:10]` é o dia da consulta (`consulta.py:212`, `cruzamento.py:201`, `:336`), `criado_em[:10]` é a data mostrada no histórico (`historico.py:64`, `redacao.py:70`, `:139`), `fromisoformat(data[:10])` é a conversão para `date` (`redacao.py:120`, `inferencia.py:269`) e `enviada_em[:7]` é a chave `AAAA-MM` do agrupamento por mês (`conversa.py:92`). Em nenhum deles existe texto depois do caractere 10 que importe: o resto é a hora.
-- Onde mais aparece: `agente_nw/nucleo/consulta.py:212`; `agente_nw/nucleo/relevancia/cruzamento.py:201`, `:336`; `agente_nw/nucleo/redacao.py:70`, `:120`, `:139`; `agente_nw/nucleo/historico.py:64`; `agente_nw/perfil/inferencia.py:269`; `agente_nw/nucleo/database/queries/conversa.py:92`.
+- Onde mais aparece: `agente_nw/nucleo/consulta.py:212`; `agente_nw/nucleo/relevancia/cruzamento.py:201`, `:336`; `agente_nw/nucleo/redacao.py:72`, `:120`, `:139`; `agente_nw/nucleo/historico.py:76`; `agente_nw/perfil/inferencia.py:269`; `agente_nw/nucleo/database/queries/conversa.py:92`.
 
 #### NA-002 — agente_nw/coleta/capturas/busca.py:140 — trecho da página na mensagem de erro
 - Classe: NA
@@ -864,7 +865,7 @@ YAML. Essa é a chamada que eu mediria primeiro se você aprovar o P-040.
 
 ## 6. Certificação por arquivo
 
-Os 319 arquivos do universo, um por linha, na ordem do caminho. `Linhas lidas/total` foi conferido
+Os 320 arquivos do universo, um por linha, na ordem do caminho. `Linhas lidas/total` foi conferido
 com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pontos das seções 3 e 4.
 
 | Arquivo | Linhas lidas/total | Resultado | Evidência (uma linha) | Ponto |
@@ -924,7 +925,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | agente_nw/nucleo/database/queries/sistema.py | 63/63 | CERTIFICADO | Não manipula texto de conteúdo: versão de esquema, progresso, bloqueio por host e termo buscado (chave = prefixo + valor inteiro). | — |
 | agente_nw/nucleo/database/queries/temas.py | 105/105 | CERTIFICADO | Nome, descrição e sinônimos gravados e lidos inteiros; `listar_com_embedding` devolve **todos** os temas com vetor do modelo atual. | — |
 | agente_nw/nucleo/fluxo.py | 482/482 | CORTA | fluxo do pedido (status, perguntas, retomada); não lê texto de conteúdo, mas é aqui que nasce o orçamento de prompt `num_ctx * 0,73` que corta o prompt da redação | P-033 |
-| agente_nw/nucleo/historico.py | 85/85 | CORTA | o histórico que vai ao prompt `redigir_ganchos` leva a mensagem cortada em 100 caracteres e o comentário do usuário em 300, e só as 5 consultas mais recentes | P-028, NA-001 |
+| agente_nw/nucleo/historico.py | 97/97 | CORTA | o histórico que vai ao prompt `redigir_ganchos` leva a mensagem entregue cortada em 100 caracteres (o comentário do usuário entra inteiro desde o brief 081), e só as 5 consultas mais recentes | P-028, NA-001 |
 | agente_nw/nucleo/llm.py | 632/632 | CORTA | repassa `num_ctx` e `num_predict` da tarefa ao provedor (l. 240-251, 365, 473, 560) sem medir o prompt nem conferir se a resposta veio cortada; o texto do prompt chega e sai inteiro | P-040, P-042 |
 | agente_nw/nucleo/localizacao.py | 412/412 | CORTA | localiza a pessoa nas redes; o desempate por LLM vê só o `cabecalho` de cada candidata, os parecidos param em `maximo_parecidas` e a deduplicação do fato olha 200 fatos | P-020, P-021, NA-002 |
 | agente_nw/nucleo/modelos/__init__.py | 0/0 | CERTIFICADO | Arquivo vazio (0 bytes): só marca o pacote. | — |
@@ -944,7 +945,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | agente_nw/nucleo/modelos/lista_rede_social.py | 21/21 | CERTIFICADO | Contrato de entrada de lista (nome, cabeçalho, link) sem corte. | — |
 | agente_nw/nucleo/modelos/localizacao.py | 41/41 | CERTIFICADO | `Localizacao.opcoes` é declarada "todas, da mais para a menos provável" (linha 28); nenhum corte aqui. | — |
 | agente_nw/nucleo/modelos/marcacao.py | 15/15 | CERTIFICADO | Contrato da marcação do usuário; `motivo` sem limite. | — |
-| agente_nw/nucleo/modelos/pedido.py | 116/116 | CORTA | Dois `field_validator` cortam listas vindas do pedido do usuário antes de qualquer análise (5 itens; 6 termos de busca). | P-034 |
+| agente_nw/nucleo/modelos/pedido.py | 122/122 | CORTA | Dois `field_validator` cortam listas vindas do pedido do usuário antes de qualquer análise (5 itens em `interessa` e `sobre_o_usuario`; 6 termos de busca); `evitar` ficou sem teto no brief 081. | P-034 |
 | agente_nw/nucleo/modelos/perfil.py | 35/35 | CERTIFICADO | contrato Pydantic do perfil: campos de texto (`notas`, `formacao`, `cargo`…) sem limite de tamanho e sem validador que corte | — |
 | agente_nw/nucleo/modelos/perfil_tema.py | 23/23 | CERTIFICADO | Contrato do vínculo tema↔perfil; nenhum texto de conteúdo. | — |
 | agente_nw/nucleo/modelos/proveniencia.py | 23/23 | CERTIFICADO | Só metadado de quem gerou a linha; não manipula texto de conteúdo. | — |
@@ -966,10 +967,10 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | agente_nw/nucleo/prompts/extrair_pedido.py | 91/91 | CERTIFICADO | põe a frase do usuário inteira no prompt (l. 89) e a lista de contatos que recebe; o teto de 50 contatos é de `pedido.py` (P-035) | — |
 | agente_nw/nucleo/prompts/prerotular_calibracao.py | 63/63 | CERTIFICADO | monta o prompt com os dois títulos e os dois trechos que recebe, cercados por inteiro; o trecho de 2.000 caracteres é cortado em `calibracao.py` (P-008) | — |
 | agente_nw/nucleo/prompts/qualificar.py | 81/81 | CERTIFICADO | monta o prompt com os pares (título, domínio) que recebe, cada título cercado por inteiro; o texto do item já não existe aqui (P-002/P-006) | — |
-| agente_nw/nucleo/prompts/redigir_ganchos.py | 298/298 | CORTA | `cortar_por_tamanho` é o único estimador de tamanho de prompt do projeto (palavras × 1,4 contra 6.000 tokens) e corta histórico para 1, fatos para 5, depois moldes, depois WhatsApp | P-033 |
+| agente_nw/nucleo/prompts/redigir_ganchos.py | 313/313 | CORTA | `cortar_por_tamanho` é o único estimador de tamanho de prompt do projeto (palavras × 1,4 contra 6.000 tokens) e corta histórico para 1, fatos para 5, depois moldes, depois WhatsApp | P-033 |
 | agente_nw/nucleo/prompts/rotular.py | 40/40 | CERTIFICADO | monta o prompt com os pares (título, domínio) que recebe, cercados por inteiro; nenhum corte próprio | — |
 | agente_nw/nucleo/prompts/seguranca.py | 40/40 | CERTIFICADO | cerca o texto de terceiro por inteiro e só neutraliza marcador forjado trocando `<` e `>` por espaço — nenhum caractere é removido | — |
-| agente_nw/nucleo/redacao.py | 365/365 | CORTA | monta a entrada de `redigir_ganchos`: fatos (10 de 40, 600 caracteres cada), notas do usuário (5, 400 caracteres), histórico (3 consultas), moldes (comentário 300), WhatsApp (10 trocas), manchetes (3 por assunto, só título) | P-023, P-026, P-028, P-029, P-030, P-031, NA-001 |
+| agente_nw/nucleo/redacao.py | 379/379 | CORTA | monta a entrada de `redigir_ganchos`: fatos (10 de 40, 600 caracteres cada), notas do usuário (5, inteiras), histórico (3 consultas), moldes (comentário inteiro), WhatsApp (10 trocas), manchetes (3 por assunto, só título) | P-023, P-026, P-028, P-029, P-030, P-031, NA-001 |
 | agente_nw/nucleo/relevancia/__init__.py | 0/0 | CERTIFICADO | arquivo vazio: só marca o pacote | — |
 | agente_nw/nucleo/relevancia/candidatos.py | 83/83 | CORTA | a seleção ranqueia por cosseno e fica com `candidatos_por_contato`; `termo_evitado` casa o termo só em título + resumo do cartão | P-009, P-012 |
 | agente_nw/nucleo/relevancia/cartoes.py | 102/102 | CORTA | prompt `cartao` recebe (título, domínio, 300 primeiros caracteres) dos 5 itens mais recentes | P-007 |
@@ -1027,7 +1028,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | scripts/migracoes/018_molde_rastreio.sql | 9/9 | CERTIFICADO | uma coluna de id (`molde_origem_id`); nenhum texto. | — |
 | scripts/migracoes/019_proveniencia.sql | 63/63 | CERTIFICADO | 15 colunas de proveniência `TEXT NULL` e recriação das três tabelas vec0 copiando **todas** as linhas e vetores (`SELECT ... FROM _copia_*`, sem `WHERE`/`LIMIT`), com backfill `'bge-m3'`. | — |
 | scripts/verificar.sh | 65/65 | NÃO ANALÍTICO | o gate (ruff, format, mypy, pytest); a saída completa vai para `logs/verificar_ultimo.txt` e só a tela é encurtada (`head -n 15`, `tail -n 1`). | NA-006 |
-| scripts/verificar_auditoria_texto.py | 414/414 | CERTIFICADO | não manipula texto de conteúdo: enumera o universo, lê o relatório desta auditoria e varre o código em busca de padrões de corte | — |
+| scripts/verificar_auditoria_texto.py | 438/438 | CERTIFICADO | não manipula texto de conteúdo: enumera o universo, lê o relatório desta auditoria e varre o código em busca de padrões de corte | — |
 | tests/__init__.py | 0/0 | CERTIFICADO | Arquivo vazio. | — |
 | tests/coleta_falsa.py | 117/117 | CERTIFICADO | Rede falsa (Google/Bing/RSS); página de notícia de ~840 caracteres ("Texto relevante..." x20) e títulos curtos: nunca exerce um texto longo. | — |
 | tests/llm_falso.py | 30/30 | CERTIFICADO | Proveniência falsa e parsers do prompt (divide candidatos/assuntos numerados); sem manipular texto de conteúdo. | — |
@@ -1182,8 +1183,9 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | tests/test_sem_redes_sociais.py | 74/74 | CERTIFICADO | Botao "sem redes sociais" no console Flask; sem texto de conteudo. | — |
 | tests/test_temas_atualizar.py | 33/33 | CERTIFICADO | `temas.atualizar` regrava descricao e sinonimos; descricoes curtas, sem corte. | — |
 | tests/test_termos_contato.py | 89/89 | CERTIFICADO | Documenta teto de 3 termos e rejeicao de termo > 5 palavras em `termos_contato.py`; os fatos de teste sao curtos e escondem os cortes de 12 fatos e 300 caracteres por fato do prompt. | — |
+| tests/test_texto_do_usuario_inteiro.py | 165/165 | CERTIFICADO | Testa que comentário do histórico, nota, comentário do molde e `evitar` chegam inteiros ao prompt e à conferência; o texto que passa é fictício e nada vai a modelo real. | — |
 | tests/test_validacao_base.py | 69/69 | CERTIFICADO | Documenta `validar_ganchos`: base antes, so 1 base, `MAXIMO_GANCHOS` de noticia, limite 80 palavras da base. | — |
-| tests/test_verificar_auditoria_texto.py | 500/500 | CERTIFICADO | só exercita o verificador contra árvores e relatórios sintéticos em `tmp_path`; não constrói entrada de produção | — |
+| tests/test_verificar_auditoria_texto.py | 556/556 | CERTIFICADO | só exercita o verificador contra árvores e relatórios sintéticos em `tmp_path`; não constrói entrada de produção | — |
 | tests/test_vetores.py | 33/33 | CERTIFICADO | `cosseno` e `centroide` com vetores pequenos; sem texto. | — |
 | tests/test_whatsapp_importador.py | 289/289 | CERTIFICADO | Documenta `meses_extraidos=2` (so os 2 meses mais recentes, julho fora); mensagens de 1 linha escondem `maximo_caracteres_bloco=6000`, que nenhum teste exercita. | — |
 | tests/test_whatsapp_leitor.py | 109/109 | CERTIFICADO | Parser da exportacao (iPhone/Android/zip); descarta midia/aviso do sistema/mensagem apagada, emenda linhas, sem cortar texto de mensagem real. | — |
@@ -1222,9 +1224,9 @@ perdido, mas o modelo não enxerga a conversa inteira de uma vez.
 
 ## 8. Apêndice A — varredura mecânica, com o destino de cada ocorrência
 
-Os padrões do passo 3 do brief, aplicados pelo verificador aos 319 arquivos do universo (a lista
-exata está em `scripts/verificar_auditoria_texto.py`, `PADROES_VARREDURA`). **1.275 ocorrências** (1.272 em 2026-11-08, mais as 3 de
-`scripts/executar_serie.sh`),
+Os padrões do passo 3 do brief, aplicados pelo verificador aos 320 arquivos do universo (a lista
+exata está em `scripts/verificar_auditoria_texto.py`, `PADROES_VARREDURA`). **1.290 ocorrências** (1.272 em 2026-11-08, mais as 3 de
+`scripts/executar_serie.sh` e as 15 do brief 081, entre elas a mudança de linha dentro do próprio verificador),
 todas com destino. O comando e a saída crua:
 
 ```
@@ -1242,8 +1244,8 @@ neste relatório — é o que impede que uma ocorrência fique sem resposta.
 **NA-001** — 10 ocorrência(s):
 
 ```
-agente_nw/cli.py:1068 agente_nw/nucleo/consulta.py:212 agente_nw/nucleo/database/queries/conversa.py:92 agente_nw/nucleo/historico.py:64
-agente_nw/nucleo/redacao.py:120 agente_nw/nucleo/redacao.py:139 agente_nw/nucleo/redacao.py:70 agente_nw/nucleo/relevancia/cruzamento.py:201
+agente_nw/cli.py:1068 agente_nw/nucleo/consulta.py:212 agente_nw/nucleo/database/queries/conversa.py:92 agente_nw/nucleo/historico.py:76
+agente_nw/nucleo/redacao.py:122 agente_nw/nucleo/redacao.py:141 agente_nw/nucleo/redacao.py:72 agente_nw/nucleo/relevancia/cruzamento.py:201
 agente_nw/nucleo/relevancia/cruzamento.py:336 agente_nw/perfil/inferencia.py:269
 ```
 
@@ -1374,7 +1376,7 @@ agente_nw/coleta/whatsapp/importador.py:51 agente_nw/nucleo/database/queries/con
 **P-023** — 3 ocorrência(s):
 
 ```
-agente_nw/nucleo/database/queries/conversa.py:46 agente_nw/nucleo/redacao.py:242 config/limiares.yaml:73
+agente_nw/nucleo/database/queries/conversa.py:46 agente_nw/nucleo/redacao.py:255 config/limiares.yaml:73
 ```
 
 **P-025** — 1 ocorrência(s):
@@ -1386,7 +1388,7 @@ agente_nw/nucleo/database/queries/perfis.py:629
 **P-026** — 4 ocorrência(s):
 
 ```
-agente_nw/nucleo/database/queries/fatos.py:34 agente_nw/nucleo/redacao.py:101 agente_nw/nucleo/redacao.py:108 agente_nw/nucleo/redacao.py:146
+agente_nw/nucleo/database/queries/fatos.py:34 agente_nw/nucleo/redacao.py:103 agente_nw/nucleo/redacao.py:110 agente_nw/nucleo/redacao.py:148
 ```
 
 **P-027** — 2 ocorrência(s):
@@ -1398,7 +1400,7 @@ agente_nw/nucleo/termos_contato.py:60 agente_nw/nucleo/termos_contato.py:76
 **P-028** — 4 ocorrência(s):
 
 ```
-agente_nw/nucleo/historico.py:10 agente_nw/nucleo/historico.py:56 agente_nw/nucleo/historico.py:58 agente_nw/nucleo/redacao.py:155
+agente_nw/nucleo/historico.py:10 agente_nw/nucleo/historico.py:56 agente_nw/nucleo/historico.py:58 agente_nw/nucleo/redacao.py:157
 ```
 
 **P-029** — 2 ocorrência(s):
@@ -1416,7 +1418,7 @@ agente_nw/nucleo/database/queries/consulta_contato.py:123 agente_nw/nucleo/redac
 **P-031** — 1 ocorrência(s):
 
 ```
-agente_nw/nucleo/redacao.py:69
+agente_nw/nucleo/redacao.py:71
 ```
 
 **P-032** — 1 ocorrência(s):
@@ -1425,17 +1427,17 @@ agente_nw/nucleo/redacao.py:69
 agente_nw/nucleo/modelos/redacao.py:141
 ```
 
-**P-033** — 5 ocorrência(s):
+**P-033** — 6 ocorrência(s):
 
 ```
-agente_nw/cli.py:921 agente_nw/console/app.py:164 agente_nw/nucleo/fluxo.py:364 agente_nw/nucleo/prompts/redigir_ganchos.py:287
-agente_nw/nucleo/prompts/redigir_ganchos.py:294
+agente_nw/cli.py:921 agente_nw/console/app.py:164 agente_nw/nucleo/fluxo.py:364 agente_nw/nucleo/prompts/redigir_ganchos.py:298
+agente_nw/nucleo/prompts/redigir_ganchos.py:299 agente_nw/nucleo/prompts/redigir_ganchos.py:309
 ```
 
 **P-034** — 2 ocorrência(s):
 
 ```
-agente_nw/nucleo/modelos/pedido.py:101 agente_nw/nucleo/modelos/pedido.py:91
+agente_nw/nucleo/modelos/pedido.py:107 agente_nw/nucleo/modelos/pedido.py:91
 ```
 
 **P-035** — 1 ocorrência(s):
@@ -1525,13 +1527,13 @@ agente_nw/nucleo/consulta.py:81 agente_nw/nucleo/consulta.py:82 agente_nw/nucleo
 agente_nw/nucleo/database/queries/assuntos.py:15 agente_nw/nucleo/database/queries/assuntos.py:212 agente_nw/nucleo/database/queries/assuntos.py:216 agente_nw/nucleo/database/queries/assuntos.py:219
 agente_nw/nucleo/database/queries/assuntos.py:253 agente_nw/nucleo/database/queries/assuntos.py:32 agente_nw/nucleo/database/queries/assuntos.py:45 agente_nw/nucleo/database/queries/assuntos.py:58
 agente_nw/nucleo/database/queries/consulta_contato.py:10 agente_nw/nucleo/database/queries/consulta_contato.py:19 agente_nw/nucleo/database/queries/consulta_contato.py:29 agente_nw/nucleo/database/queries/consulta_contato.py:34
-agente_nw/nucleo/database/queries/consulta_contato.py:36 agente_nw/nucleo/historico.py:66 agente_nw/nucleo/historico.py:67 agente_nw/nucleo/localizacao.py:198
+agente_nw/nucleo/database/queries/consulta_contato.py:36 agente_nw/nucleo/historico.py:78 agente_nw/nucleo/historico.py:79 agente_nw/nucleo/localizacao.py:198
 agente_nw/nucleo/modelos/assunto.py:24 agente_nw/nucleo/modelos/cartao.py:9 agente_nw/nucleo/modelos/consulta_contato.py:13 agente_nw/nucleo/prompts/avaliar_relacao_objetivo.py:35
 agente_nw/nucleo/prompts/avaliar_relacao_objetivo.py:36 agente_nw/nucleo/prompts/avaliar_relacao_objetivo.py:39 agente_nw/nucleo/prompts/avaliar_relacao_objetivo.py:40 agente_nw/nucleo/prompts/cartao.py:28
 agente_nw/nucleo/prompts/cartao.py:43 agente_nw/nucleo/prompts/cartao.py:46 agente_nw/nucleo/prompts/cartao.py:54 agente_nw/nucleo/prompts/cartao.py:64
-agente_nw/nucleo/prompts/qualificar.py:53 agente_nw/nucleo/prompts/redigir_ganchos.py:184 agente_nw/nucleo/prompts/redigir_ganchos.py:185 agente_nw/nucleo/prompts/redigir_ganchos.py:209
+agente_nw/nucleo/prompts/qualificar.py:53 agente_nw/nucleo/prompts/redigir_ganchos.py:191 agente_nw/nucleo/prompts/redigir_ganchos.py:192 agente_nw/nucleo/prompts/redigir_ganchos.py:216
 agente_nw/nucleo/prompts/redigir_ganchos.py:66 agente_nw/nucleo/prompts/rotular.py:11 agente_nw/nucleo/prompts/rotular.py:26 agente_nw/nucleo/prompts/rotular.py:38
-agente_nw/nucleo/prompts/seguranca.py:22 agente_nw/nucleo/redacao.py:85 agente_nw/nucleo/relevancia/candidatos.py:40 agente_nw/nucleo/relevancia/cartoes.py:100
+agente_nw/nucleo/prompts/seguranca.py:22 agente_nw/nucleo/redacao.py:87 agente_nw/nucleo/relevancia/candidatos.py:40 agente_nw/nucleo/relevancia/cartoes.py:100
 agente_nw/nucleo/relevancia/cartoes.py:102 agente_nw/nucleo/relevancia/cartoes.py:39 agente_nw/nucleo/relevancia/cartoes.py:40 agente_nw/nucleo/relevancia/cartoes.py:50
 agente_nw/nucleo/relevancia/cartoes.py:54 agente_nw/nucleo/relevancia/cartoes.py:63 agente_nw/nucleo/relevancia/cartoes.py:65 agente_nw/nucleo/relevancia/cartoes.py:68
 agente_nw/nucleo/relevancia/cartoes.py:90 agente_nw/nucleo/relevancia/cartoes.py:92 agente_nw/nucleo/relevancia/cartoes.py:98 agente_nw/nucleo/relevancia/cruzamento.py:150
@@ -1554,7 +1556,7 @@ agente_nw/perfil/importador.py:75 agente_nw/perfil/importador.py:94 agente_nw/pe
 scripts/agente_lacunas.py:128 scripts/migracoes/001_inicial.sql:75 scripts/migracoes/004_consulta_contato.sql:10 scripts/migracoes/005_perfil_id_reatribuivel.sql:15
 ```
 
-descartada: arquivo de teste — não gera ponto (certificação simplificada, seção 6) — 464 ocorrência(s):
+descartada: arquivo de teste — não gera ponto (certificação simplificada, seção 6) — 475 ocorrência(s):
 
 ```
 tests/coleta_falsa.py:66 tests/llm_falso.py:23 tests/test_agente_entregar.py:174 tests/test_agente_lacunas.py:131
@@ -1659,20 +1661,23 @@ tests/test_seguranca_prompt.py:292 tests/test_seguranca_prompt.py:335 tests/test
 tests/test_seguranca_prompt.py:91 tests/test_seguranca_prompt.py:93 tests/test_selecao_provedor.py:209 tests/test_selecao_provedor.py:210
 tests/test_selecao_provedor.py:44 tests/test_selecao_provedor.py:45 tests/test_sem_censura_de_tema.py:56 tests/test_sem_censura_de_tema.py:61
 tests/test_sem_censura_de_tema.py:63 tests/test_sem_censura_de_tema.py:64 tests/test_sem_objetivo_avisa.py:23 tests/test_sem_objetivo_avisa.py:35
-tests/test_sem_objetivo_avisa.py:36 tests/test_validacao_base.py:40 tests/test_validacao_base.py:47 tests/test_validacao_base.py:50
-tests/test_verificar_auditoria_texto.py:104 tests/test_verificar_auditoria_texto.py:123 tests/test_verificar_auditoria_texto.py:349 tests/test_verificar_auditoria_texto.py:350
-tests/test_verificar_auditoria_texto.py:351 tests/test_verificar_auditoria_texto.py:352 tests/test_verificar_auditoria_texto.py:353 tests/test_verificar_auditoria_texto.py:354
-tests/test_verificar_auditoria_texto.py:355 tests/test_verificar_auditoria_texto.py:356 tests/test_verificar_auditoria_texto.py:357 tests/test_verificar_auditoria_texto.py:358
-tests/test_verificar_auditoria_texto.py:359 tests/test_verificar_auditoria_texto.py:360 tests/test_verificar_auditoria_texto.py:361 tests/test_verificar_auditoria_texto.py:362
-tests/test_verificar_auditoria_texto.py:363 tests/test_verificar_auditoria_texto.py:364 tests/test_verificar_auditoria_texto.py:365 tests/test_verificar_auditoria_texto.py:366
-tests/test_verificar_auditoria_texto.py:367 tests/test_verificar_auditoria_texto.py:368 tests/test_verificar_auditoria_texto.py:369 tests/test_verificar_auditoria_texto.py:370
-tests/test_verificar_auditoria_texto.py:371 tests/test_verificar_auditoria_texto.py:372 tests/test_verificar_auditoria_texto.py:373 tests/test_verificar_auditoria_texto.py:389
-tests/test_verificar_auditoria_texto.py:408 tests/test_verificar_auditoria_texto.py:410 tests/test_verificar_auditoria_texto.py:419 tests/test_verificar_auditoria_texto.py:492
-tests/test_whatsapp_importador.py:100 tests/test_whatsapp_importador.py:102 tests/test_whatsapp_importador.py:120 tests/test_whatsapp_importador.py:122
-tests/test_whatsapp_importador.py:146 tests/test_whatsapp_importador.py:157 tests/test_whatsapp_importador.py:247 tests/test_whatsapp_importador.py:257
-tests/test_whatsapp_importador.py:31 tests/test_whatsapp_importador.py:77 tests/test_whatsapp_importador.py:79 tests/test_whatsapp_no_prompt.py:1
-tests/test_whatsapp_no_prompt.py:102 tests/test_whatsapp_no_prompt.py:104 tests/test_whatsapp_no_prompt.py:106 tests/test_whatsapp_no_prompt.py:51
-tests/test_whatsapp_no_prompt.py:72 tests/test_whatsapp_no_prompt.py:73 tests/test_whatsapp_no_prompt.py:74 tests/test_whatsapp_no_prompt.py:97
+tests/test_sem_objetivo_avisa.py:36 tests/test_texto_do_usuario_inteiro.py:116 tests/test_texto_do_usuario_inteiro.py:138 tests/test_texto_do_usuario_inteiro.py:147
+tests/test_texto_do_usuario_inteiro.py:152 tests/test_texto_do_usuario_inteiro.py:155 tests/test_texto_do_usuario_inteiro.py:156 tests/test_texto_do_usuario_inteiro.py:157
+tests/test_texto_do_usuario_inteiro.py:162 tests/test_texto_do_usuario_inteiro.py:164 tests/test_texto_do_usuario_inteiro.py:165 tests/test_texto_do_usuario_inteiro.py:97
+tests/test_validacao_base.py:40 tests/test_validacao_base.py:47 tests/test_validacao_base.py:50 tests/test_verificar_auditoria_texto.py:104
+tests/test_verificar_auditoria_texto.py:123 tests/test_verificar_auditoria_texto.py:349 tests/test_verificar_auditoria_texto.py:350 tests/test_verificar_auditoria_texto.py:351
+tests/test_verificar_auditoria_texto.py:352 tests/test_verificar_auditoria_texto.py:353 tests/test_verificar_auditoria_texto.py:354 tests/test_verificar_auditoria_texto.py:355
+tests/test_verificar_auditoria_texto.py:356 tests/test_verificar_auditoria_texto.py:357 tests/test_verificar_auditoria_texto.py:358 tests/test_verificar_auditoria_texto.py:359
+tests/test_verificar_auditoria_texto.py:360 tests/test_verificar_auditoria_texto.py:361 tests/test_verificar_auditoria_texto.py:362 tests/test_verificar_auditoria_texto.py:363
+tests/test_verificar_auditoria_texto.py:364 tests/test_verificar_auditoria_texto.py:365 tests/test_verificar_auditoria_texto.py:366 tests/test_verificar_auditoria_texto.py:367
+tests/test_verificar_auditoria_texto.py:368 tests/test_verificar_auditoria_texto.py:369 tests/test_verificar_auditoria_texto.py:370 tests/test_verificar_auditoria_texto.py:371
+tests/test_verificar_auditoria_texto.py:372 tests/test_verificar_auditoria_texto.py:373 tests/test_verificar_auditoria_texto.py:389 tests/test_verificar_auditoria_texto.py:408
+tests/test_verificar_auditoria_texto.py:410 tests/test_verificar_auditoria_texto.py:419 tests/test_verificar_auditoria_texto.py:492 tests/test_whatsapp_importador.py:100
+tests/test_whatsapp_importador.py:102 tests/test_whatsapp_importador.py:120 tests/test_whatsapp_importador.py:122 tests/test_whatsapp_importador.py:146
+tests/test_whatsapp_importador.py:157 tests/test_whatsapp_importador.py:247 tests/test_whatsapp_importador.py:257 tests/test_whatsapp_importador.py:31
+tests/test_whatsapp_importador.py:77 tests/test_whatsapp_importador.py:79 tests/test_whatsapp_no_prompt.py:1 tests/test_whatsapp_no_prompt.py:102
+tests/test_whatsapp_no_prompt.py:104 tests/test_whatsapp_no_prompt.py:106 tests/test_whatsapp_no_prompt.py:51 tests/test_whatsapp_no_prompt.py:72
+tests/test_whatsapp_no_prompt.py:73 tests/test_whatsapp_no_prompt.py:74 tests/test_whatsapp_no_prompt.py:97
 ```
 
 descartada: declaração ou repasse de num_ctx/num_predict (a ausência de conferência é P-040/P-042) — 35 ocorrência(s):
@@ -1695,18 +1700,20 @@ descartada: extração do corpo da notícia, sem teto (ver P-003) — 1 ocorrên
 agente_nw/coleta/rss/leitor.py:13
 ```
 
-descartada: fatia a partir de índice fixo (nome, palavra ou tabela), sem texto de conteúdo — 8 ocorrência(s):
+descartada: fatia a partir de índice fixo (nome, palavra ou tabela), sem texto de conteúdo — 10 ocorrência(s):
 
 ```
-agente_nw/cli.py:196 agente_nw/nucleo/confirmacao.py:101 agente_nw/nucleo/database/queries/perfis.py:462 agente_nw/nucleo/pedido.py:122
-agente_nw/nucleo/redacao.py:111 agente_nw/nucleo/texto.py:42 scripts/agente_lacunas.py:66 scripts/executar_serie.sh:107
+agente_nw/cli.py:196 agente_nw/nucleo/confirmacao.py:101 agente_nw/nucleo/database/queries/perfis.py:462 agente_nw/nucleo/historico.py:72
+agente_nw/nucleo/pedido.py:122 agente_nw/nucleo/redacao.py:113 agente_nw/nucleo/redacao.py:174 agente_nw/nucleo/texto.py:42
+scripts/agente_lacunas.py:66 scripts/executar_serie.sh:107
 ```
 
-descartada: fatia de lista ou texto já coberta pelo ponto do arquivo — 8 ocorrência(s):
+descartada: fatia de lista ou texto já coberta pelo ponto do arquivo — 9 ocorrência(s):
 
 ```
 agente_nw/coleta/rss/leitor.py:87 agente_nw/nucleo/database/queries/consulta_contato.py:124 agente_nw/nucleo/database/queries/perfis.py:427 agente_nw/nucleo/database/queries/perfis.py:436
-agente_nw/nucleo/pedido.py:122 agente_nw/nucleo/redacao.py:106 agente_nw/nucleo/redacao.py:110 agente_nw/nucleo/redacao.py:113
+agente_nw/nucleo/pedido.py:122 agente_nw/nucleo/prompts/redigir_ganchos.py:305 agente_nw/nucleo/redacao.py:108 agente_nw/nucleo/redacao.py:112
+agente_nw/nucleo/redacao.py:115
 ```
 
 descartada: leitura de arquivo/zip ou amostragem já coberta pelo ponto do arquivo — 2 ocorrência(s):
@@ -1731,8 +1738,8 @@ agente_nw/nucleo/llm.py:473 agente_nw/nucleo/llm.py:560
 descartada: nome de função/variável de corte já coberto pelo ponto do arquivo — 7 ocorrência(s):
 
 ```
-agente_nw/coleta/capturas/listas.py:165 agente_nw/coleta/capturas/listas.py:367 agente_nw/nucleo/prompts/extrair_de_texto.py:29 agente_nw/nucleo/prompts/redigir_ganchos.py:255
-agente_nw/nucleo/prompts/redigir_ganchos.py:280 agente_nw/nucleo/prompts/redigir_ganchos.py:298 agente_nw/nucleo/redacao.py:309
+agente_nw/coleta/capturas/listas.py:165 agente_nw/coleta/capturas/listas.py:367 agente_nw/nucleo/historico.py:65 agente_nw/nucleo/prompts/extrair_de_texto.py:29
+agente_nw/nucleo/prompts/redigir_ganchos.py:262 agente_nw/nucleo/prompts/redigir_ganchos.py:313 agente_nw/nucleo/redacao.py:323
 ```
 
 descartada: palavra trocas/meses/blocos/trecho em nome, docstring ou comentário — 108 ocorrência(s):
@@ -1758,12 +1765,12 @@ agente_nw/nucleo/prompts/cartao.py:36 agente_nw/nucleo/prompts/cartao.py:37 agen
 agente_nw/nucleo/prompts/extrair_de_texto.py:38 agente_nw/nucleo/prompts/extrair_de_texto.py:40 agente_nw/nucleo/prompts/extrair_de_texto.py:66 agente_nw/nucleo/prompts/extrair_de_texto.py:68
 agente_nw/nucleo/prompts/extrair_de_texto.py:69 agente_nw/nucleo/prompts/prerotular_calibracao.py:13 agente_nw/nucleo/prompts/prerotular_calibracao.py:29 agente_nw/nucleo/prompts/prerotular_calibracao.py:31
 agente_nw/nucleo/prompts/prerotular_calibracao.py:44 agente_nw/nucleo/prompts/prerotular_calibracao.py:46 agente_nw/nucleo/prompts/prerotular_calibracao.py:51 agente_nw/nucleo/prompts/prerotular_calibracao.py:53
-agente_nw/nucleo/prompts/prerotular_calibracao.py:60 agente_nw/nucleo/prompts/prerotular_calibracao.py:62 agente_nw/nucleo/prompts/redigir_ganchos.py:142 agente_nw/nucleo/prompts/redigir_ganchos.py:146
-agente_nw/nucleo/prompts/redigir_ganchos.py:261 agente_nw/nucleo/prompts/redigir_ganchos.py:277 agente_nw/nucleo/prompts/redigir_ganchos.py:87 agente_nw/nucleo/prompts/seguranca.py:34
-agente_nw/nucleo/prompts/seguranca.py:35 agente_nw/nucleo/prompts/seguranca.py:5 agente_nw/nucleo/redacao.py:116 agente_nw/nucleo/redacao.py:123
-agente_nw/nucleo/redacao.py:131 agente_nw/nucleo/redacao.py:141 agente_nw/nucleo/redacao.py:167 agente_nw/nucleo/redacao.py:171
-agente_nw/nucleo/redacao.py:207 agente_nw/nucleo/redacao.py:208 agente_nw/nucleo/redacao.py:232 agente_nw/nucleo/redacao.py:243
-agente_nw/nucleo/redacao.py:272 agente_nw/nucleo/redacao.py:273 agente_nw/nucleo/redacao.py:302 agente_nw/nucleo/redacao.py:303
+agente_nw/nucleo/prompts/prerotular_calibracao.py:60 agente_nw/nucleo/prompts/prerotular_calibracao.py:62 agente_nw/nucleo/prompts/redigir_ganchos.py:148 agente_nw/nucleo/prompts/redigir_ganchos.py:152
+agente_nw/nucleo/prompts/redigir_ganchos.py:268 agente_nw/nucleo/prompts/redigir_ganchos.py:284 agente_nw/nucleo/prompts/redigir_ganchos.py:87 agente_nw/nucleo/prompts/seguranca.py:34
+agente_nw/nucleo/prompts/seguranca.py:35 agente_nw/nucleo/prompts/seguranca.py:5 agente_nw/nucleo/redacao.py:118 agente_nw/nucleo/redacao.py:125
+agente_nw/nucleo/redacao.py:133 agente_nw/nucleo/redacao.py:143 agente_nw/nucleo/redacao.py:179 agente_nw/nucleo/redacao.py:183
+agente_nw/nucleo/redacao.py:219 agente_nw/nucleo/redacao.py:220 agente_nw/nucleo/redacao.py:244 agente_nw/nucleo/redacao.py:256
+agente_nw/nucleo/redacao.py:286 agente_nw/nucleo/redacao.py:287 agente_nw/nucleo/redacao.py:316 agente_nw/nucleo/redacao.py:317
 agente_nw/perfil/extrator.py:55 agente_nw/perfil/extrator.py:60 config/limiares.yaml:68 scripts/migracoes/001_inicial.sql:134
 ```
 
@@ -1791,19 +1798,19 @@ agente_nw/nucleo/database/queries/itens.py:66 agente_nw/nucleo/database/queries/
 agente_nw/nucleo/database/queries/nota_contato.py:39 agente_nw/nucleo/database/queries/nota_contato.py:46 agente_nw/nucleo/database/queries/pedidos.py:157 agente_nw/nucleo/database/queries/pedidos.py:159
 agente_nw/nucleo/database/queries/pedidos.py:172 agente_nw/nucleo/database/queries/pedidos.py:180 agente_nw/nucleo/database/queries/pedidos.py:181 agente_nw/nucleo/database/queries/perfis.py:386
 agente_nw/nucleo/database/queries/perfis.py:387 agente_nw/nucleo/database/queries/perfis.py:414 agente_nw/nucleo/database/queries/perfis.py:415 agente_nw/nucleo/database/queries/perfis.py:427
-agente_nw/nucleo/database/queries/perfis.py:436 agente_nw/nucleo/historico.py:83 agente_nw/nucleo/historico.py:85 agente_nw/nucleo/localizacao.py:260
+agente_nw/nucleo/database/queries/perfis.py:436 agente_nw/nucleo/historico.py:95 agente_nw/nucleo/historico.py:97 agente_nw/nucleo/localizacao.py:260
 agente_nw/nucleo/modelos/configuracao.py:190 agente_nw/nucleo/modelos/configuracao.py:192 agente_nw/nucleo/modelos/configuracao.py:208 agente_nw/nucleo/modelos/configuracao.py:209
 agente_nw/nucleo/modelos/configuracao.py:224 agente_nw/nucleo/modelos/configuracao.py:228 agente_nw/nucleo/modelos/configuracao.py:242 agente_nw/nucleo/modelos/configuracao.py:277
-agente_nw/nucleo/modelos/configuracao.py:302 agente_nw/nucleo/modelos/configuracao.py:81 agente_nw/nucleo/modelos/pedido.py:95 agente_nw/nucleo/modelos/redacao.py:10
+agente_nw/nucleo/modelos/configuracao.py:302 agente_nw/nucleo/modelos/configuracao.py:81 agente_nw/nucleo/modelos/pedido.py:101 agente_nw/nucleo/modelos/redacao.py:10
 agente_nw/nucleo/modelos/redacao.py:101 agente_nw/nucleo/modelos/redacao.py:105 agente_nw/nucleo/modelos/redacao.py:126 agente_nw/nucleo/modelos/redacao.py:129
 agente_nw/nucleo/orquestracao.py:173 agente_nw/nucleo/orquestracao.py:210 agente_nw/nucleo/orquestracao.py:213 agente_nw/nucleo/prompts/cruzar_por_que.py:79
-agente_nw/nucleo/prompts/redigir_ganchos.py:18 agente_nw/nucleo/prompts/redigir_ganchos.py:194 agente_nw/nucleo/prompts/redigir_ganchos.py:195 agente_nw/nucleo/prompts/redigir_ganchos.py:214
-agente_nw/nucleo/prompts/redigir_ganchos.py:216 agente_nw/nucleo/prompts/redigir_ganchos.py:25 agente_nw/nucleo/prompts/redigir_ganchos.py:280 agente_nw/nucleo/prompts/redigir_ganchos.py:281
-agente_nw/nucleo/prompts/redigir_ganchos.py:284 agente_nw/nucleo/prompts/redigir_ganchos.py:289 agente_nw/nucleo/prompts/redigir_ganchos.py:292 agente_nw/nucleo/prompts/redigir_ganchos.py:297
-agente_nw/nucleo/prompts/redigir_ganchos.py:298 agente_nw/nucleo/prompts/redigir_ganchos.py:7 agente_nw/nucleo/redacao.py:168 agente_nw/nucleo/redacao.py:171
-agente_nw/nucleo/redacao.py:175 agente_nw/nucleo/redacao.py:183 agente_nw/nucleo/redacao.py:209 agente_nw/nucleo/redacao.py:219
-agente_nw/nucleo/redacao.py:271 agente_nw/nucleo/redacao.py:274 agente_nw/nucleo/redacao.py:304 agente_nw/nucleo/redacao.py:309
-agente_nw/nucleo/redacao.py:310 agente_nw/nucleo/relevancia/candidatos.py:18 agente_nw/nucleo/relevancia/candidatos.py:56 agente_nw/nucleo/relevancia/candidatos.py:63
+agente_nw/nucleo/prompts/redigir_ganchos.py:18 agente_nw/nucleo/prompts/redigir_ganchos.py:201 agente_nw/nucleo/prompts/redigir_ganchos.py:202 agente_nw/nucleo/prompts/redigir_ganchos.py:221
+agente_nw/nucleo/prompts/redigir_ganchos.py:223 agente_nw/nucleo/prompts/redigir_ganchos.py:25 agente_nw/nucleo/prompts/redigir_ganchos.py:287 agente_nw/nucleo/prompts/redigir_ganchos.py:288
+agente_nw/nucleo/prompts/redigir_ganchos.py:293 agente_nw/nucleo/prompts/redigir_ganchos.py:302 agente_nw/nucleo/prompts/redigir_ganchos.py:307 agente_nw/nucleo/prompts/redigir_ganchos.py:312
+agente_nw/nucleo/prompts/redigir_ganchos.py:313 agente_nw/nucleo/prompts/redigir_ganchos.py:7 agente_nw/nucleo/redacao.py:180 agente_nw/nucleo/redacao.py:183
+agente_nw/nucleo/redacao.py:187 agente_nw/nucleo/redacao.py:195 agente_nw/nucleo/redacao.py:221 agente_nw/nucleo/redacao.py:231
+agente_nw/nucleo/redacao.py:285 agente_nw/nucleo/redacao.py:288 agente_nw/nucleo/redacao.py:318 agente_nw/nucleo/redacao.py:323
+agente_nw/nucleo/redacao.py:324 agente_nw/nucleo/relevancia/candidatos.py:18 agente_nw/nucleo/relevancia/candidatos.py:56 agente_nw/nucleo/relevancia/candidatos.py:63
 agente_nw/nucleo/relevancia/cartoes.py:89 agente_nw/nucleo/relevancia/cartoes.py:91 agente_nw/nucleo/relevancia/qualificador.py:50 agente_nw/nucleo/relevancia/qualificador.py:55
 agente_nw/perfil/extrator.py:67 agente_nw/perfil/extrator.py:75 agente_nw/perfil/inferencia.py:257 agente_nw/ponte/servidor.py:20
 agente_nw/ponte/servidor.py:227 agente_nw/ponte/servidor.py:236 agente_nw/ponte/servidor.py:238 agente_nw/ponte/servidor.py:243
@@ -1826,13 +1833,13 @@ agente_nw/nucleo/localizacao.py:62 agente_nw/nucleo/relevancia/cartoes.py:40 ext
 scripts/executar_serie.sh:121 scripts/executar_serie.sh:123
 ```
 
-descartada: é a própria lista de padrões da varredura (este verificador) — 13 ocorrência(s):
+descartada: é a própria lista de padrões da varredura (este verificador) — 14 ocorrência(s) em 13 linhas:
 
 ```
-scripts/verificar_auditoria_texto.py:18 scripts/verificar_auditoria_texto.py:7 scripts/verificar_auditoria_texto.py:83 scripts/verificar_auditoria_texto.py:89
-scripts/verificar_auditoria_texto.py:90 scripts/verificar_auditoria_texto.py:91 scripts/verificar_auditoria_texto.py:92 scripts/verificar_auditoria_texto.py:93
-scripts/verificar_auditoria_texto.py:94 scripts/verificar_auditoria_texto.py:95 scripts/verificar_auditoria_texto.py:97 scripts/verificar_auditoria_texto.py:98
-scripts/verificar_auditoria_texto.py:99
+scripts/verificar_auditoria_texto.py:18 scripts/verificar_auditoria_texto.py:7 scripts/verificar_auditoria_texto.py:88 scripts/verificar_auditoria_texto.py:94
+scripts/verificar_auditoria_texto.py:95 scripts/verificar_auditoria_texto.py:96 scripts/verificar_auditoria_texto.py:97 scripts/verificar_auditoria_texto.py:98
+scripts/verificar_auditoria_texto.py:99 scripts/verificar_auditoria_texto.py:100 scripts/verificar_auditoria_texto.py:102 scripts/verificar_auditoria_texto.py:103
+scripts/verificar_auditoria_texto.py:104
 ```
 
 ---

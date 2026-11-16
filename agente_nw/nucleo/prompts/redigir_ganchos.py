@@ -88,6 +88,12 @@ class EntradaRedacao:
     moldes: list[str] = field(default_factory=list)  # mensagens que funcionaram com outro contato (048)
     molde_origem_id: int | None = None  # id do gancho_uso usado como molde, se houver (065)
     genero_gramatical: str = "desconhecido"  # masculino/feminino/desconhecido — concordância (048)
+    # Texto do usuário protegido no corte por tamanho (brief 081): só o comentário de cada consulta do
+    # histórico (mesma ordem de `historico`) e as linhas dos moldes que têm comentário.
+    historico_comentarios: list[str] = field(default_factory=list)
+    moldes_comentados: list[str] = field(default_factory=list)
+    # Preenchido só pelo corte: comentários das consultas que saíram do histórico.
+    comentarios_preservados: list[str] = field(default_factory=list)
 
 
 def estimar_tokens(texto: str) -> int:
@@ -151,9 +157,10 @@ def _bloco_historico(entrada: EntradaRedacao) -> str:
         )
     if not entrada.historico:
         return "HISTÓRICO: (nenhuma consulta anterior)" + extras
+    linhas = [*entrada.historico, *entrada.comentarios_preservados]
     return (
         "HISTÓRICO (consultas anteriores; não repita o que já foi usado; comentário do usuário diz por que "
-        "uma mensagem serviu ou não):\n" + cercar_dado_externo("\n".join(entrada.historico)) + extras
+        "uma mensagem serviu ou não):\n" + cercar_dado_externo("\n".join(linhas)) + extras
         # Cada linha junta o pedido antigo, a leitura de rede social e os títulos de notícia: bloco cercado
         # inteiro, com o rótulo fora (brief 069).
     )
@@ -279,16 +286,24 @@ def _montar(entrada: EntradaRedacao) -> str:
 
 def cortar_por_tamanho(entrada: EntradaRedacao, limite_tokens: int = LIMITE_TOKENS_PADRAO) -> EntradaRedacao:
     """Se o prompt estimado passa de `limite_tokens`, fica com 1 consulta de histórico e 5 fatos; se
-    ainda passar, saem os moldes de outro contato; se ainda passar, sai a conversa do WhatsApp — as
-    notas do usuário continuam protegidas (brief 050/061/048)."""
+    ainda passar, saem os moldes de outro contato; se ainda passar, sai a conversa do WhatsApp. O que o
+    usuário escreveu nunca é sacrificado nem cortado: as notas, o comentário de cada consulta do histórico e
+    o comentário de cada molde ficam, byte a byte (brief 050/061/048/081). Se ainda estourar, o prompt
+    segue grande; quem avisa é a medida da janela (brief 082)."""
     if estimar_tokens(_montar(entrada)) <= limite_tokens:
         return entrada
+    perdidas = [c for c in entrada.historico_comentarios[_HISTORICO_NO_CORTE:] if c]
     cortada = replace(
-        entrada, historico=entrada.historico[:_HISTORICO_NO_CORTE], fatos=entrada.fatos[:_FATOS_NO_CORTE]
+        entrada,
+        historico=entrada.historico[:_HISTORICO_NO_CORTE],
+        fatos=entrada.fatos[:_FATOS_NO_CORTE],
+        comentarios_preservados=perdidas,
     )
     if estimar_tokens(_montar(cortada)) <= limite_tokens:
         return cortada
-    sem_moldes = replace(cortada, moldes=[], molde_origem_id=None)
+    # Só os moldes sem comentário saem; o primeiro molde segue sendo a origem só se continuar na lista.
+    origem = cortada.molde_origem_id if cortada.moldes_comentados[:1] == cortada.moldes[:1] else None
+    sem_moldes = replace(cortada, moldes=list(cortada.moldes_comentados), molde_origem_id=origem)
     if estimar_tokens(_montar(sem_moldes)) <= limite_tokens:
         return sem_moldes
     return replace(sem_moldes, trocas_whatsapp=[])
