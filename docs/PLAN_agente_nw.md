@@ -151,6 +151,7 @@
 - [082-1] O 1,4 do estimador subestima o `qwen2.5:14b` em 30% (2,0 tokens por palavra medidos num prompt real de redação, seção 3). O orçamento do `cortar_por_tamanho` (`0,73 × num_ctx`, P-033) chega a cerca de 1,04 × `num_ctx` em tokens reais. Um pedido grande que antes era cortado em silêncio pelo Ollama agora é recusado (`FalhaNaRedacao`). Ajustar o 1,4 ou a fração muda o corte aprovado no P-033, então a decisão é sua. Não conferido no `qwen3:4b` do `air16` · degrada · 2026-11-16
 - [089-1] O centróide do contato usa só os 20 fatos mais recentes (`_MAXIMO_FATOS_NO_CENTROIDE`, `perfis.py:614`), a parte de classe C do P-025. O brief 089 mandou cada texto inteiro e não falou do número de fatos, e esse teto não tem linha em `docs/EXCECOES_TEXTO_INTEGRAL.md`: aprovar a exceção ou mandar corrigir é decisão sua · degrada · 2026-11-16
 - [089-2] Com a versão nova do critério, todo vetor de assunto, tema e perfil gravado antes deste brief é ausente para o produto até uma regravação autorizada (item 2.3). Na cópia foram 413 de 413 assuntos e 5 de 5 perfis. Até lá, o agrupamento abre assunto novo em vez de vincular a um antigo, a qualificação e o menu não veem os assuntos antigos, e os temas do usuário ficam sem vetor até serem inferidos de novo. A regravação é do brief 095 e depende da sua autorização · quebra · 2026-11-16
+- [090-1] Cartão gravado antes deste brief fica com `cartao_versao` nulo e continua em uso: até a regravação, um assunto antigo ainda chega ao gate de objetivo com o cartão feito de 5 itens × 300 caracteres. Nada é regravado por este brief, por decisão (2.4). Depende de Sidarta ver as contagens da comparação e autorizar a regravação dos cartões, que é o brief 095 · degrada · 2026-11-16
 
 ## Dívidas conhecidas
 
@@ -193,6 +194,7 @@
 - [089-3] `vetor_item` não guarda modelo nem critério (o brief 066 não a versionou), então o vetor de item do critério antigo não se distingue do novo. Só o tamanho do texto (acima de 2.000 caracteres) indica quais itens mudariam, e o `medir-dano` do brief 095 não tem como contá-los pela versão · degrada · 2026-11-16
 - [089-4] Na comparação, o centróide de cada assunto inclui o vetor antigo do próprio item, e a maioria dos assuntos da cópia tem um item só. Por isso "itens que trocariam de assunto" (0 na cópia) é um piso, e não uma estimativa sem viés · nice · 2026-11-16
 - [089-6] No relatório 079, a tabela da seção 7 (janela) ainda descreve o embedding do item como "título + 2.000 caracteres" e o do centróide como "20 × 500 caracteres". A autorização cobre só a seção 6, o apêndice A e o estado dos pontos · nice · 2026-11-16
+- [090-3] O `num_ctx` das tarefas não mudou (decisão 2.3). Com o cartão lendo todos os itens, a consolidação em níveis passa a acontecer mais vezes no `air16` (janela de 2.048), o que significa mais chamadas ao modelo por assunto grande; quanto isso pesa no ciclo diário não foi medido · nice · 2026-11-16
 
 ---
 
