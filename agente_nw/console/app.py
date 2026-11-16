@@ -27,6 +27,7 @@ from agente_nw.nucleo.database.queries import (
     assuntos,
     fatos,
     fila_extracao,
+    fila_revisao,
     gancho_uso,
     nota_contato,
     pedidos,
@@ -509,6 +510,47 @@ def criar_app(
         despachar(lambda: _processar_whatsapp_em_fundo(perfil_id))
         mensagem = f"{resumo.novas} mensagens novas, {resumo.repetidas} já estavam"
         return redirect(url_for("pessoa", perfil_id=perfil_id, whatsapp=mensagem))
+
+    @app.route("/revisao")
+    def revisao() -> str:
+        """O que o modelo não conseguiu processar (brief 087): sem a entrada, que é texto de terceiros."""
+        conn = _conn()
+        return render_template(
+            "revisao.html",
+            contagens=fila_revisao.contar(conn),
+            itens=fila_revisao.listar(conn),
+            reenviaveis=fila_revisao.TAREFAS_COM_REPETICAO,
+            aviso=request.args.get("aviso"),
+        )
+
+    @app.route("/revisao/<int:item_id>/descartar", methods=["POST"])
+    def revisao_descartar(item_id: int) -> Response:
+        try:
+            fila_revisao.descartar(
+                _conn(), item_id, request.form.get("motivo", ""), datetime.now(UTC).isoformat()
+            )
+            aviso = f"Item {item_id} descartado."
+        except (fila_revisao.ItemInexistente, fila_revisao.ItemJaResolvido, ValueError) as erro:
+            aviso = f"Não descartei: {erro}"
+        return redirect(url_for("revisao", aviso=aviso))
+
+    @app.route("/revisao/<int:item_id>/reenviar", methods=["POST"])
+    def revisao_reenviar(item_id: int) -> Response:
+        conn = _conn()
+
+        def reprocessar(extracao_id: int) -> int | None:
+            return extrator.reprocessador_de_item(_cliente_llm(), conn)(extracao_id)
+
+        try:
+            desfecho = fila_revisao.reenviar(conn, item_id, datetime.now(UTC).isoformat(), reprocessar)
+            aviso = f"Item {item_id}: {desfecho}."
+        except (
+            fila_revisao.ItemInexistente,
+            fila_revisao.ItemJaResolvido,
+            fila_revisao.SemCaminhoDeRepeticao,
+        ) as erro:
+            aviso = f"Não reenviei: {erro}"
+        return redirect(url_for("revisao", aviso=aviso))
 
     @app.route("/contatos")
     def contatos() -> str:

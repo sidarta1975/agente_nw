@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block titulo %}revisão{% endblock %}
+{% block conteudo %}
+  <h1>Fila de revisão</h1>
+  <p>O que o modelo não conseguiu processar. A entrada (o prompt, com texto de terceiros) não aparece aqui; a CLI a mostra com <code>agente_nw revisao ver --inteiro &lt;id&gt;</code>.</p>
+
+  {% if aviso %}<p class="aviso">{{ aviso }}</p>{% endif %}
+
+  {% if itens %}
+    <ul>
+      {% for c in contagens %}
+        <li>{{ c.tarefa }} · {{ c.classe_do_erro }}: {{ c.itens }} (o mais antigo: {{ c.mais_antigo[:10] }})</li>
+      {% endfor %}
+    </ul>
+    {% for item in itens %}
+      <div class="cartao">
+        <h3>#{{ item.id }} · {{ item.tarefa }} · {{ item.classe_do_erro }}</h3>
+        <p>Criado em {{ item.criado_em[:10] }}{% if item.resolucao %} · {{ item.resolucao }}{% endif %}</p>
+        {% if item.tarefa in reenviaveis %}
+          <form method="post" action="{{ url_for('revisao_reenviar', item_id=item.id) }}">
+            <p><button type="submit">Reenviar</button></p>
+          </form>
+        {% endif %}
+        <form method="post" action="{{ url_for('revisao_descartar', item_id=item.id) }}">
+          <label for="motivo-{{ item.id }}">Motivo do descarte</label>
+          <input id="motivo-{{ item.id }}" type="text" name="motivo" required>
+          <p><button type="submit" class="perigo">Descartar</button></p>
+        </form>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="vazio">Nada esperando revisão.</p>
+  {% endif %}
+{% endblock %}

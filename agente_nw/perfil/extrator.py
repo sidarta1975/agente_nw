@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol, TypeVar
@@ -63,6 +64,64 @@ def _gravar_tag(
     queries_perfil_tema.vincular(conexao, item.perfil_id, tema.id, tag.peso, "sugerida", None, False, agora)
 
 
+def processar_item(
+    cliente_llm: ClienteExtracaoPerfil,
+    conexao: sqlite3.Connection,
+    item: FilaExtracao,
+    resumo: ResumoProcessamento,
+) -> FalhaJsonInvalido | None:
+    """Extrai e grava um item de `fila_extracao`. Devolve `None` quando gravou, ou a falha que o
+    deixou com erro (o item fica marcado e o lote segue)."""
+    agora = datetime.now(UTC).isoformat()
+
+    try:
+        resposta = cliente_llm.gerar_json(
+            "extrair_de_texto", construir_prompt(item.texto), RespostaExtracaoTexto, versao_prompt=VERSAO
+        )
+    except FalhaJsonInvalido as erro:
+        assert item.id is not None
+        fila_extracao.marcar_erro(conexao, item.id, str(erro))
+        conexao.commit()
+        resumo.erros += 1
+        return erro
+
+    proveniencia = cliente_llm.proveniencia("extrair_de_texto", VERSAO)
+    campos = resposta.campos.model_dump(exclude_none=True)
+    if campos:
+        queries_perfis.atualizar_campos_guiados(conexao, item.perfil_id, campos, agora)
+        resumo.campos_gravados += len(campos)
+
+    for tag in resposta.tags_sugeridas:
+        _gravar_tag(conexao, tag, item, agora)
+        resumo.tags_gravadas += 1
+
+    for fato_extraido in resposta.fatos_datados:
+        data = fato_extraido.data
+        if item.origem.startswith("whatsapp:"):
+            # Bloco é um mês inteiro de mensagens; a data do mês (não o palpite do modelo sobre o
+            # dia) é o que faz a marca [antigo] (brief 046) valer sozinha (brief 061).
+            data = f"{item.origem.removeprefix('whatsapp:')}-01"
+        fatos.inserir(
+            conexao,
+            Fato(
+                perfil_id=item.perfil_id,
+                data_do_fato=data,
+                tipo=fato_extraido.tipo,
+                conteudo=fato_extraido.conteudo,
+                fonte=fato_extraido.fonte,
+                registrado_em=agora,
+            ),
+            proveniencia,
+        )
+        resumo.fatos_gravados += 1
+
+    assert item.id is not None
+    fila_extracao.marcar_processado(conexao, item.id, proveniencia)
+    conexao.commit()
+    resumo.itens_processados += 1
+    return None
+
+
 def processar_fila(
     cliente_llm: ClienteExtracaoPerfil, conexao: sqlite3.Connection, limite: int = 20
 ) -> ResumoProcessamento:
@@ -71,54 +130,21 @@ def processar_fila(
     ou com erro; um erro em um item não interrompe o lote.
     """
     resumo = ResumoProcessamento()
-
     for item in fila_extracao.listar_pendentes(conexao, limite):
-        agora = datetime.now(UTC).isoformat()
-
-        try:
-            resposta = cliente_llm.gerar_json(
-                "extrair_de_texto", construir_prompt(item.texto), RespostaExtracaoTexto, versao_prompt=VERSAO
-            )
-        except FalhaJsonInvalido as erro:
-            assert item.id is not None
-            fila_extracao.marcar_erro(conexao, item.id, str(erro))
-            conexao.commit()
-            resumo.erros += 1
-            continue
-
-        proveniencia = cliente_llm.proveniencia("extrair_de_texto", VERSAO)
-        campos = resposta.campos.model_dump(exclude_none=True)
-        if campos:
-            queries_perfis.atualizar_campos_guiados(conexao, item.perfil_id, campos, agora)
-            resumo.campos_gravados += len(campos)
-
-        for tag in resposta.tags_sugeridas:
-            _gravar_tag(conexao, tag, item, agora)
-            resumo.tags_gravadas += 1
-
-        for fato_extraido in resposta.fatos_datados:
-            data = fato_extraido.data
-            if item.origem.startswith("whatsapp:"):
-                # Bloco é um mês inteiro de mensagens; a data do mês (não o palpite do modelo sobre o
-                # dia) é o que faz a marca [antigo] (brief 046) valer sozinha (brief 061).
-                data = f"{item.origem.removeprefix('whatsapp:')}-01"
-            fatos.inserir(
-                conexao,
-                Fato(
-                    perfil_id=item.perfil_id,
-                    data_do_fato=data,
-                    tipo=fato_extraido.tipo,
-                    conteudo=fato_extraido.conteudo,
-                    fonte=fato_extraido.fonte,
-                    registrado_em=agora,
-                ),
-                proveniencia,
-            )
-            resumo.fatos_gravados += 1
-
-        assert item.id is not None
-        fila_extracao.marcar_processado(conexao, item.id, proveniencia)
-        conexao.commit()
-        resumo.itens_processados += 1
-
+        processar_item(cliente_llm, conexao, item, resumo)
     return resumo
+
+
+def reprocessador_de_item(
+    cliente_llm: ClienteExtracaoPerfil, conexao: sqlite3.Connection
+) -> Callable[[int], int | None]:
+    """Reprocessa uma linha de `fila_extracao` (reenvio da fila de revisão, brief 087): devolve
+    `None` se gravou, ou o id que a nova falha abriu em `fila_revisao`."""
+
+    def reprocessar(extracao_id: int) -> int | None:
+        item = fila_extracao.obter(conexao, extracao_id)
+        assert item is not None
+        falha = processar_item(cliente_llm, conexao, item, ResumoProcessamento())
+        return None if falha is None else falha.fila_revisao_id
+
+    return reprocessar

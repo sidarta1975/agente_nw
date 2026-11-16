@@ -149,7 +149,9 @@ def ambiente(tmp_path: Path) -> dict[str, str]:
         (bin_falso / nome).write_text(corpo)
         (bin_falso / nome).chmod(0o755)
     return {
-        **os.environ,
+        # Rodando dentro de uma série (o gate do `agente_entregar.sh`), o ambiente já traz esta marca e o
+        # script pularia o `caffeinate` que o teste quer ver chamado (brief 087).
+        **{k: v for k, v in os.environ.items() if k != "SERIE_DENTRO_DO_CAFFEINATE"},
         "PATH": f"{bin_falso}{os.pathsep}{os.environ['PATH']}",
         "CHAMADAS_LOG": str(tmp_path / "chamadas.log"),
         "CAFFEINATE_LOG": str(tmp_path / "caffeinate.log"),

@@ -64,3 +64,8 @@ def contar_whatsapp(conexao: sqlite3.Connection, perfil_id: int) -> tuple[int, i
         "SELECT COUNT(*) FROM fila_extracao WHERE perfil_id = ? AND origem LIKE 'whatsapp:%'", (perfil_id,)
     ).fetchone()
     return int(pendentes), int(total)
+
+
+def obter(conexao: sqlite3.Connection, item_id: int) -> FilaExtracao | None:
+    linha = conexao.execute(f"SELECT {_COLUNAS} FROM fila_extracao WHERE id = ?", (item_id,)).fetchone()
+    return _para_fila_extracao(linha) if linha is not None else None

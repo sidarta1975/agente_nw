@@ -24,8 +24,15 @@ from agente_nw.nucleo.agrupamento import agrupador
 from agente_nw.nucleo.agrupamento import calibracao as calibracao_agrupamento
 from agente_nw.nucleo.agrupamento.agrupador import ClienteEmbeddagem
 from agente_nw.nucleo.consulta import ResultadoConsulta
-from agente_nw.nucleo.database import backup, conexao
-from agente_nw.nucleo.database.queries import assunto_contato, assuntos, perfil_tema, perfis, sistema
+from agente_nw.nucleo.database import backup, conexao, migracoes
+from agente_nw.nucleo.database.queries import (
+    assunto_contato,
+    assuntos,
+    fila_revisao,
+    perfil_tema,
+    perfis,
+    sistema,
+)
 from agente_nw.nucleo.database.queries import listas as queries_listas
 from agente_nw.nucleo.database.queries import temas as queries_temas
 from agente_nw.nucleo.fluxo import FRACAO_DO_CONTEXTO_NO_PROMPT
@@ -407,6 +414,69 @@ def processar_fila_cmd() -> int:
     print(f"Fatos gravados: {resumo.fatos_gravados}")
     print(f"Erros: {resumo.erros}")
     return 0
+
+
+def _abrir_para_revisao(caminho: str | None) -> sqlite3.Connection:
+    if caminho is None:
+        return banco()
+    aberta = conexao.abrir(Path(caminho))
+    migracoes.aplicar(aberta)
+    return aberta
+
+
+def revisao_ver_cmd(inteiro: int | None, incluir_resolvidos: bool, caminho: str | None) -> int:
+    conn = _abrir_para_revisao(caminho)
+    if inteiro is not None:
+        completo = fila_revisao.obter(conn, inteiro)
+        if completo is None:
+            print(f"FALHA: não existe item {inteiro} na fila de revisão")
+            return 1
+        print(f"#{completo.id} {completo.tarefa} ({completo.classe_do_erro}) criado em {completo.criado_em}")
+        print(f"erro: {completo.erro}")
+        print("entrada (prompt inteiro; contém texto de terceiros):")
+        print(completo.entrada)
+        return 0
+    agora = datetime.now(UTC)
+    itens = fila_revisao.listar(conn, incluir_resolvidos)
+    for contagem in fila_revisao.contar(conn):
+        grupo = f"{contagem.tarefa} · {contagem.classe_do_erro}"
+        print(f"{grupo}: {contagem.itens} (o mais antigo: {contagem.mais_antigo[:10]})")
+    for item in itens:
+        idade = (agora - datetime.fromisoformat(item.criado_em)).days
+        situacao = f" [{item.resolucao}]" if item.resolucao else ""
+        print(f"#{item.id} {item.tarefa} · {item.classe_do_erro} · há {idade} dias{situacao}")
+    print(f"{len(itens)} itens (--inteiro <id> mostra a entrada)")
+    return 0
+
+
+def revisao_descartar_cmd(item_id: int, motivo: str) -> int:
+    conn = banco()
+    try:
+        fila_revisao.descartar(conn, item_id, motivo, datetime.now(UTC).isoformat())
+    except (fila_revisao.ItemInexistente, fila_revisao.ItemJaResolvido, ValueError) as erro:
+        print(f"FALHA: {erro}")
+        return 1
+    print(f"Item {item_id} descartado.")
+    return 0
+
+
+def revisao_reenviar_cmd(item_id: int) -> int:
+    conn = banco()
+
+    def reprocessar(extracao_id: int) -> int | None:
+        return extrator.reprocessador_de_item(llm(), conn)(extracao_id)
+
+    try:
+        desfecho = fila_revisao.reenviar(conn, item_id, datetime.now(UTC).isoformat(), reprocessar)
+    except (
+        fila_revisao.ItemInexistente,
+        fila_revisao.ItemJaResolvido,
+        fila_revisao.SemCaminhoDeRepeticao,
+    ) as erro:
+        print(f"FALHA: {erro}")
+        return 1
+    print(f"Item {item_id}: {desfecho}")
+    return 0 if desfecho == "reenviado_ok" else 1
 
 
 def agrupar_cmd() -> int:
@@ -1398,6 +1468,20 @@ def _montar_parser() -> argparse.ArgumentParser:
     preparar_parser.add_argument("--evitar", default="")
     preparar_parser.add_argument("--livre", default="")
 
+    revisao_parser = subparsers.add_parser("revisao", help="o que o modelo não conseguiu processar")
+    revisao_sub = revisao_parser.add_subparsers(dest="acao", required=True)
+    revisao_ver = revisao_sub.add_parser("ver", help="lista por tarefa, tipo de erro e idade (sem a entrada)")
+    revisao_ver.add_argument(
+        "--inteiro", type=int, default=None, metavar="ID", help="mostra a entrada do item"
+    )
+    revisao_ver.add_argument("--todos", action="store_true", help="inclui os já resolvidos")
+    revisao_ver.add_argument("--banco", default=None, help="lê este banco (uma cópia) em vez do de config")
+    revisao_descartar = revisao_sub.add_parser("descartar", help="dá o item por resolvido, com motivo")
+    revisao_descartar.add_argument("id", type=int)
+    revisao_descartar.add_argument("--motivo", required=True)
+    revisao_reenviar = revisao_sub.add_parser("reenviar", help="refaz a tarefa do item (chama o modelo)")
+    revisao_reenviar.add_argument("id", type=int)
+
     for nome in COMANDOS_RESERVADOS:
         subparsers.add_parser(nome)
 
@@ -1460,6 +1544,12 @@ def main(argv: list[str] | None = None) -> int:
         if args.acao == "atualizar":
             return listas_atualizar_cmd(args.rede, args.forcar)
         return listas_ver_cmd(args.rede, args.filtro)
+    if args.comando == "revisao":
+        if args.acao == "ver":
+            return revisao_ver_cmd(args.inteiro, args.todos, args.banco)
+        if args.acao == "descartar":
+            return revisao_descartar_cmd(args.id, args.motivo)
+        return revisao_reenviar_cmd(args.id)
     if args.comando == "pedir":
         if args.menu and args.json:
             parser.error("--menu e --json não combinam: --json imprime a redação")
