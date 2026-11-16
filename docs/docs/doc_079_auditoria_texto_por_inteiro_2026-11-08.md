@@ -1111,7 +1111,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | tests/test_cruzamento_por_consulta.py | 328/328 | CERTIFICADO | Exercita cruzamento por consulta; ESCONDE: assuntos criados só com `titulo_gerado` (sem resumo/itens), centróides injetados e embedder fake decide por `"fato" in texto`. | — |
 | tests/test_cruzar_por_que_nao_atribui.py | 62/62 | CERTIFICADO | Exercita prompt `cruzar_por_que` (regra de não atribuir posição); títulos curtos, não há texto de notícia no prompt. | — |
 | tests/test_divisao.py | 37/37 | CERTIFICADO | Exercita `dividir` de agrupamento com vetores 2D; sem texto. | — |
-| tests/test_evitar_e_fatos_inteiros.py | 198/198 | CERTIFICADO | brief 091, LLM falso: fato de 3.000 caracteres inteiro no prompt; 4 fatos mais recentes e lista dos não incluídos; termo evitado só na manchete do 9º item; fato de 1.000 caracteres inteiro nos termos do contato; entrada curta igual. Textos montados por repetição; nada vai a modelo real. | — |
+| tests/test_evitar_e_fatos_inteiros.py | 200/200 | CERTIFICADO | brief 091, LLM falso: fato de 3.000 caracteres inteiro no prompt; 4 fatos mais recentes e lista dos não incluídos; termo evitado só na manchete do 9º item; fato de 1.000 caracteres inteiro nos termos do contato; entrada curta igual. Textos montados por repetição; nada vai a modelo real. | — |
 | tests/test_evitar_implicito.py | 174/174 | CERTIFICADO | Exercita "não me interessa" virando evitar; casa só pelo TÍTULO do assunto ("Política fiscal..."); assunto sem corpo. | — |
 | tests/test_executar_serie.py | 441/441 | CERTIFICADO | Testa `scripts/executar_serie.sh` com `claude`, `pmset`, `caffeinate` e `osascript` falsos num repositório git temporário; o único texto que passa é cabeçalho fictício de brief e o JSON de teste, nada vai a modelo, embedding ou filtro. | — |
 | tests/test_extensao_backend.py | 207/207 | CERTIFICADO | Exercita `PaginaExtensao`; DOCUMENTA corte do texto da página em `maximo_caracteres_pagina` e `maximo_entradas`/`maximo` de imagens (ver bloco). | — |
@@ -2050,9 +2050,9 @@ agente_nw/nucleo/llm.py:731 agente_nw/nucleo/llm.py:942
 ```
 agente_nw/nucleo/prompts/redigir_ganchos.py:288 agente_nw/nucleo/prompts/redigir_ganchos.py:289 agente_nw/nucleo/prompts/redigir_ganchos.py:292 agente_nw/nucleo/prompts/redigir_ganchos.py:295
 agente_nw/nucleo/redacao.py:325 agente_nw/nucleo/redacao.py:330 agente_nw/nucleo/relevancia/candidatos.py:42 agente_nw/nucleo/relevancia/candidatos.py:47
-agente_nw/nucleo/relevancia/candidatos.py:49 agente_nw/nucleo/relevancia/candidatos.py:54 agente_nw/nucleo/relevancia/candidatos.py:55 tests/test_evitar_e_fatos_inteiros.py:103
-tests/test_evitar_e_fatos_inteiros.py:110 tests/test_evitar_e_fatos_inteiros.py:130 tests/test_evitar_e_fatos_inteiros.py:131 tests/test_evitar_e_fatos_inteiros.py:146
-tests/test_evitar_e_fatos_inteiros.py:147 tests/test_evitar_e_fatos_inteiros.py:196 tests/test_evitar_e_fatos_inteiros.py:85 tests/test_evitar_e_fatos_inteiros.py:86
+agente_nw/nucleo/relevancia/candidatos.py:49 agente_nw/nucleo/relevancia/candidatos.py:54 agente_nw/nucleo/relevancia/candidatos.py:55 tests/test_evitar_e_fatos_inteiros.py:104
+tests/test_evitar_e_fatos_inteiros.py:112 tests/test_evitar_e_fatos_inteiros.py:132 tests/test_evitar_e_fatos_inteiros.py:133 tests/test_evitar_e_fatos_inteiros.py:148
+tests/test_evitar_e_fatos_inteiros.py:149 tests/test_evitar_e_fatos_inteiros.py:198 tests/test_evitar_e_fatos_inteiros.py:85 tests/test_evitar_e_fatos_inteiros.py:86
 tests/test_evitar_e_fatos_inteiros.py:88 tests/test_evitar_e_fatos_inteiros.py:89 tests/test_evitar_e_fatos_inteiros.py:90 tests/test_evitar_e_fatos_inteiros.py:97
 tests/test_evitar_e_fatos_inteiros.py:99
 ```
