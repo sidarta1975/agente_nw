@@ -17,7 +17,7 @@ from typing import Protocol
 from agente_nw.nucleo.database.queries import perfil_tema as perfil_tema_q
 from agente_nw.nucleo.database.queries import perfis as perfis_q
 from agente_nw.nucleo.database.queries import temas as temas_q
-from agente_nw.nucleo.llm import FalhaJsonInvalido
+from agente_nw.nucleo.llm import FalhaJsonInvalido, embeddar_em_partes
 from agente_nw.nucleo.modelos.configuracao import NivelTema, TemasUsuarioLimiares
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.modelos.perfil_tema import OrigemTema
@@ -25,6 +25,7 @@ from agente_nw.nucleo.modelos.tema import RespostaDescreverTema, Tema
 from agente_nw.nucleo.prompts import descrever_tema
 from agente_nw.nucleo.texto import sem_acento_e_caixa
 from agente_nw.nucleo.vetores import cosseno
+from agente_nw.perfil.configurador import texto_do_tema
 
 _PESO_MAXIMO = 5
 _PESO_DECLARADA = 5
@@ -117,7 +118,7 @@ def _criar_tema(conexao: sqlite3.Connection, cliente_llm: ClienteInferencia, ter
     tema = temas_q.obter_ou_criar(conexao, termo, descricao, sinonimos, agora)
     assert tema.id is not None
     try:
-        vetor = cliente_llm.embeddar([f"{termo}: {descricao}"])[0]
+        vetor = embeddar_em_partes(cliente_llm, texto_do_tema(termo, descricao, sinonimos))
         temas_q.gravar_embedding(conexao, tema.id, vetor, cliente_llm.modelo_embedding)
     except Exception:
         pass

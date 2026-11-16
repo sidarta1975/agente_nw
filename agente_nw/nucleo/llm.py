@@ -51,6 +51,19 @@ LIMITE_TOKENS_EMBEDDING = 8192
 """Janela do `bge-m3`, o modelo de embedding dos dois perfis (`bert.context_length` em `/api/show`).
 Acima disso o Ollama corta a entrada do embedding em silêncio (brief 082, decisão 2.4)."""
 
+VERSAO_CRITERIO_VETOR = "2026-11-16-1"
+"""Versão do critério com que os vetores gravados são calculados (brief 089): o texto inteiro, por
+`embeddar_em_partes`, no vetor do item, no centróide do contato e no vetor do tema (que passou a levar
+os sinônimos). Vai junto do modelo no `modelo_embedding` que cada vetor guarda (mecanismo do brief 066):
+vetor gravado pelo critério anterior (só o nome do modelo, `bge-m3`) é tratado como ausente por quem
+pede o vetor atual, e a linha continua no banco, intacta. Nenhum vetor é regravado por isso."""
+
+
+def identificador_do_vetor(modelo: str) -> str:
+    """O que se grava em `modelo_embedding` e se confere na leitura: o modelo e a versão do critério."""
+    return f"{modelo}#criterio-{VERSAO_CRITERIO_VETOR}"
+
+
 MotivoJanela = Literal[
     "prompt_estimado_acima_da_janela", "prompt_cortado", "resposta_cortada", "embedding_acima_do_limite"
 ]
@@ -499,9 +512,11 @@ class ClienteOllama(_ClienteLLMBase):
 
     @property
     def modelo_embedding(self) -> str:
-        """Modelo de embedding do perfil ativo — gravado com cada centróide e conferido na leitura
-        (brief 066): vetor de outro modelo é tratado como ausente."""
-        return self._roteamento.perfis[self._roteamento.perfil_ativo].embeddings.modelo
+        """Modelo de embedding do perfil ativo e versão do critério do vetor — gravado com cada
+        centróide e conferido na leitura (briefs 066 e 089): vetor de outro modelo, ou do mesmo modelo
+        por outro critério, é tratado como ausente."""
+        perfil = self._roteamento.perfis[self._roteamento.perfil_ativo]
+        return identificador_do_vetor(perfil.embeddings.modelo)
 
     def _registrar_aviso_porteiro(self, modelo: str, resposta: dict[str, object] | None) -> None:
         """Uma linha no mesmo `chamadas_llm.jsonl` das chamadas, só quando há o que avisar. Mesmo

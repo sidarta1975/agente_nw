@@ -37,6 +37,7 @@ from agente_nw.nucleo.database.queries import (
     redes_sociais,
 )
 from agente_nw.nucleo.database.queries import temas as queries_temas
+from agente_nw.nucleo.llm import embeddar_em_partes
 from agente_nw.nucleo.modelos.assunto import Assunto
 from agente_nw.nucleo.modelos.assunto_contato import AssuntoContato
 from agente_nw.nucleo.modelos.configuracao import (
@@ -986,7 +987,7 @@ def criar_app(
         sinonimos = [s.strip() for s in request.form.get("sinonimos", "").split(",") if s.strip()]
         queries_temas.atualizar(conn, tema_id, descricao, sinonimos)
         cliente = _cliente_llm()
-        vetor = cliente.embeddar([f"{tema.nome}: {descricao}"])[0]
+        vetor = embeddar_em_partes(cliente, configurador.texto_do_tema(tema.nome, descricao, sinonimos))
         queries_temas.gravar_embedding(conn, tema_id, vetor, cliente.modelo_embedding)
         conn.commit()
         return redirect(url_for("temas_lista"))

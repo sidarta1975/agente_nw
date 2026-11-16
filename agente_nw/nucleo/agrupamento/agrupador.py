@@ -9,6 +9,7 @@ from typing import Protocol
 from agente_nw.nucleo.agrupamento import divisao
 from agente_nw.nucleo.database.queries import assuntos, fila_revisao, itens
 from agente_nw.nucleo.database.queries.itens import ItemComDominio
+from agente_nw.nucleo.llm import embeddar_em_partes
 from agente_nw.nucleo.modelos.assunto import Assunto, StatusAssunto
 from agente_nw.nucleo.modelos.configuracao import Limiares
 from agente_nw.nucleo.vetores import centroide, cosseno
@@ -30,6 +31,15 @@ class ResumoAgrupamento:
     assuntos_reabertos: int = 0
     assuntos_encerrados: int = 0
     assuntos_divididos: int = 0
+    itens_sem_vetor: int = 0
+    """Itens cujo vetor falhou (numa parte que seja): ficam sem vetor e sem assunto, nunca com um vetor
+    parcial, e voltam a ser tentados no próximo agrupamento."""
+
+
+def texto_do_item(titulo: str, texto: str | None) -> str:
+    """O texto que vira o vetor do item (brief 089): o título e o texto inteiro, sem corte. Item sem
+    corpo (`texto` nulo, brief 083) é só o título, como antes."""
+    return titulo if texto is None else f"{titulo}\n\n{texto}"
 
 
 def _id(item_com_dominio: ItemComDominio) -> int:
@@ -85,8 +95,12 @@ def agrupar(
             break
         assert item.id is not None
 
-        texto_para_embeddar = item.titulo if item.texto is None else f"{item.titulo}\n\n{item.texto[:2000]}"
-        vetor = cliente_llm.embeddar([texto_para_embeddar])[0]
+        try:
+            vetor = embeddar_em_partes(cliente_llm, texto_do_item(item.titulo, item.texto))
+        except ValueError as erro:  # inclui `FalhaJanelaEmbedding`: nenhum vetor parcial (brief 089)
+            resumo.itens_sem_vetor += 1
+            print(f"item {item.id} ficou sem vetor: {erro}")
+            continue
         itens.gravar_embedding(conexao, item.id, vetor)
         resumo.itens_embeddados += 1
 

@@ -19,7 +19,7 @@ from agente_nw.nucleo import redacao as redacao_mod
 from agente_nw.nucleo.consulta import ResultadoConsulta, ResumoRedeSocial
 from agente_nw.nucleo.database import conexao, migracoes
 from agente_nw.nucleo.database.queries import assuntos, consulta_contato, perfis, temas
-from agente_nw.nucleo.llm import ClienteOllama
+from agente_nw.nucleo.llm import ClienteOllama, identificador_do_vetor
 from agente_nw.nucleo.modelos.configuracao import Roteamento
 from agente_nw.nucleo.modelos.pedido import PedidoExtraido
 from agente_nw.nucleo.prompts import redigir_ganchos
@@ -263,7 +263,9 @@ def test_vetor_de_tema_calculado_hoje_grava_o_modelo_de_embedding_do_perfil_ativ
     )
 
     (modelo_gravado,) = conn.execute("SELECT modelo_embedding FROM vetor_tema").fetchone()
-    assert modelo_gravado == roteamento.perfis[roteamento.perfil_ativo].embeddings.modelo
+    # brief 089: o identificador guarda o modelo e a versão do critério do vetor
+    modelo = roteamento.perfis[roteamento.perfil_ativo].embeddings.modelo
+    assert modelo_gravado == identificador_do_vetor(modelo)
     assert modelo_gravado == cliente.modelo_embedding
 
 

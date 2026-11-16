@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sqlite3
 import subprocess
@@ -20,7 +21,7 @@ from agente_nw.coleta.capturas.listas import PaginaLista
 from agente_nw.coleta.rss import leitor
 from agente_nw.console.app import criar_app
 from agente_nw.nucleo import orquestracao
-from agente_nw.nucleo.agrupamento import agrupador
+from agente_nw.nucleo.agrupamento import agrupador, comparar_vetores
 from agente_nw.nucleo.agrupamento import calibracao as calibracao_agrupamento
 from agente_nw.nucleo.agrupamento.agrupador import ClienteEmbeddagem
 from agente_nw.nucleo.consulta import ResultadoConsulta
@@ -36,6 +37,7 @@ from agente_nw.nucleo.database.queries import (
 from agente_nw.nucleo.database.queries import listas as queries_listas
 from agente_nw.nucleo.database.queries import temas as queries_temas
 from agente_nw.nucleo.fluxo import FRACAO_DO_CONTEXTO_NO_PROMPT
+from agente_nw.nucleo.llm import ClienteOllama
 from agente_nw.nucleo.localizacao import ContextoNavegacao, atualizar_lista
 from agente_nw.nucleo.modelos.configuracao import PerfilRoteamento, Roteamento, TemasArquivo
 from agente_nw.nucleo.modelos.pedido import ResultadoPedido
@@ -492,6 +494,69 @@ def agrupar_cmd() -> int:
     print(f"Assuntos reabertos: {resumo.assuntos_reabertos}")
     print(f"Assuntos encerrados: {resumo.assuntos_encerrados}")
     print(f"Assuntos divididos: {resumo.assuntos_divididos}")
+    print(f"Itens sem vetor (falha numa parte, tentados de novo depois): {resumo.itens_sem_vetor}")
+    return 0
+
+
+def _cliente_de_embedding() -> comparar_vetores.ClienteEmbeddagem:
+    """Só o `ClienteOllama` local, que faz os embeddings, ligado a um banco em memória: `llm()` abriria
+    (e migraria) o banco real, e embedding nunca escreve na `fila_revisao` (brief 082)."""
+    cfg = configuracao()
+    memoria = conexao.abrir(":memory:")
+    migracoes.aplicar(memoria)
+    return ClienteOllama(http(), memoria, cfg.roteamento, cfg.local.ollama_url, caminho_log_chamadas_llm())
+
+
+def _sha256_do_arquivo(caminho: Path) -> str:
+    return hashlib.sha256(caminho.read_bytes()).hexdigest()
+
+
+def comparar_vetores_cmd(amostra: int, caminho: str) -> int:
+    """Simulação somente leitura (brief 089, 2.4 e 2.4b): vetor antigo contra vetor do texto inteiro, numa
+    cópia do banco dada por `--banco`. Recusa o banco real; confere o hash do arquivo antes e depois."""
+    destino = Path(caminho)
+    if destino.resolve() == caminho_banco().resolve():
+        print("FALHA: comparar-vetores não roda no banco real; use uma cópia (agente_nw copiar-banco)")
+        return 1
+    if not destino.is_file():
+        print(f"FALHA: {destino} não existe")
+        return 1
+    if amostra < 1:
+        print("FALHA: --amostra precisa ser pelo menos 1")
+        return 1
+
+    hash_antes = _sha256_do_arquivo(destino)
+    print(f"Banco: {destino}")
+    print(f"sha256 antes: {hash_antes}")
+    cfg = configuracao()
+    conn = comparar_vetores.abrir_somente_leitura(destino)
+    try:
+        resultado = comparar_vetores.comparar(_cliente_de_embedding(), conn, cfg.limiares, amostra)
+    finally:
+        conn.close()
+
+    print(f"Itens na amostra: {resultado.itens_na_amostra}")
+    print(f"Itens lidos em partes: {resultado.itens_lidos_em_partes}")
+    print(f"Itens com o mesmo vetor de antes: {resultado.itens_com_vetor_igual}")
+    print(f"Itens sem vetor novo (falha numa parte): {resultado.itens_sem_vetor_novo}")
+    if resultado.menor_cosseno_antigo_novo is not None and resultado.mediana_cosseno_antigo_novo is not None:
+        print(
+            f"Cosseno entre o vetor antigo e o novo: menor {resultado.menor_cosseno_antigo_novo:.4f}, "
+            f"mediana {resultado.mediana_cosseno_antigo_novo:.4f}"
+        )
+    print(f"Itens que trocariam de assunto: {resultado.itens_que_trocariam_de_assunto}")
+    print(f"Assuntos que se fundiriam: {resultado.assuntos_que_se_fundiriam}")
+    print(f"Assuntos que se separariam: {resultado.assuntos_que_se_separariam}")
+    print(f"Itens republicados (vetor antigo): {resultado.republicados_antes}")
+    print(f"Republicados que deixariam de ser: {resultado.republicacoes_que_mudariam}")
+    print(f"Itens que passariam a ser republicação: {resultado.passariam_a_republicacao}")
+    for tabela, outros, total in resultado.vetores_do_criterio_anterior:
+        print(f"{tabela}: {outros} de {total} do critério anterior (ausentes até uma regravação autorizada)")
+    hash_depois = _sha256_do_arquivo(destino)
+    print(f"sha256 depois: {hash_depois}")
+    if hash_depois != hash_antes:
+        print("FALHA: o arquivo do banco mudou durante a comparação")
+        return 1
     return 0
 
 
@@ -1401,6 +1466,12 @@ def _montar_parser() -> argparse.ArgumentParser:
     copiar_banco_parser = subparsers.add_parser("copiar-banco")
     copiar_banco_parser.add_argument("destino")
 
+    comparar_vetores_parser = subparsers.add_parser(
+        "comparar-vetores", help="simulação, só leitura: vetor antigo x vetor do texto inteiro (numa cópia)"
+    )
+    comparar_vetores_parser.add_argument("--amostra", type=int, required=True)
+    comparar_vetores_parser.add_argument("--banco", required=True, help="caminho da cópia do banco")
+
     restaurar_backup_parser = subparsers.add_parser("restaurar-backup")
     restaurar_backup_parser.add_argument("arquivo")
     restaurar_backup_parser.add_argument("--confirmo", action="store_true")
@@ -1532,6 +1603,8 @@ def main(argv: list[str] | None = None) -> int:
         return ler_marcacoes_cmd(args.data)
     if args.comando == "copiar-banco":
         return copiar_banco(args.destino)
+    if args.comando == "comparar-vetores":
+        return comparar_vetores_cmd(args.amostra, args.banco)
     if args.comando == "restaurar-backup":
         return restaurar_backup(args.arquivo, args.confirmo)
     if args.comando == "importar-agenda":

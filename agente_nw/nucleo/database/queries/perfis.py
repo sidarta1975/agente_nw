@@ -9,6 +9,7 @@ from typing import Protocol
 import sqlite_vec
 
 from agente_nw.nucleo.database.queries import fatos
+from agente_nw.nucleo.llm import embeddar_em_partes
 from agente_nw.nucleo.modelos.perfil import Perfil
 from agente_nw.nucleo.texto import sem_acento_e_caixa
 from agente_nw.nucleo.vetores import centroide as calcular_media_ponderada
@@ -611,7 +612,6 @@ def calcular_centroide(
 
 
 _MAXIMO_FATOS_NO_CENTROIDE = 20
-_TRECHO_DO_FATO_NO_CENTROIDE = 500  # o fato é guardado inteiro; para o vetor basta o começo
 
 
 class _ClienteEmbeddagem(Protocol):
@@ -623,17 +623,20 @@ def calcular_centroide_do_contato(
 ) -> list[float] | None:
     """Perfil do contato para a relevância, vindo só do que o sistema sabe dele: o que ele publicou
     (os fatos mais recentes) e, na falta de fatos, a ficha (cargo, empresa, setor, cidade, notas).
-    Tags não entram: o usuário não trabalha para o agente. Sem nada, devolve None."""
+    Tags não entram: o usuário não trabalha para o agente. Sem nada, devolve None.
+
+    Cada texto entra inteiro (brief 089): o conteúdo de cada fato e a ficha vão sem corte a
+    `embeddar_em_partes`, que divide o que não cabe numa chamada; falha numa parte sobe, nunca um
+    vetor parcial."""
     fatos_recentes = fatos.listar_recentes(conexao, perfil_id, _MAXIMO_FATOS_NO_CENTROIDE)
     if fatos_recentes:
-        trechos = [fato.conteudo[:_TRECHO_DO_FATO_NO_CENTROIDE] for fato in fatos_recentes]
-        return cliente_llm.embeddar(["\n".join(trechos)])[0]
+        return embeddar_em_partes(cliente_llm, "\n".join(fato.conteudo for fato in fatos_recentes))
     perfil = obter_por_id(conexao, perfil_id)
     if perfil is None:
         return None
     ficha = [perfil.cargo, perfil.empresa, perfil.setor, perfil.cidade, perfil.notas]
     texto = ". ".join(parte for parte in ficha if parte)
-    return cliente_llm.embeddar([texto])[0] if texto else None
+    return embeddar_em_partes(cliente_llm, texto) if texto else None
 
 
 def gravar_centroide(

@@ -6,6 +6,7 @@ from typing import Protocol
 from agente_nw.nucleo.database.queries import perfil_tema
 from agente_nw.nucleo.database.queries import perfis as queries_perfis
 from agente_nw.nucleo.database.queries import temas as queries_temas
+from agente_nw.nucleo.llm import embeddar_em_partes
 from agente_nw.nucleo.modelos.configuracao import TemaUsuario
 from agente_nw.nucleo.modelos.perfil import Perfil
 
@@ -17,6 +18,16 @@ class ClienteEmbeddagem(Protocol):
     def modelo_embedding(self) -> str: ...
 
 
+def texto_do_tema(nome: str, descricao: str, sinonimos: list[str]) -> str:
+    """O texto que vira o vetor do tema (brief 089): nome, descrição e sinônimos, quando existirem,
+    juntos num texto só. Com descrição e sem sinônimos, é o `"nome: descricao"` de antes, caractere por
+    caractere; sem descrição, só o nome (antes, `"nome: "`)."""
+    texto = f"{nome}: {descricao}" if descricao else nome
+    if sinonimos:
+        texto += "\nSinônimos: " + ", ".join(sinonimos)
+    return texto
+
+
 def _gravar_tema_do_usuario(
     conexao: sqlite3.Connection,
     cliente_llm: ClienteEmbeddagem,
@@ -26,7 +37,7 @@ def _gravar_tema_do_usuario(
 ) -> None:
     tema_gravado = queries_temas.obter_ou_criar(conexao, tema.nome, tema.descricao, tema.sinonimos, agora)
     assert tema_gravado.id is not None
-    vetor = cliente_llm.embeddar([f"{tema.nome}: {tema.descricao}"])[0]
+    vetor = embeddar_em_partes(cliente_llm, texto_do_tema(tema.nome, tema.descricao, tema.sinonimos))
     queries_temas.gravar_embedding(conexao, tema_gravado.id, vetor, cliente_llm.modelo_embedding)
     perfil_tema.vincular(
         conexao, usuario_id, tema_gravado.id, tema.peso, "declarada", tema.nivel, True, agora
