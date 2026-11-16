@@ -48,6 +48,11 @@ def marcar_processado(
     )
 
 
+def registrar_partes(conexao: sqlite3.Connection, item_id: int, partes: int) -> None:
+    """Registro de cobertura (brief 088): em quantas partes o item foi lido (1 = inteiro numa chamada)."""
+    conexao.execute("UPDATE fila_extracao SET partes_lidas = ? WHERE id = ?", (partes, item_id))
+
+
 def marcar_erro(conexao: sqlite3.Connection, item_id: int, erro: str) -> None:
     conexao.execute("UPDATE fila_extracao SET erro = ? WHERE id = ?", (erro, item_id))
 

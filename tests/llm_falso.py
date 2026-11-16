@@ -17,6 +17,10 @@ class ProvenienciaFalsa:
     def proveniencia(self, tarefa_nome: str, versao_prompt: str | None = None) -> Proveniencia:
         return Proveniencia(modelo=f"modelo-falso-{tarefa_nome}", perfil="teste", prompt_versao=versao_prompt)
 
+    def num_ctx(self, tarefa_nome: str) -> int:
+        """O menor `num_ctx` dos perfis (`air16`): o orçamento de quem divide o texto (brief 088)."""
+        return 4096
+
 
 def candidatos_do_prompt(prompt: str) -> list[str]:
     """Cada candidato numerado de `avaliar_relacao_objetivo` (um bloco por "N. ", que pode ter várias

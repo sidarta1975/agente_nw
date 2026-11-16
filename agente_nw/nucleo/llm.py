@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal, TypeVar
+from typing import Literal, Protocol, TypeVar
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -17,6 +17,7 @@ from agente_nw.nucleo.database.queries import fila_revisao
 from agente_nw.nucleo.estimativa_tokens import estimar_tokens_conservador
 from agente_nw.nucleo.modelos.configuracao import Roteamento, TarefaRoteamento
 from agente_nw.nucleo.modelos.proveniencia import Proveniencia
+from agente_nw.nucleo.texto_integral import Parte, consolidar_vetores, processar_dividindo
 
 EsquemaT = TypeVar("EsquemaT", bound=BaseModel)
 
@@ -227,6 +228,11 @@ class _ClienteLLMBase(ABC):
         `None` na base: os provedores de API não cortam o prompt em silêncio (recusam com erro HTTP) e o
         `num_ctx` da tarefa é a janela do modelo local. O `ClienteOllama` devolve o `num_ctx`."""
         return None
+
+    def num_ctx(self, tarefa_nome: str) -> int:
+        """`num_ctx` declarado da tarefa no perfil ativo: de onde quem divide o texto em partes tira o
+        orçamento de cada parte (brief 088, `texto_integral.orcamento_do_texto`)."""
+        return self._tarefa(tarefa_nome).num_ctx
 
     def proveniencia(self, tarefa_nome: str, versao_prompt: str | None = None) -> Proveniencia:
         """Perfil ativo, modelo da tarefa e versão do prompt — o que `gerar_json` usa e registra no log,
@@ -922,3 +928,29 @@ def _parada_openai(dados: object) -> str | None:
     escolha = _primeiro_da_lista(dados, "choices")
     parada = escolha.get("finish_reason") if escolha is not None else None
     return parada if isinstance(parada, str) else None
+
+
+class _Embeddador(Protocol):
+    def embeddar(self, textos: list[str]) -> list[list[float]]: ...
+
+
+def embeddar_em_partes(cliente: _Embeddador, texto: str) -> list[float]:
+    """Vetor de um texto de qualquer tamanho, sem cortar nada (brief 088).
+
+    Regra de consolidação: o texto é dividido por `texto_integral.dividir` com orçamento de
+    `LIMITE_TOKENS_EMBEDDING`; cada parte é embeddada numa chamada própria (assim a medida do servidor
+    confere cada parte, brief 082); o vetor é a **média dos vetores das partes ponderada pelo número de
+    caracteres de cada parte, normalizada**. Texto que cabe vai inteiro numa chamada só e volta o vetor
+    dela, sem mudança nenhuma. **Falha numa parte invalida o vetor**: a exceção sobe e nenhum vetor
+    parcial é devolvido. Se o servidor recusar uma parte por tamanho (`FalhaJanelaEmbedding`), o
+    orçamento cai à metade, até 4 vezes (`texto_integral.processar_dividindo`)."""
+
+    def vetores_das_partes(partes: list[Parte]) -> list[list[float]]:
+        return [cliente.embeddar([parte.texto])[0] for parte in partes]
+
+    vetores, partes = processar_dividindo(
+        texto, LIMITE_TOKENS_EMBEDDING, vetores_das_partes, FalhaJanelaEmbedding
+    )
+    if len(partes) == 1:
+        return vetores[0]
+    return consolidar_vetores(vetores, [len(parte.texto) for parte in partes])

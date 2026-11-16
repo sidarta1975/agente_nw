@@ -15,7 +15,12 @@ class _ClienteFake:
         self.tarefa_recebida: str | None = None
         self.prompt_recebido: str | None = None
 
-    def gerar_json(self, tarefa: str, prompt: str, esquema: type[BaseModel]) -> Any:
+    def num_ctx(self, tarefa_nome: str) -> int:
+        return 4096
+
+    def gerar_json(
+        self, tarefa: str, prompt: str, esquema: type[BaseModel], versao_prompt: str | None = None
+    ) -> Any:
         self.tarefa_recebida = tarefa
         self.prompt_recebido = prompt
         if isinstance(self._resposta_ou_erro, Exception):

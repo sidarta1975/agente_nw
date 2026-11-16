@@ -51,7 +51,12 @@ class _ClienteLLMFake:
         self._respostas = respostas_por_bloco
         self.chamadas: list[str] = []
 
-    def gerar_json(self, tarefa: str, prompt: str, esquema: type[BaseModel]) -> Any:
+    def num_ctx(self, tarefa_nome: str) -> int:
+        return 4096
+
+    def gerar_json(
+        self, tarefa: str, prompt: str, esquema: type[BaseModel], versao_prompt: str | None = None
+    ) -> Any:
         self.chamadas.append(tarefa)
         for chave, resposta in self._respostas.items():
             if chave in prompt:
@@ -347,7 +352,12 @@ class _ClienteVisaoFake(_ClienteLLMFake):
         self.imagens_enviadas: list[list[str] | None] = []
 
     def gerar_json(
-        self, tarefa: str, prompt: str, esquema: type[BaseModel], imagens: list[str] | None = None
+        self,
+        tarefa: str,
+        prompt: str,
+        esquema: type[BaseModel],
+        imagens: list[str] | None = None,
+        versao_prompt: str | None = None,
     ) -> Any:
         if tarefa == "descrever_imagem":
             self.chamadas.append(tarefa)

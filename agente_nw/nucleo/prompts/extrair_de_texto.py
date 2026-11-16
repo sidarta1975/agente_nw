@@ -3,7 +3,11 @@ from __future__ import annotations
 from agente_nw.nucleo.modelos.extracao import RespostaExtracaoTexto
 from agente_nw.nucleo.prompts.seguranca import INSTRUCAO_DADO_EXTERNO, cercar_dado_externo
 
-VERSAO = "2026-11-02-1"
+VERSAO = "2026-11-16-1"
+"""Brief 088: o texto que não cabe numa chamada chega em partes (`nucleo/texto_integral.py`), cada uma
+com o aviso "[parte K de N de um documento maior]" na primeira linha do cerco. Texto que cabe produz o
+mesmo prompt da versão `2026-11-02-1`, caractere por caractere; a versão nova diz, na proveniência, que o
+item foi lido por inteiro (numa chamada ou em partes)."""
 ESQUEMA = RespostaExtracaoTexto
 
 _GUIA_CAMPOS = """\
@@ -49,6 +53,9 @@ def construir_prompt(texto: str) -> str:
     A saída deve validar contra :class:`RespostaExtracaoTexto` (``ESQUEMA``
     acima) — é esse o vínculo entre este prompt e o esquema do passo 3 do
     brief: quem chama ``ClienteOllama.gerar_json`` passa os dois juntos.
+
+    ``texto`` é o texto inteiro, ou o de uma parte já com o aviso "parte K de N"
+    (``texto_integral.texto_para_o_prompt``): os dois entram no mesmo cerco.
     """
     return f"""\
 Você recebe um texto livre sobre um contato de uma agenda pessoal e extrai só

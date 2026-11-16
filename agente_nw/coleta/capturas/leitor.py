@@ -144,7 +144,7 @@ def ler_redes_sociais_do_contato(
                 break
             if avisar is not None:
                 avisar(f"  {rede.rede}: bloco {numero}/{len(blocos)}")
-            extraido = extrator.extrair(cliente_llm, bloco, rede.rede)
+            extraido = extrator.extrair(cliente_llm, bloco, rede.rede, conexao=conexao)
             if extraido is None:
                 descartados += 1
                 continue

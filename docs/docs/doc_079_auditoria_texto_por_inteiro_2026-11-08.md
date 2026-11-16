@@ -145,8 +145,8 @@ Os cinco mais graves, em uma linha cada:
 Além dos 45, há 7 cortes que **não** alimentam análise (data, log, tela) na seção 4, com a prova de
 cada um; se você discordar de qualquer linha dessa seção, ela volta para a seção 3.
 
-O verificador (`scripts/verificar_auditoria_texto.py`) confere que nada ficou fora: 324 arquivos na
-tabela, um por arquivo, com a contagem de linhas batendo com o disco; 1.393 ocorrências da varredura
+O verificador (`scripts/verificar_auditoria_texto.py`) confere que nada ficou fora: 328 arquivos na
+tabela, um por arquivo, com a contagem de linhas batendo com o disco; 1.461 ocorrências da varredura
 mecânica, todas com destino; e nenhuma exceção aprovada por quem não pode. Saída dele:
 
 ```
@@ -170,7 +170,7 @@ e o `manifest.json`, os `*.py` da raiz (não há nenhum) e `tests/**/*.py`. Fica
 `node_modules/`, `__pycache__/`, `dados/`, `logs/`, `docs/` e `.git/`. Duas inclusões vão além da
 letra do brief, de propósito, porque cobrir mais nunca cobre menos: `agente_nw/**/*.yaml` (por causa
 de `nucleo/prompts/exemplos_conversavel.yaml`, que é dado de prompt) e o `extensao/manifest.json`
-(citado no próprio item 3.7). Deu **317** arquivos em 2026-11-08, **319** depois do brief 086 **320** depois do brief 081 **322** depois do brief 087 (`scripts/migracoes/020_fila_revisao_destino.sql` e `tests/test_fila_revisao_destino.py`) e **324** depois do brief 082 (`agente_nw/nucleo/estimativa_tokens.py` e `tests/test_janela_modelo.py`). Ficaram fora da tabela, por serem dados e não
+(citado no próprio item 3.7). Deu **317** arquivos em 2026-11-08, **319** depois do brief 086 **320** depois do brief 081 **322** depois do brief 087 (`scripts/migracoes/020_fila_revisao_destino.sql` e `tests/test_fila_revisao_destino.py`) **324** depois do brief 082 (`agente_nw/nucleo/estimativa_tokens.py` e `tests/test_janela_modelo.py`) e **328** depois do brief 088 (`agente_nw/nucleo/texto_integral.py`, `agente_nw/nucleo/prompts/extrair_captura_rede_social.py`, `scripts/migracoes/021_cobertura_texto.sql` e `tests/test_texto_integral.py`). Ficaram fora da tabela, por serem dados e não
 código: os templates HTML do console (18 arquivos, só apresentação) e as 8 fixturas de dados de
 `tests/fixtures/` — estas estão cobertas na linha de certificação do teste que as lê.
 
@@ -429,15 +429,15 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Estado: EXCEÇÃO APROVADA
 - Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 
-#### P-019 — agente_nw/coleta/capturas/extrator.py:68 — `extrair`
+#### P-019 — agente_nw/coleta/capturas/extrator.py:108 — `extrair`
 - Classe: P
 - O que é cortado e quanto: nada é cortado aqui — o bloco inteiro (até 5.000 caracteres, P-014) vai ao prompt `extrair_captura_rede_social`. O problema é que **ninguém confere se ele cabe**: o `num_ctx` da tarefa é 4.096 tokens no `air16`, e 5.000 caracteres de português são ≈ 1.400 tokens, mas o prompt tem mais 600 tokens de instrução e exemplo, e nada mede a soma.
 - Qual decisão do produto depende desse corte: a extração do fato daquele bloco. Se o Ollama cortar o prompt em silêncio (armadilha 1 do PLAN), o modelo responde sobre um texto truncado e o fato gravado é parcial — sem erro, sem log.
 - Commit que introduziu: `c6e0969`
 - Justificativa existente: nenhuma.
 - Proposta do executor: ver P-040: a correção certa é uma só, no cliente de LLM, e serve a todas as 15 tarefas. Este ponto fica aqui porque é a chamada com a maior entrada de texto de terceiro do produto.
-- Estado: CORRIGIDO (brief 082)
-- Decisão de Sidarta: corrigir (brief 082): o cliente de LLM mede o prompt de `extrair_captura_rede_social` (estimativa antes, `prompt_eval_count` depois) e recusa o que não cabe, com o item na `fila_revisao`; o bloco continua inteiro no prompt
+- Estado: CORRIGIDO (brief 088)
+- Decisão de Sidarta: corrigir (brief 082): o cliente de LLM mede o prompt de `extrair_captura_rede_social` (estimativa antes, `prompt_eval_count` depois) e recusa o que não cabe, com o item na `fila_revisao`; o bloco continua inteiro no prompt. Brief 088 (decisões 2.1 a 2.5 do brief): o bloco que não cabe deixa de ser recusado e é lido em partes consecutivas que cobrem o texto todo (`agente_nw/nucleo/texto_integral.py`), com 500 caracteres de sobreposição; data e tipo divergentes entre partes vão para a `fila_revisao`, sem voto
 
 #### P-020 — agente_nw/coleta/capturas/busca.py:112 — identidade da pessoa decidida por 3-4 linhas
 - Classe: R
@@ -662,7 +662,7 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 
 ### 3.f. Janela do modelo — ninguém mede
 
-#### P-040 — agente_nw/nucleo/llm.py:465 — `ClienteOllama._chamar`
+#### P-040 — agente_nw/nucleo/llm.py:471 — `ClienteOllama._chamar`
 - Classe: P
 - O que é cortado e quanto: nada aqui corta texto; o que falta é a conferência. O cliente manda `num_ctx` no payload e o prompt inteiro, **sem medir o prompt**. Se o prompt passar do `num_ctx`, o Ollama trunca em silêncio (armadilha 1 do `docs/PLAN.md`) e o modelo responde sobre um texto cortado — sem erro, sem log, sem `fila_revisao`. Vale para 14 das 15 tarefas: a única com orçamento é `redigir_ganchos` (P-033).
 - Qual decisão do produto depende desse corte: toda saída de LLM do produto. As entradas de maior risco são `extrair_de_texto` (`perfil/extrator.py:78`, que manda `item.texto` inteiro), `extrair_captura_rede_social` (P-019) e `extrair_pedido` (`nucleo/pedido.py:41`, a frase acumulada de correções mais 50 contatos).
@@ -671,7 +671,7 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Proposta do executor: corrigir, e é a correção de melhor relação custo/benefício desta auditoria: uma função no cliente que estime os tokens do prompt (o estimador de `redigir_ganchos` já existe) e, acima do `num_ctx` da tarefa, registre uma linha de aviso no `chamadas_llm.jsonl` e mande o item para `fila_revisao` em vez de deixar o modelo responder sobre um texto cortado. Um brief, um arquivo, nenhuma mudança de prompt.
 - Estado: CORRIGIDO (brief 082)
 - Decisão de Sidarta: corrigir (brief 082): toda chamada de geração ao Ollama é conferida contra o `num_ctx` da tarefa (estimativa antes, `prompt_eval_count` depois); o que não cabe vira `FalhaJanela`, linha `"janela": true` no `chamadas_llm.jsonl` e item na `fila_revisao`
-- Onde mais aparece: `agente_nw/perfil/extrator.py:78`; `agente_nw/coleta/capturas/extrator.py:66`; `agente_nw/nucleo/pedido.py:41`; `config/llm_routing.yaml:8`.
+- Onde mais aparece: `agente_nw/perfil/extrator.py:139`; `agente_nw/coleta/capturas/extrator.py:110`; `agente_nw/nucleo/pedido.py:41`; `config/llm_routing.yaml:8`.
 
 #### P-041 — agente_nw/nucleo/agrupamento/agrupador.py:89 — nenhuma medida antes de `embeddar`
 - Classe: P
@@ -684,7 +684,7 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Decisão de Sidarta: corrigir (brief 082): `embeddar` confere cada texto contra os 8.192 tokens do `bge-m3` antes da chamada (e pela contagem do servidor, quando é um texto só); acima disso, `FalhaJanelaEmbedding` com registro, nunca um vetor do texto cortado
 - Onde mais aparece: `agente_nw/nucleo/consulta.py:133`; `agente_nw/nucleo/database/queries/perfis.py:630`; `config/llm_routing.yaml:6`.
 
-#### P-042 — agente_nw/nucleo/llm.py:462 — `num_predict` e a resposta cortada
+#### P-042 — agente_nw/nucleo/llm.py:468 — `num_predict` e a resposta cortada
 - Classe: P (na saída)
 - O que é cortado e quanto: `num_predict` por tarefa (256 a 2.048 tokens) limita a resposta, e nada confere se ela veio cortada (`done_reason == "length"` no Ollama, `stop_reason == "max_tokens"` na Anthropic, `finish_reason` nas outras). Uma resposta cortada no meio do JSON cai no caminho de "JSON inválido" e vira nova tentativa, mas uma resposta **válida e incompleta** (uma lista com menos itens, um cartão com duas linhas) é gravada como boa.
 - Qual decisão do produto depende desse corte: o conteúdo gravado de qualquer tarefa com saída longa — cartão (1.024), `extrair_de_texto` (1.024) e `redigir_ganchos` (2.048) são as de maior risco.
@@ -865,7 +865,7 @@ YAML. Essa é a chamada que eu mediria primeiro se você aprovar o P-040.
 
 ## 6. Certificação por arquivo
 
-Os 324 arquivos do universo, um por linha, na ordem do caminho. `Linhas lidas/total` foi conferido
+Os 328 arquivos do universo, um por linha, na ordem do caminho. `Linhas lidas/total` foi conferido
 com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pontos das seções 3 e 4.
 
 | Arquivo | Linhas lidas/total | Resultado | Evidência (uma linha) | Ponto |
@@ -876,7 +876,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | agente_nw/coleta/capturas/__init__.py | 0/0 | CERTIFICADO | arquivo vazio: não manipula texto de conteúdo (só marca o pacote) | — |
 | agente_nw/coleta/capturas/busca.py | 151/151 | CORTA | o texto do cartão de cada candidato da busca da rede vira `nome_exibido` + 4 linhas de descrição; o resto do cartão é descartado antes de o candidato ser ordenado e mostrado | P-020, NA-002 |
 | agente_nw/coleta/capturas/extensao_backend.py | 181/181 | CORTA | o texto da página capturada é cortado em `maximo_caracteres_pagina` duas vezes: no pedido à extensão (l. 88) e no recorte local da resposta (l. 93) | P-013 |
-| agente_nw/coleta/capturas/extrator.py | 73/73 | CORTA | o bloco capturado vai inteiro ao prompt (bom), mas sem nenhuma conferência de janela, e o que é gravado é o "texto essencial" que o modelo devolve, não o bloco | P-019, P-040 |
+| agente_nw/coleta/capturas/extrator.py | 134/134 | CORTA | o bloco capturado vai inteiro ao modelo: numa chamada quando cabe (o prompt de antes), em partes que cobrem o bloco todo quando não cabe (`texto_integral.processar_dividindo`, l. 124; brief 088), com data e tipo divergentes entre partes indo para a `fila_revisao`; o que é gravado continua sendo o "texto essencial" que o modelo devolve, não o bloco | P-019, P-040 |
 | agente_nw/coleta/capturas/imagens.py | 68/68 | CORTA | a imagem inteira (base64) vai ao modelo de visão, mas o prompt limita a descrição a "2 a 5 frases" e essa descrição é tudo o que sobra da imagem a jusante | P-018 |
 | agente_nw/coleta/capturas/leitor.py | 170/170 | CORTA | grava o bloco integral como fato (`conteudo=bloco`, l. 155, com o comentário "texto de fonte externa não se altera"), mas examina só `maximo_blocos × 4` blocos da página e para ao gravar `maximo_blocos` | P-016 |
 | agente_nw/coleta/capturas/listas.py | 408/408 | CORTA | de cada cartão da lista ficam o nome e até 3 linhas de cabeçalho; a lista inteira é lida só até `maximo_entradas` / 3 rodadas sem novidade | P-015, P-020 |
@@ -910,7 +910,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | agente_nw/nucleo/database/queries/consulta_contato.py | 124/124 | CORTA | Grava `contexto_json`/`resumo_redes_sociais` inteiros; corta o histórico de consultas e as mensagens-molde que alimentam o prompt de redação. | P-028, P-030 |
 | agente_nw/nucleo/database/queries/conversa.py | 98/98 | CORTA | guarda a mensagem inteira e reparte o mês em blocos sem perder nada (`_em_blocos`), mas devolve só os `meses_extraidos` meses mais recentes (l. 97) e as `limite` últimas trocas (l. 46) | P-022, P-023, NA-001, NA-007 |
 | agente_nw/nucleo/database/queries/fatos.py | 56/56 | CORTA | `inserir` grava `conteudo` inteiro; `listar_recentes` escolhe só os N fatos mais recentes que vão ao prompt e aos termos de busca. | P-026 |
-| agente_nw/nucleo/database/queries/fila_extracao.py | 71/71 | CORTA | Enfileira e devolve `texto` inteiro (nenhum corte de caractere); o lote de pendentes é limitado por `LIMIT`. | P-043 |
+| agente_nw/nucleo/database/queries/fila_extracao.py | 76/76 | CORTA | Enfileira e devolve `texto` inteiro (nenhum corte de caractere); o lote de pendentes é limitado por `LIMIT`; `registrar_partes` (brief 088) só grava o número de partes em que o item foi lido. | P-043 |
 | agente_nw/nucleo/database/queries/fila_revisao.py | 212/212 | CERTIFICADO | Lista (sem a coluna `entrada`), conta, descarta e reenvia os itens da fila (brief 087); `entrada` e `erro` são gravados e devolvidos por inteiro por `obter`, o descarte só grava o motivo que Sidarta escreveu, e o único limite é o `LIMIT 1` da busca do vínculo com `fila_extracao`, que escolhe uma linha e não corta texto. | — |
 | agente_nw/nucleo/database/queries/fontes.py | 75/75 | CORTA | Cadastro de feeds, sem texto de conteúdo; único corte de coleção é o `LIMIT 2` da regra "dois dias vazios". | P-043 |
 | agente_nw/nucleo/database/queries/gancho_uso.py | 107/107 | CERTIFICADO | Grava e lê `gancho_json` e `comentario` inteiros (só `.strip()`, que não é corte de conteúdo); nenhum LIMIT. | — |
@@ -927,7 +927,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | agente_nw/nucleo/estimativa_tokens.py | 24/24 | CERTIFICADO | só conta palavras e caracteres do texto que recebe para estimar tokens (brief 082); não corta nem devolve texto | — |
 | agente_nw/nucleo/fluxo.py | 482/482 | CORTA | fluxo do pedido (status, perguntas, retomada); não lê texto de conteúdo, mas é aqui que nasce o orçamento de prompt `num_ctx * 0,73` que corta o prompt da redação | P-033 |
 | agente_nw/nucleo/historico.py | 97/97 | CORTA | o histórico que vai ao prompt `redigir_ganchos` leva a mensagem entregue cortada em 100 caracteres (o comentário do usuário entra inteiro desde o brief 081), e só as 5 consultas mais recentes | P-028, NA-001 |
-| agente_nw/nucleo/llm.py | 924/924 | CERTIFICADO | o prompt e o texto de embedding chegam e saem inteiros; desde o brief 082 o cliente confere a janela (estimativa antes, `prompt_eval_count` e motivo de parada depois) e recusa o que não cabe em vez de deixar o modelo responder sobre texto cortado | P-040, P-042 |
+| agente_nw/nucleo/llm.py | 956/956 | CERTIFICADO | o prompt e o texto de embedding chegam e saem inteiros; desde o brief 082 o cliente confere a janela (estimativa antes, `prompt_eval_count` e motivo de parada depois) e recusa o que não cabe em vez de deixar o modelo responder sobre texto cortado; desde o brief 088, `num_ctx` expõe a janela da tarefa a quem divide o texto e `embeddar_em_partes` (l. 937) embedda em partes que cobrem o texto todo e devolve a média ponderada, nunca um vetor parcial | P-040, P-042 |
 | agente_nw/nucleo/localizacao.py | 412/412 | CORTA | localiza a pessoa nas redes; o desempate por LLM vê só o `cabecalho` de cada candidata, os parecidos param em `maximo_parecidas` e a deduplicação do fato olha 200 fatos | P-020, P-021, NA-002 |
 | agente_nw/nucleo/modelos/__init__.py | 0/0 | CERTIFICADO | Arquivo vazio (0 bytes): só marca o pacote. | — |
 | agente_nw/nucleo/modelos/assunto.py | 24/24 | CERTIFICADO | Contrato frozen; `titulo_gerado`, `justificativa` e `resumo_cartao` sem limite de tamanho. | — |
@@ -964,7 +964,8 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | agente_nw/nucleo/prompts/descrever_tema.py | 32/32 | CERTIFICADO | monta o prompt com o termo inteiro; pede descrição de 10 a 20 palavras, que é saída do modelo, não corte de entrada | — |
 | agente_nw/nucleo/prompts/desempatar_perfil.py | 62/62 | CERTIFICADO | monta o prompt com os cabeçalhos que recebe, cercados por inteiro; o recorte ao cabeçalho vem de `localizacao.py` (P-020) | — |
 | agente_nw/nucleo/prompts/exemplos_conversavel.yaml | 22/22 | CERTIFICADO | dado de prompt: 20 frases de exemplo de conversável/não conversável; nenhum limite de quantidade ou tamanho de texto analisado | — |
-| agente_nw/nucleo/prompts/extrair_de_texto.py | 85/85 | CERTIFICADO | põe o texto recebido inteiro no prompt, cercado (`cercar_dado_externo(texto)`, l. 84); nenhum corte | — |
+| agente_nw/nucleo/prompts/extrair_captura_rede_social.py | 57/57 | CERTIFICADO | prompt de `extrair_captura_rede_social` (saiu de `capturas/extrator.py` no brief 088, sem mudança de texto): o bloco entra inteiro entre aspas (l. 44); a parte de um bloco dividido entra inteira, cercada, com o aviso "parte K de N" (`construir_prompt_de_parte`, l. 48); nenhum corte | — |
+| agente_nw/nucleo/prompts/extrair_de_texto.py | 92/92 | CERTIFICADO | põe o texto recebido inteiro no prompt, cercado (`cercar_dado_externo(texto)`, l. 91); o texto é o item inteiro ou uma parte dele com o aviso "parte K de N" (brief 088); nenhum corte | — |
 | agente_nw/nucleo/prompts/extrair_pedido.py | 91/91 | CERTIFICADO | põe a frase do usuário inteira no prompt (l. 89) e a lista de contatos que recebe; o teto de 50 contatos é de `pedido.py` (P-035) | — |
 | agente_nw/nucleo/prompts/prerotular_calibracao.py | 63/63 | CERTIFICADO | monta o prompt com os dois títulos e os dois trechos que recebe, cercados por inteiro; o trecho de 2.000 caracteres é cortado em `calibracao.py` (P-008) | — |
 | agente_nw/nucleo/prompts/qualificar.py | 81/81 | CERTIFICADO | monta o prompt com os pares (título, domínio) que recebe, cada título cercado por inteiro; o texto do item já não existe aqui (P-002/P-006) | — |
@@ -982,12 +983,13 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | agente_nw/nucleo/saidas/markdown.py | 112/112 | NÃO ANALÍTICO | gera o menu em Markdown (título + "por quê" + cartão) e relê só as marcações `[x]`/motivos; nenhum texto de conteúdo é analisado aqui | NA-004 |
 | agente_nw/nucleo/termos_contato.py | 76/76 | CORTA | prompt `extrair_termos_contato` recebe 12 dos 30 fatos lidos, cada um cortado em 300 caracteres | P-027 |
 | agente_nw/nucleo/texto.py | 61/61 | CERTIFICADO | funções de nome próprio: `casa_nome` e `similaridade_nome` usam todas as palavras das duas cadeias (`_palavras` não descarta nada) e `variantes_do_nome` acrescenta variantes sem remover o nome completo | — |
+| agente_nw/nucleo/texto_integral.py | 259/259 | CERTIFICADO | divide o texto que não cabe em partes consecutivas com 500 caracteres de sobreposição e confere que `reconstruir(partes) == texto` antes de devolver (l. 142); as fatias `texto[inicio:fim]` são as partes, não cortes; consolida vetores (média ponderada normalizada) e fatos (união ordenada; campo único divergente vira `Divergencia`, sem voto); nada é descartado (brief 088) | — |
 | agente_nw/nucleo/vetores.py | 31/31 | CERTIFICADO | não manipula texto de conteúdo: só infraestrutura numérica (cosseno e centróide ponderado sobre vetores já prontos) | — |
 | agente_nw/perfil/__init__.py | 0/0 | CERTIFICADO | Arquivo vazio (0 bytes): só marca o pacote. | — |
 | agente_nw/perfil/agenda_google_csv.py | 46/46 | CORTA | `notas` do CSV vai inteira para `ContatoBruto`, mas só o primeiro telefone/e-mail/organização (coluna "1") e só a primeira coluna que casa o prefixo. | P-044 |
 | agente_nw/perfil/agenda_macos.py | 107/107 | CORTA | A nota do contato é lida inteira (`str(completo.note())`), mas só o primeiro telefone e o primeiro e-mail entram no `ContatoBruto`. | P-044 |
 | agente_nw/perfil/configurador.py | 73/73 | CORTA | O texto do tema vai inteiro ao embedding: `embeddar([f"{tema.nome}: {tema.descricao}"])[0]` — o `[0]` é o único resultado do lote de um item, não corte. | P-037 |
-| agente_nw/perfil/extrator.py | 150/150 | CORTA | manda `item.texto` inteiro ao prompt `extrair_de_texto` (l. 78-80) — e é justamente por isso que nada confere se ele cabe no `num_ctx` da tarefa | P-040 |
+| agente_nw/perfil/extrator.py | 230/230 | CORTA | manda o texto do item inteiro a `extrair_de_texto`: numa chamada quando cabe no `num_ctx` (o prompt de antes), em partes que cobrem o texto todo quando não cabe (`texto_integral.processar_dividindo(item.texto, ...)`, l. 153; brief 088); parte inválida ou campo único divergente manda o item inteiro para a `fila_revisao`; o único corte é o lote de pendentes da P-043 | P-040, P-043 |
 | agente_nw/perfil/importador.py | 111/111 | CERTIFICADO | `bruto.notas` entra inteira na fila de extração (linha 106) e todos os `marcadores` são percorridos; o contato sem telefone nem e-mail é ignorado (filtro de identidade, não de texto). | — |
 | agente_nw/perfil/inferencia.py | 283/283 | CORTA | Percorre todos os termos do pedido e todos os temas com embedding, mas cada frase de `sobre_o_usuario` só é lida por três expressões regulares e, sem padrão, é descartada. | P-036, NA-001 |
 | agente_nw/perfil/lacunas.py | 25/25 | CERTIFICADO | Percorre `ORDEM_IMPACTO` inteira e devolve todos os campos vazios; não manipula texto de conteúdo. | — |
@@ -1029,11 +1031,12 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | scripts/migracoes/018_molde_rastreio.sql | 9/9 | CERTIFICADO | uma coluna de id (`molde_origem_id`); nenhum texto. | — |
 | scripts/migracoes/019_proveniencia.sql | 63/63 | CERTIFICADO | 15 colunas de proveniência `TEXT NULL` e recriação das três tabelas vec0 copiando **todas** as linhas e vetores (`SELECT ... FROM _copia_*`, sem `WHERE`/`LIMIT`), com backfill `'bge-m3'`. | — |
 | scripts/migracoes/020_fila_revisao_destino.sql | 12/12 | CERTIFICADO | Três colunas `TEXT NULL` (`resolvido_em`, `resolucao`, `motivo`) em `fila_revisao`; nenhum texto é lido ou cortado (brief 087). | — |
+| scripts/migracoes/021_cobertura_texto.sql | 11/11 | CERTIFICADO | Uma coluna `partes_lidas INTEGER NULL` em `fila_extracao` (brief 088); nenhum texto é lido ou cortado. | — |
 | scripts/verificar.sh | 65/65 | NÃO ANALÍTICO | o gate (ruff, format, mypy, pytest); a saída completa vai para `logs/verificar_ultimo.txt` e só a tela é encurtada (`head -n 15`, `tail -n 1`). | NA-006 |
 | scripts/verificar_auditoria_texto.py | 438/438 | CERTIFICADO | não manipula texto de conteúdo: enumera o universo, lê o relatório desta auditoria e varre o código em busca de padrões de corte | — |
 | tests/__init__.py | 0/0 | CERTIFICADO | Arquivo vazio. | — |
 | tests/coleta_falsa.py | 117/117 | CERTIFICADO | Rede falsa (Google/Bing/RSS); página de notícia de ~840 caracteres ("Texto relevante..." x20) e títulos curtos: nunca exerce um texto longo. | — |
-| tests/llm_falso.py | 30/30 | CERTIFICADO | Proveniência falsa e parsers do prompt (divide candidatos/assuntos numerados); sem manipular texto de conteúdo. | — |
+| tests/llm_falso.py | 34/34 | CERTIFICADO | Proveniência falsa, `num_ctx` falso (4.096, brief 088) e parsers do prompt (divide candidatos/assuntos numerados); sem manipular texto de conteúdo. | — |
 | tests/test_agente_entregar.py | 174/174 | CERTIFICADO | Testa o script de entrega (git falso, gate falso); só infraestrutura. | — |
 | tests/test_agente_lacunas.py | 186/186 | CERTIFICADO | Testa o script que copia lacunas do relatório para o PLAN; texto de documento passa inteiro. | — |
 | tests/test_agrupador.py | 272/272 | CERTIFICADO | Itens com `texto=None` e título de 6 a 12 caracteres; embedder falso indexado pelo próprio título; não prova o que é embeddado de um texto real. | — |
@@ -1050,8 +1053,8 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | tests/test_candidatos_por_consulta.py | 119/119 | CERTIFICADO | `selecionar_por_consulta`; a linha 117 afirma corte em 10 de 12 candidatos não evitados. | — |
 | tests/test_canonicalizar.py | 71/71 | CERTIFICADO | URL canônica e `hash_titulo` com títulos de 40 a 50 caracteres; normalização, sem corte. | — |
 | tests/test_capturas_busca.py | 208/208 | CERTIFICADO | Filtra candidatos de busca em rede social (nome, descrição, link); descrições de 1 a 3 linhas curtas. | — |
-| tests/test_capturas_extrator.py | 66/66 | CERTIFICADO | `extrair` com bloco curto de uma linha e cliente falso que ignora o prompt. | — |
-| tests/test_capturas_leitor.py | 429/429 | CERTIFICADO | Leitor de redes; linhas 223-253 afirmam `maximo_blocos` (6 blocos, só 3 chamadas ao LLM), 363-405 `maximo_imagens`; linha 284 prova que o fato guarda o texto integral do bloco. | — |
+| tests/test_capturas_extrator.py | 71/71 | CERTIFICADO | `extrair` com bloco curto de uma linha e cliente falso que ignora o prompt (com `num_ctx` de 4.096 desde o brief 088). | — |
+| tests/test_capturas_leitor.py | 439/439 | CERTIFICADO | Leitor de redes; linhas 228-258 afirmam `maximo_blocos` (6 blocos, só 3 chamadas ao LLM), 373-415 `maximo_imagens`; linha 289 prova que o fato guarda o texto integral do bloco. | — |
 | tests/test_capturas_navegador.py | 205/205 | CERTIFICADO | Leitura de página com rolagem; linhas 164-190 afirmam `maximo_imagens=3` e `max_rolagens`; blocos curtos. | — |
 | tests/test_cartoes.py | 125/125 | CERTIFICADO | `gerar_cartao`; um item só, `texto` de 41 caracteres, LLM falso que ignora o prompt. | — |
 | tests/test_cartoes_pendentes.py | 118/118 | CERTIFICADO | `gerar_pendentes`; linha 110 afirma limite (3 criados, 2 candidatos); item de 41 caracteres e LLM falso que ignora o prompt. | — |
@@ -1188,6 +1191,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | tests/test_temas_atualizar.py | 33/33 | CERTIFICADO | `temas.atualizar` regrava descricao e sinonimos; descricoes curtas, sem corte. | — |
 | tests/test_termos_contato.py | 89/89 | CERTIFICADO | Documenta teto de 3 termos e rejeicao de termo > 5 palavras em `termos_contato.py`; os fatos de teste sao curtos e escondem os cortes de 12 fatos e 300 caracteres por fato do prompt. | — |
 | tests/test_texto_do_usuario_inteiro.py | 165/165 | CERTIFICADO | Testa que comentário do histórico, nota, comentário do molde e `evitar` chegam inteiros ao prompt e à conferência; o texto que passa é fictício e nada vai a modelo real. | — |
+| tests/test_texto_integral.py | 602/602 | CERTIFICADO | Teste de aceite do brief 088 com clientes falsos e banco em `tmp_path`: cobertura byte a byte, prompt idêntico para texto curto, marcadores do meio e do último caractere de 300.000 caracteres, sobreposição, média ponderada, fila de revisão; as fatias do teste montam textos e reconstroem o original, nada vai a modelo real | — |
 | tests/test_validacao_base.py | 69/69 | CERTIFICADO | Documenta `validar_ganchos`: base antes, so 1 base, `MAXIMO_GANCHOS` de noticia, limite 80 palavras da base. | — |
 | tests/test_verificar_auditoria_texto.py | 556/556 | CERTIFICADO | só exercita o verificador contra árvores e relatórios sintéticos em `tmp_path`; não constrói entrada de produção | — |
 | tests/test_vetores.py | 33/33 | CERTIFICADO | `cosseno` e `centroide` com vetores pequenos; sem texto. | — |
@@ -1208,11 +1212,11 @@ como violação.
 
 | Onde | O que pode vir cortado | O que o provedor devolve | O que o projeto faz hoje |
 |---|---|---|---|
-| `agente_nw/nucleo/llm.py:462` (Ollama) | resposta acima de `num_predict` (256 a 2.048 por tarefa) | `done_reason: "length"` no JSON da resposta | ignora o campo; só olha `response` |
-| `agente_nw/nucleo/llm.py:584` (`_chamar` do Ollama, bloco `options`) | idem, em `cartao` (1.024) e `redigir_ganchos` (2.048), as saídas mais longas | idem | idem |
-| `agente_nw/nucleo/llm.py:730` (Anthropic) | resposta acima de `max_tokens` (= `num_predict`) | `stop_reason: "max_tokens"` | ignora |
-| `agente_nw/nucleo/llm.py:827` (OpenAI) | idem | `finish_reason: "length"` | ignora |
-| `agente_nw/nucleo/llm.py:680` (Gemini) | idem (`maxOutputTokens`) | `finishReason: "MAX_TOKENS"` | ignora |
+| `agente_nw/nucleo/llm.py:468` (Ollama) | resposta acima de `num_predict` (256 a 2.048 por tarefa) | `done_reason: "length"` no JSON da resposta | ignora o campo; só olha `response` |
+| `agente_nw/nucleo/llm.py:590` (`_chamar` do Ollama, bloco `options`) | idem, em `cartao` (1.024) e `redigir_ganchos` (2.048), as saídas mais longas | idem | idem |
+| `agente_nw/nucleo/llm.py:736` (Anthropic) | resposta acima de `max_tokens` (= `num_predict`) | `stop_reason: "max_tokens"` | ignora |
+| `agente_nw/nucleo/llm.py:833` (OpenAI) | idem | `finish_reason: "length"` | ignora |
+| `agente_nw/nucleo/llm.py:686` (Gemini) | idem (`maxOutputTokens`) | `finishReason: "MAX_TOKENS"` | ignora |
 
 Consequência: uma resposta cortada no meio do JSON cai no caminho de "JSON inválido" e ganha nova
 tentativa — isso funciona. Uma resposta **sintaticamente válida e semanticamente incompleta** (um
@@ -1228,10 +1232,10 @@ perdido, mas o modelo não enxerga a conversa inteira de uma vez.
 
 ## 8. Apêndice A — varredura mecânica, com o destino de cada ocorrência
 
-Os padrões do passo 3 do brief, aplicados pelo verificador aos 324 arquivos do universo (a lista
-exata está em `scripts/verificar_auditoria_texto.py`, `PADROES_VARREDURA`). **1.393 ocorrências** (1.272 em 2026-11-08, mais as 3 de
+Os padrões do passo 3 do brief, aplicados pelo verificador aos 328 arquivos do universo (a lista
+exata está em `scripts/verificar_auditoria_texto.py`, `PADROES_VARREDURA`). **1.461 ocorrências** (1.272 em 2026-11-08, mais as 3 de
 `scripts/executar_serie.sh`, as 15 do brief 081, entre elas a mudança de linha dentro do próprio verificador, as 5 do brief 087
-e as 98 a mais depois do brief 082, da conferência de janela em `llm.py`, do estimador e do teste novos),
+e as 98 a mais depois do brief 082, da conferência de janela em `llm.py`, do estimador e do teste novos, e as 68 a mais depois do brief 088, da divisão em partes),
 todas com destino. O comando e a saída crua:
 
 ```
@@ -1554,8 +1558,8 @@ agente_nw/nucleo/relevancia/cruzamento.py:500 agente_nw/nucleo/relevancia/cruzam
 agente_nw/nucleo/relevancia/qualificador.py:107 agente_nw/nucleo/relevancia/qualificador.py:109 agente_nw/nucleo/relevancia/qualificador.py:41 agente_nw/nucleo/relevancia/qualificador.py:53
 agente_nw/nucleo/relevancia/qualificador.py:57 agente_nw/nucleo/relevancia/qualificador.py:63 agente_nw/nucleo/relevancia/qualificador.py:66 agente_nw/nucleo/relevancia/qualificador.py:72
 agente_nw/nucleo/relevancia/qualificador.py:76 agente_nw/nucleo/relevancia/qualificador.py:81 agente_nw/nucleo/relevancia/qualificador.py:87 agente_nw/nucleo/saidas/markdown.py:39
-agente_nw/perfil/extrator.py:116 agente_nw/perfil/extrator.py:121 agente_nw/perfil/extrator.py:135 agente_nw/perfil/extrator.py:73
-agente_nw/perfil/extrator.py:85 agente_nw/perfil/extrator.py:92 agente_nw/perfil/extrator.py:96 agente_nw/perfil/importador.py:103
+agente_nw/perfil/extrator.py:195 agente_nw/perfil/extrator.py:201 agente_nw/perfil/extrator.py:215 agente_nw/perfil/extrator.py:127
+agente_nw/perfil/extrator.py:163 agente_nw/perfil/extrator.py:171 agente_nw/perfil/extrator.py:175 agente_nw/perfil/importador.py:103
 agente_nw/perfil/importador.py:107 agente_nw/perfil/importador.py:111 agente_nw/perfil/importador.py:67 agente_nw/perfil/importador.py:70
 agente_nw/perfil/importador.py:75 agente_nw/perfil/importador.py:94 agente_nw/perfil/importador.py:96 scripts/agente_lacunas.py:127
 scripts/agente_lacunas.py:128 scripts/migracoes/001_inicial.sql:75 scripts/migracoes/004_consulta_contato.sql:10 scripts/migracoes/005_perfil_id_reatribuivel.sql:15
@@ -1564,23 +1568,23 @@ scripts/agente_lacunas.py:128 scripts/migracoes/001_inicial.sql:75 scripts/migra
 descartada: arquivo de teste — não gera ponto (certificação simplificada, seção 6) — 521 ocorrência(s):
 
 ```
-tests/coleta_falsa.py:66 tests/llm_falso.py:23 tests/test_agente_entregar.py:174 tests/test_agente_lacunas.py:131
+tests/coleta_falsa.py:66 tests/llm_falso.py:27 tests/test_agente_entregar.py:174 tests/test_agente_lacunas.py:131
 tests/test_agente_lacunas.py:49 tests/test_agente_lacunas.py:98 tests/test_agrupador.py:128 tests/test_agrupador.py:130
 tests/test_agrupador.py:131 tests/test_agrupador.py:132 tests/test_agrupador.py:167 tests/test_agrupador.py:169
 tests/test_agrupador.py:170 tests/test_agrupador.py:215 tests/test_agrupador.py:217 tests/test_agrupador.py:218
 tests/test_agrupador.py:263 tests/test_agrupador.py:265 tests/test_agrupador.py:73 tests/test_assuntos_qualificacao.py:166
 tests/test_assuntos_qualificacao.py:95 tests/test_assuntos_sem_cartao.py:39 tests/test_assuntos_sem_cartao.py:52 tests/test_calibracao.py:143
 tests/test_calibracao.py:200 tests/test_calibracao.py:208 tests/test_calibracao.py:209 tests/test_calibracao.py:210
-tests/test_calibracao.py:212 tests/test_candidatos.py:103 tests/test_capturas_leitor.py:117 tests/test_capturas_leitor.py:130
-tests/test_capturas_leitor.py:131 tests/test_capturas_leitor.py:132 tests/test_capturas_leitor.py:186 tests/test_capturas_leitor.py:199
-tests/test_capturas_leitor.py:200 tests/test_capturas_leitor.py:201 tests/test_capturas_leitor.py:202 tests/test_capturas_leitor.py:223
-tests/test_capturas_leitor.py:229 tests/test_capturas_leitor.py:230 tests/test_capturas_leitor.py:236 tests/test_capturas_leitor.py:245
-tests/test_capturas_leitor.py:250 tests/test_capturas_leitor.py:251 tests/test_capturas_leitor.py:256 tests/test_capturas_leitor.py:269
-tests/test_capturas_leitor.py:278 tests/test_capturas_leitor.py:281 tests/test_capturas_leitor.py:284 tests/test_capturas_leitor.py:292
-tests/test_capturas_leitor.py:297 tests/test_capturas_leitor.py:340 tests/test_capturas_leitor.py:341 tests/test_capturas_leitor.py:375
-tests/test_capturas_leitor.py:385 tests/test_capturas_leitor.py:388 tests/test_capturas_leitor.py:390 tests/test_capturas_leitor.py:403
-tests/test_capturas_leitor.py:408 tests/test_capturas_leitor.py:74 tests/test_capturas_leitor.py:80 tests/test_capturas_leitor.py:93
-tests/test_capturas_leitor.py:94 tests/test_capturas_leitor.py:95 tests/test_capturas_navegador.py:112 tests/test_capturas_navegador.py:115
+tests/test_calibracao.py:212 tests/test_candidatos.py:103 tests/test_capturas_leitor.py:122 tests/test_capturas_leitor.py:135
+tests/test_capturas_leitor.py:136 tests/test_capturas_leitor.py:137 tests/test_capturas_leitor.py:191 tests/test_capturas_leitor.py:204
+tests/test_capturas_leitor.py:205 tests/test_capturas_leitor.py:206 tests/test_capturas_leitor.py:207 tests/test_capturas_leitor.py:228
+tests/test_capturas_leitor.py:234 tests/test_capturas_leitor.py:235 tests/test_capturas_leitor.py:241 tests/test_capturas_leitor.py:250
+tests/test_capturas_leitor.py:255 tests/test_capturas_leitor.py:256 tests/test_capturas_leitor.py:261 tests/test_capturas_leitor.py:274
+tests/test_capturas_leitor.py:283 tests/test_capturas_leitor.py:286 tests/test_capturas_leitor.py:289 tests/test_capturas_leitor.py:297
+tests/test_capturas_leitor.py:302 tests/test_capturas_leitor.py:345 tests/test_capturas_leitor.py:346 tests/test_capturas_leitor.py:385
+tests/test_capturas_leitor.py:395 tests/test_capturas_leitor.py:398 tests/test_capturas_leitor.py:400 tests/test_capturas_leitor.py:413
+tests/test_capturas_leitor.py:418 tests/test_capturas_leitor.py:79 tests/test_capturas_leitor.py:85 tests/test_capturas_leitor.py:98
+tests/test_capturas_leitor.py:99 tests/test_capturas_leitor.py:100 tests/test_capturas_navegador.py:112 tests/test_capturas_navegador.py:115
 tests/test_capturas_navegador.py:143 tests/test_capturas_navegador.py:144 tests/test_capturas_navegador.py:158 tests/test_capturas_navegador.py:159
 tests/test_capturas_navegador.py:164 tests/test_capturas_navegador.py:180 tests/test_capturas_navegador.py:184 tests/test_capturas_navegador.py:193
 tests/test_capturas_navegador.py:39 tests/test_capturas_navegador.py:40 tests/test_capturas_navegador.py:45 tests/test_capturas_navegador.py:65
@@ -1700,8 +1704,8 @@ tests/test_janela_modelo.py:380 tests/test_janela_modelo.py:383
 descartada: declaração ou repasse de num_ctx/num_predict (a ausência de conferência é P-040/P-042) — 35 ocorrência(s):
 
 ```
-agente_nw/cli.py:975 agente_nw/nucleo/fluxo.py:47 agente_nw/nucleo/llm.py:571 agente_nw/nucleo/llm.py:574
-agente_nw/nucleo/llm.py:730 agente_nw/nucleo/llm.py:783 agente_nw/nucleo/llm.py:827 agente_nw/nucleo/modelos/configuracao.py:63
+agente_nw/cli.py:975 agente_nw/nucleo/fluxo.py:47 agente_nw/nucleo/llm.py:577 agente_nw/nucleo/llm.py:580
+agente_nw/nucleo/llm.py:736 agente_nw/nucleo/llm.py:789 agente_nw/nucleo/llm.py:833 agente_nw/nucleo/modelos/configuracao.py:63
 agente_nw/nucleo/modelos/configuracao.py:67 config/llm_routing.yaml:10 config/llm_routing.yaml:11 config/llm_routing.yaml:12
 config/llm_routing.yaml:13 config/llm_routing.yaml:14 config/llm_routing.yaml:15 config/llm_routing.yaml:16
 config/llm_routing.yaml:17 config/llm_routing.yaml:18 config/llm_routing.yaml:19 config/llm_routing.yaml:20
@@ -1749,13 +1753,13 @@ extensao/conteudo.js:61
 descartada: max_tokens/max_chars de API já coberto por P-042 — 2 ocorrência(s):
 
 ```
-agente_nw/nucleo/llm.py:730 agente_nw/nucleo/llm.py:827
+agente_nw/nucleo/llm.py:736 agente_nw/nucleo/llm.py:833
 ```
 
 descartada: nome de função/variável de corte já coberto pelo ponto do arquivo — 7 ocorrência(s):
 
 ```
-agente_nw/coleta/capturas/listas.py:165 agente_nw/coleta/capturas/listas.py:367 agente_nw/nucleo/historico.py:65 agente_nw/nucleo/prompts/extrair_de_texto.py:29
+agente_nw/coleta/capturas/listas.py:165 agente_nw/coleta/capturas/listas.py:367 agente_nw/nucleo/historico.py:65 agente_nw/nucleo/prompts/extrair_de_texto.py:33
 agente_nw/nucleo/prompts/redigir_ganchos.py:257 agente_nw/nucleo/prompts/redigir_ganchos.py:308 agente_nw/nucleo/redacao.py:323
 ```
 
@@ -1773,14 +1777,14 @@ agente_nw/coleta/whatsapp/importador.py:56 agente_nw/nucleo/agrupamento/calibrac
 agente_nw/nucleo/consulta.py:43 agente_nw/nucleo/consulta.py:78 agente_nw/nucleo/consulta.py:79 agente_nw/nucleo/database/queries/conversa.py:42
 agente_nw/nucleo/database/queries/conversa.py:55 agente_nw/nucleo/database/queries/conversa.py:65 agente_nw/nucleo/database/queries/conversa.py:70 agente_nw/nucleo/database/queries/conversa.py:75
 agente_nw/nucleo/database/queries/conversa.py:76 agente_nw/nucleo/database/queries/conversa.py:79 agente_nw/nucleo/database/queries/conversa.py:80 agente_nw/nucleo/database/queries/conversa.py:83
-agente_nw/nucleo/database/queries/conversa.py:96 agente_nw/nucleo/database/queries/fila_extracao.py:56 agente_nw/nucleo/database/queries/fila_extracao.py:57 agente_nw/nucleo/historico.py:59
-agente_nw/nucleo/llm.py:860 agente_nw/nucleo/llm.py:861 agente_nw/nucleo/llm.py:863 agente_nw/nucleo/llm.py:868
+agente_nw/nucleo/database/queries/conversa.py:96 agente_nw/nucleo/database/queries/fila_extracao.py:61 agente_nw/nucleo/database/queries/fila_extracao.py:62 agente_nw/nucleo/historico.py:59
+agente_nw/nucleo/llm.py:866 agente_nw/nucleo/llm.py:867 agente_nw/nucleo/llm.py:869 agente_nw/nucleo/llm.py:874
 agente_nw/nucleo/modelos/configuracao.py:190 agente_nw/nucleo/modelos/configuracao.py:265 agente_nw/nucleo/modelos/configuracao.py:266 agente_nw/nucleo/modelos/configuracao.py:274
 agente_nw/nucleo/modelos/configuracao.py:278 agente_nw/nucleo/modelos/extracao.py:31 agente_nw/nucleo/orquestracao.py:211 agente_nw/nucleo/orquestracao.py:212
 agente_nw/nucleo/prompts/cartao.py:19 agente_nw/nucleo/prompts/cartao.py:24 agente_nw/nucleo/prompts/cartao.py:29 agente_nw/nucleo/prompts/cartao.py:30
 agente_nw/nucleo/prompts/cartao.py:36 agente_nw/nucleo/prompts/cartao.py:37 agente_nw/nucleo/prompts/cartao.py:39 agente_nw/nucleo/prompts/cartao.py:43
-agente_nw/nucleo/prompts/extrair_de_texto.py:38 agente_nw/nucleo/prompts/extrair_de_texto.py:40 agente_nw/nucleo/prompts/extrair_de_texto.py:66 agente_nw/nucleo/prompts/extrair_de_texto.py:68
-agente_nw/nucleo/prompts/extrair_de_texto.py:69 agente_nw/nucleo/prompts/prerotular_calibracao.py:13 agente_nw/nucleo/prompts/prerotular_calibracao.py:29 agente_nw/nucleo/prompts/prerotular_calibracao.py:31
+agente_nw/nucleo/prompts/extrair_de_texto.py:42 agente_nw/nucleo/prompts/extrair_de_texto.py:44 agente_nw/nucleo/prompts/extrair_de_texto.py:73 agente_nw/nucleo/prompts/extrair_de_texto.py:75
+agente_nw/nucleo/prompts/extrair_de_texto.py:76 agente_nw/nucleo/prompts/prerotular_calibracao.py:13 agente_nw/nucleo/prompts/prerotular_calibracao.py:29 agente_nw/nucleo/prompts/prerotular_calibracao.py:31
 agente_nw/nucleo/prompts/prerotular_calibracao.py:44 agente_nw/nucleo/prompts/prerotular_calibracao.py:46 agente_nw/nucleo/prompts/prerotular_calibracao.py:51 agente_nw/nucleo/prompts/prerotular_calibracao.py:53
 agente_nw/nucleo/prompts/prerotular_calibracao.py:60 agente_nw/nucleo/prompts/prerotular_calibracao.py:62 agente_nw/nucleo/prompts/redigir_ganchos.py:143 agente_nw/nucleo/prompts/redigir_ganchos.py:147
 agente_nw/nucleo/prompts/redigir_ganchos.py:263 agente_nw/nucleo/prompts/redigir_ganchos.py:279 agente_nw/nucleo/prompts/redigir_ganchos.py:87 agente_nw/nucleo/prompts/seguranca.py:34
@@ -1788,7 +1792,7 @@ agente_nw/nucleo/prompts/seguranca.py:35 agente_nw/nucleo/prompts/seguranca.py:5
 agente_nw/nucleo/redacao.py:133 agente_nw/nucleo/redacao.py:143 agente_nw/nucleo/redacao.py:179 agente_nw/nucleo/redacao.py:183
 agente_nw/nucleo/redacao.py:219 agente_nw/nucleo/redacao.py:220 agente_nw/nucleo/redacao.py:244 agente_nw/nucleo/redacao.py:256
 agente_nw/nucleo/redacao.py:286 agente_nw/nucleo/redacao.py:287 agente_nw/nucleo/redacao.py:316 agente_nw/nucleo/redacao.py:317
-agente_nw/perfil/extrator.py:56 agente_nw/perfil/extrator.py:61 config/limiares.yaml:68 scripts/migracoes/001_inicial.sql:134
+agente_nw/perfil/extrator.py:76 agente_nw/perfil/extrator.py:81 config/limiares.yaml:68 scripts/migracoes/001_inicial.sql:134
 ```
 
 descartada: parâmetro de limite, nome de coluna ou SQL de apresentação — 173 ocorrência(s):
@@ -1829,7 +1833,7 @@ agente_nw/nucleo/redacao.py:187 agente_nw/nucleo/redacao.py:195 agente_nw/nucleo
 agente_nw/nucleo/redacao.py:285 agente_nw/nucleo/redacao.py:288 agente_nw/nucleo/redacao.py:318 agente_nw/nucleo/redacao.py:323
 agente_nw/nucleo/redacao.py:324 agente_nw/nucleo/relevancia/candidatos.py:18 agente_nw/nucleo/relevancia/candidatos.py:56 agente_nw/nucleo/relevancia/candidatos.py:63
 agente_nw/nucleo/relevancia/cartoes.py:89 agente_nw/nucleo/relevancia/cartoes.py:91 agente_nw/nucleo/relevancia/qualificador.py:50 agente_nw/nucleo/relevancia/qualificador.py:55
-agente_nw/perfil/extrator.py:67 agente_nw/perfil/extrator.py:75 agente_nw/perfil/inferencia.py:257 agente_nw/ponte/servidor.py:20
+agente_nw/perfil/extrator.py:121 agente_nw/perfil/extrator.py:134 agente_nw/perfil/inferencia.py:257 agente_nw/ponte/servidor.py:20
 agente_nw/ponte/servidor.py:227 agente_nw/ponte/servidor.py:236 agente_nw/ponte/servidor.py:238 agente_nw/ponte/servidor.py:243
 agente_nw/ponte/servidor.py:245 agente_nw/ponte/servidor.py:259 agente_nw/ponte/servidor.py:52 agente_nw/ponte/servidor.py:74
 config/limiares.yaml:57 config/limiares.yaml:76 config/llm_routing.yaml:24 config/llm_routing.yaml:47
@@ -1859,17 +1863,45 @@ scripts/verificar_auditoria_texto.py:99 scripts/verificar_auditoria_texto.py:100
 scripts/verificar_auditoria_texto.py:104
 ```
 
+**Brief 088 (sem ponto novo)** — 65 linha(s) citada(s), todas descartadas. O brief 088 criou a divisão em partes (`agente_nw/nucleo/texto_integral.py`), o prompt de captura como módulo próprio e o `embeddar_em_partes`; as linhas deslocadas das citações antigas de `capturas/extrator.py`, `fila_extracao.py`, `llm.py`, `prompts/extrair_de_texto.py`, `perfil/extrator.py` e dos testes alterados foram renumeradas pela correspondência entre a versão anterior e a atual, e só as que nasceram com o brief ficam aqui. Nenhuma corta texto:
+
+- `num_ctx` nos protocolos e nos clientes falsos (`agente_nw/coleta/capturas/extrator.py:47`, `agente_nw/perfil/extrator.py:42`, `agente_nw/nucleo/llm.py:232`, `tests/llm_falso.py:20`, `tests/test_capturas_extrator.py:18`, `tests/test_capturas_leitor.py:54`, `tests/test_texto_integral.py:121`, `:539`): só informa a janela da tarefa a quem divide.
+- `orcamento_do_texto(cliente_llm.num_ctx(...), construir_prompt(...))` (`agente_nw/coleta/capturas/extrator.py:104`, `agente_nw/perfil/extrator.py:135`) e a docstring de `processar_item` (`agente_nw/perfil/extrator.py:130`): o orçamento decide em quantas partes o texto é lido, não quanto dele é lido.
+- `agente_nw/nucleo/texto_integral.py` inteiro: `limite`, `_melhor_corte`, `texto[piso:limite]` e `trechos` são o fim de cada parte; a parte seguinte começa antes desse fim (sobreposição) e `dividir` só devolve as partes depois de conferir que `reconstruir(partes) == texto` byte a byte.
+- `LIMITE_TOKENS_EMBEDDING` em `embeddar_em_partes` (`agente_nw/nucleo/llm.py:941`, `:952`) e a palavra "cortar" da sua docstring (`:938`): é o orçamento de cada parte do embedding; o texto todo é embeddado.
+- `tests/test_texto_integral.py`: as fatias montam o texto de teste (`[:tamanho]`, `base[:meio]`), reconstroem o original a partir dos prompts enviados e conferem a sobreposição (`[:500] == [-500:]`) e as duas primeiras posições do vetor; `resumo` é o `ResumoProcessamento`; nada vai a modelo real.
+
+```
+agente_nw/coleta/capturas/extrator.py:47 agente_nw/coleta/capturas/extrator.py:104 agente_nw/nucleo/llm.py:232 agente_nw/nucleo/llm.py:233
+agente_nw/nucleo/llm.py:235 agente_nw/nucleo/llm.py:938 agente_nw/nucleo/llm.py:941 agente_nw/nucleo/llm.py:952
+agente_nw/nucleo/texto_integral.py:8 agente_nw/nucleo/texto_integral.py:11 agente_nw/nucleo/texto_integral.py:48 agente_nw/nucleo/texto_integral.py:75
+agente_nw/nucleo/texto_integral.py:95 agente_nw/nucleo/texto_integral.py:96 agente_nw/nucleo/texto_integral.py:97 agente_nw/nucleo/texto_integral.py:98
+agente_nw/nucleo/texto_integral.py:99 agente_nw/nucleo/texto_integral.py:110 agente_nw/nucleo/texto_integral.py:122 agente_nw/nucleo/texto_integral.py:125
+agente_nw/nucleo/texto_integral.py:126 agente_nw/nucleo/texto_integral.py:128 agente_nw/nucleo/texto_integral.py:129 agente_nw/nucleo/texto_integral.py:130
+agente_nw/nucleo/texto_integral.py:132 agente_nw/nucleo/texto_integral.py:133 agente_nw/nucleo/texto_integral.py:137 agente_nw/nucleo/texto_integral.py:140
+agente_nw/perfil/extrator.py:42 agente_nw/perfil/extrator.py:130 agente_nw/perfil/extrator.py:135 tests/llm_falso.py:20
+tests/llm_falso.py:21 tests/test_capturas_extrator.py:18 tests/test_capturas_leitor.py:54 tests/test_texto_integral.py:25
+tests/test_texto_integral.py:51 tests/test_texto_integral.py:56 tests/test_texto_integral.py:57 tests/test_texto_integral.py:58
+tests/test_texto_integral.py:73 tests/test_texto_integral.py:121 tests/test_texto_integral.py:233 tests/test_texto_integral.py:249
+tests/test_texto_integral.py:250 tests/test_texto_integral.py:264 tests/test_texto_integral.py:266 tests/test_texto_integral.py:295
+tests/test_texto_integral.py:317 tests/test_texto_integral.py:330 tests/test_texto_integral.py:337 tests/test_texto_integral.py:371
+tests/test_texto_integral.py:372 tests/test_texto_integral.py:390 tests/test_texto_integral.py:392 tests/test_texto_integral.py:395
+tests/test_texto_integral.py:413 tests/test_texto_integral.py:419 tests/test_texto_integral.py:421 tests/test_texto_integral.py:424
+tests/test_texto_integral.py:442 tests/test_texto_integral.py:448 tests/test_texto_integral.py:450 tests/test_texto_integral.py:453
+tests/test_texto_integral.py:539
+```
+
 **Brief 087 (sem ponto novo)** — 8 ocorrência(s), todas descartadas. O brief 087 criou a fila de revisão com destino e reformou `agente_nw/perfil/extrator.py`; as linhas deslocadas das citações antigas foram renumeradas pela correspondência entre a versão anterior e a atual de `cli.py`, `console/app.py`, `extrator.py`, `fila_extracao.py` e `fila_revisao.py`, e só as que nasceram com o brief ficam aqui:
 
 - `agente_nw/cli.py:443` — fatia `[:10]` da data ISO do item mais antigo, impressa na contagem (a mesma natureza da NA-001; o texto do item não passa por ela).
 - `agente_nw/nucleo/database/queries/fila_revisao.py:164` — `LIMIT 1` na busca da linha de `fila_extracao` que aponta para o item; escolhe uma linha, não corta texto.
-- `agente_nw/perfil/extrator.py:71`, `:132`, `:134` — o nome `resumo` (`ResumoProcessamento`, contadores) e a chamada `processar_item(..., resumo)`; nenhum texto.
-- `agente_nw/perfil/extrator.py:126`, `:133` — `limite: int = 20` e `listar_pendentes(conexao, limite)`: o lote de pendentes por rodada, o mesmo da P-043 e já aprovado como exceção (lote com retomada); o texto de cada item segue inteiro até o prompt (`construir_prompt(item.texto)`, l. 78-80).
+- `agente_nw/perfil/extrator.py:125`, `:212`, `:214` — o nome `resumo` (`ResumoProcessamento`, contadores) e a chamada `processar_item(..., resumo)`; nenhum texto.
+- `agente_nw/perfil/extrator.py:206`, `:213` — `limite: int = 20` e `listar_pendentes(conexao, limite)`: o lote de pendentes por rodada, o mesmo da P-043 e já aprovado como exceção (lote com retomada); o texto de cada item segue inteiro até o prompt (`construir_prompt(item.texto)`, l. 78-80).
 - `tests/test_fila_revisao_destino.py:240` — `<= 19` do nome da migração na montagem do banco antigo do teste.
 
 ```
-agente_nw/cli.py:443 agente_nw/nucleo/database/queries/fila_revisao.py:164 agente_nw/perfil/extrator.py:71 agente_nw/perfil/extrator.py:126
-agente_nw/perfil/extrator.py:132 agente_nw/perfil/extrator.py:133 agente_nw/perfil/extrator.py:134 tests/test_fila_revisao_destino.py:240
+agente_nw/cli.py:443 agente_nw/nucleo/database/queries/fila_revisao.py:164 agente_nw/perfil/extrator.py:125 agente_nw/perfil/extrator.py:206
+agente_nw/perfil/extrator.py:212 agente_nw/perfil/extrator.py:213 agente_nw/perfil/extrator.py:214 tests/test_fila_revisao_destino.py:240
 ```
 
 **Brief 082 (sem ponto novo)** — 46 ocorrência(s), todas descartadas. O brief 082 pôs a conferência de janela em `agente_nw/nucleo/llm.py` e moveu o estimador de `redigir_ganchos.py` para `agente_nw/nucleo/estimativa_tokens.py`; as linhas deslocadas das citações antigas desses dois arquivos foram renumeradas pela correspondência entre a versão anterior e a atual, e só as que nasceram com o brief ficam aqui. Nenhuma corta texto: todas são a própria conferência, que mede e recusa.
@@ -1882,18 +1914,18 @@ agente_nw/perfil/extrator.py:132 agente_nw/perfil/extrator.py:133 agente_nw/perf
 - `agente_nw/nucleo/estimativa_tokens.py:4` — a palavra "corte" na docstring do módulo (cita o `cortar_por_tamanho`, P-033); o módulo só conta.
 
 ```
-agente_nw/nucleo/estimativa_tokens.py:4 agente_nw/nucleo/llm.py:49 agente_nw/nucleo/llm.py:54 agente_nw/nucleo/llm.py:61
-agente_nw/nucleo/llm.py:66 agente_nw/nucleo/llm.py:67 agente_nw/nucleo/llm.py:71 agente_nw/nucleo/llm.py:72
-agente_nw/nucleo/llm.py:79 agente_nw/nucleo/llm.py:88 agente_nw/nucleo/llm.py:95 agente_nw/nucleo/llm.py:99
-agente_nw/nucleo/llm.py:103 agente_nw/nucleo/llm.py:105 agente_nw/nucleo/llm.py:121 agente_nw/nucleo/llm.py:123
-agente_nw/nucleo/llm.py:126 agente_nw/nucleo/llm.py:130 agente_nw/nucleo/llm.py:133 agente_nw/nucleo/llm.py:134
-agente_nw/nucleo/llm.py:135 agente_nw/nucleo/llm.py:136 agente_nw/nucleo/llm.py:159 agente_nw/nucleo/llm.py:160
-agente_nw/nucleo/llm.py:177 agente_nw/nucleo/llm.py:178 agente_nw/nucleo/llm.py:228 agente_nw/nucleo/llm.py:322
-agente_nw/nucleo/llm.py:331 agente_nw/nucleo/llm.py:332 agente_nw/nucleo/llm.py:335 agente_nw/nucleo/llm.py:341
-agente_nw/nucleo/llm.py:356 agente_nw/nucleo/llm.py:491 agente_nw/nucleo/llm.py:492 agente_nw/nucleo/llm.py:564
-agente_nw/nucleo/llm.py:610 agente_nw/nucleo/llm.py:613 agente_nw/nucleo/llm.py:615 agente_nw/nucleo/llm.py:618
-agente_nw/nucleo/llm.py:620 agente_nw/nucleo/llm.py:625 agente_nw/nucleo/llm.py:633 agente_nw/nucleo/llm.py:709
-agente_nw/nucleo/llm.py:710 agente_nw/nucleo/llm.py:921
+agente_nw/nucleo/estimativa_tokens.py:4 agente_nw/nucleo/llm.py:50 agente_nw/nucleo/llm.py:55 agente_nw/nucleo/llm.py:62
+agente_nw/nucleo/llm.py:67 agente_nw/nucleo/llm.py:68 agente_nw/nucleo/llm.py:72 agente_nw/nucleo/llm.py:73
+agente_nw/nucleo/llm.py:80 agente_nw/nucleo/llm.py:89 agente_nw/nucleo/llm.py:96 agente_nw/nucleo/llm.py:100
+agente_nw/nucleo/llm.py:104 agente_nw/nucleo/llm.py:106 agente_nw/nucleo/llm.py:122 agente_nw/nucleo/llm.py:124
+agente_nw/nucleo/llm.py:127 agente_nw/nucleo/llm.py:131 agente_nw/nucleo/llm.py:134 agente_nw/nucleo/llm.py:135
+agente_nw/nucleo/llm.py:136 agente_nw/nucleo/llm.py:137 agente_nw/nucleo/llm.py:160 agente_nw/nucleo/llm.py:161
+agente_nw/nucleo/llm.py:178 agente_nw/nucleo/llm.py:179 agente_nw/nucleo/llm.py:229 agente_nw/nucleo/llm.py:328
+agente_nw/nucleo/llm.py:337 agente_nw/nucleo/llm.py:338 agente_nw/nucleo/llm.py:341 agente_nw/nucleo/llm.py:347
+agente_nw/nucleo/llm.py:362 agente_nw/nucleo/llm.py:497 agente_nw/nucleo/llm.py:498 agente_nw/nucleo/llm.py:570
+agente_nw/nucleo/llm.py:616 agente_nw/nucleo/llm.py:619 agente_nw/nucleo/llm.py:621 agente_nw/nucleo/llm.py:624
+agente_nw/nucleo/llm.py:626 agente_nw/nucleo/llm.py:631 agente_nw/nucleo/llm.py:639 agente_nw/nucleo/llm.py:715
+agente_nw/nucleo/llm.py:716 agente_nw/nucleo/llm.py:927
 ```
 
 ---
