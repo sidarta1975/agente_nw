@@ -10,6 +10,7 @@
 **Depende de:** brief 079 executado e brief 087 executado (a fila de revisão precisa ter quem a resolva antes de receber mais itens). Deve ser executado **antes** de qualquer brief que suba tetos de texto (briefs 088 a 091).
 **Ordem em série:** depois de 087; antes de 088, 089, 090 e 091
 **Data:** 2026-11-08 (v2: dependência do 087 e fronteira com o 088)
+**Relatório 079 (autorização de Sidarta, 2026-11-16):** este brief pode atualizar a seção 6 (tabela de certificação: linha nova para arquivo que ele criar, contagem de linhas dos que ele alterar) e o apêndice A (destino das ocorrências novas da varredura) do relatório 079, só para os arquivos que ele mesmo criar ou alterar, sem criar ponto novo.
 
 ---
 

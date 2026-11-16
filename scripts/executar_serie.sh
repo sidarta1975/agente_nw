@@ -188,7 +188,9 @@ parar_no_brief() {  # parar_no_brief <NNN> <motivo>
   exit 1
 }
 
-while IFS='|' read -r NUMERO MODELO ESFORCO; do
+# A lista entra pelo descritor 3, e não pela entrada padrão: o `claude -p` lê a entrada padrão e
+# juntaria o resto da lista ao pedido, além de consumi-la — a série rodaria um brief só.
+while IFS='|' read -r NUMERO MODELO ESFORCO <&3; do
   [[ -n "$NUMERO" ]] || continue
 
   if [[ -f "logs/entregue_${NUMERO}_commit.txt" && -f "logs/entregue_${NUMERO}_arquivos.txt" ]]; then
@@ -206,18 +208,28 @@ while IFS='|' read -r NUMERO MODELO ESFORCO; do
     --max-budget-usd "$MAX_ORCAMENTO" \
     --output-format json \
     ${AJUSTES[@]+"${AJUSTES[@]}"} \
-    > "$SAIDA" 2> "$PASTA/$NUMERO.erro.txt" || true
+    < /dev/null > "$SAIDA" 2> "$PASTA/$NUMERO.erro.txt" || true
 
   # Conferência 1: o que o próprio Claude Code devolveu (is_error, subtype, linha PAROU, pendência).
   LEITURA="$(python3 - "$SAIDA" <<'FIM'
 import json
 import sys
 
+# O motivo e a pendência são texto livre e podem trazer "|" (um brief parou em 2026-11-16 citando
+# `NNN|modelo|esforço`, e o custo se perdeu na divisão). Por isso o separador é o 0x1f, e o texto
+# livre vai nos dois últimos campos.
+SEPARADOR = "\x1f"
+
+
+def campos(estado: str, custo: object, pendencia: str, motivo: str) -> str:
+    return SEPARADOR.join([estado, str(custo), pendencia, motivo])
+
+
 try:
     with open(sys.argv[1], encoding="utf-8") as arquivo:
         dados = json.load(arquivo)
 except (OSError, ValueError) as erro:
-    print(f"falha|saída do Claude Code ilegível ({type(erro).__name__})|0|")
+    print(campos("falha", 0, "", f"saída do Claude Code ilegível ({type(erro).__name__})"))
     raise SystemExit(0)
 
 custo = dados.get("total_cost_usd") or 0
@@ -226,15 +238,14 @@ parou = next((linha for linha in linhas if linha.startswith("PAROU:")), "")
 pendencia = next((linha for linha in linhas if linha.startswith("Para você")), "")
 
 if dados.get("is_error") or dados.get("subtype") != "success":
-    motivo = f"is_error={dados.get('is_error')}, subtype={dados.get('subtype')}"
-    print(f"falha|{motivo}|{custo}|{pendencia}")
+    print(campos("falha", custo, pendencia, f"is_error={dados.get('is_error')}, subtype={dados.get('subtype')}"))
 elif parou:
-    print(f"falha|{parou}|{custo}|{pendencia}")
+    print(campos("falha", custo, pendencia, parou))
 else:
-    print(f"ok||{custo}|{pendencia}")
+    print(campos("ok", custo, pendencia, ""))
 FIM
 )"
-  IFS='|' read -r ESTADO MOTIVO CUSTO PENDENCIA <<< "$LEITURA"
+  IFS=$'\x1f' read -r ESTADO CUSTO PENDENCIA MOTIVO <<< "$LEITURA"
   CUSTO_TOTAL="$(awk "BEGIN{printf \"%.4f\", $CUSTO_TOTAL + ${CUSTO:-0}}")"
   [[ "$ESTADO" == "ok" ]] || parar_no_brief "$NUMERO" "$MOTIVO"
 
@@ -262,7 +273,7 @@ FIM
     PENDENCIAS="$PENDENCIAS$NUMERO: $PENDENCIA"$'\n'
     echo "  pendência humana: $PENDENCIA"
   fi
-done <<< "$PREVOO"
+done 3<<< "$PREVOO"
 
 {
   echo ""

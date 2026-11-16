@@ -10,6 +10,7 @@
 **Depende de:** brief 093 executado
 **Ordem em série:** depois de 093; antes de 095
 **Data:** 2026-11-08
+**Relatório 079 (autorização de Sidarta, 2026-11-16):** este brief pode atualizar a seção 6 (tabela de certificação: linha nova para arquivo que ele criar, contagem de linhas dos que ele alterar) e o apêndice A (destino das ocorrências novas da varredura) do relatório 079, só para os arquivos que ele mesmo criar ou alterar, sem criar ponto novo.
 
 ---
 

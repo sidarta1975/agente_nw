@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -22,6 +23,10 @@ for argumento in "$@"; do
   esac
 done
 echo "$@" >> "$CHAMADAS_LOG"
+# O `claude -p` de verdade lê a entrada padrão e junta o que vier ao pedido. O falso faz o mesmo e
+# guarda o que recebeu: é assim que o teste prova que a lista da série não cai dentro da sessão.
+ENTRADA="$(cat)"
+printf '%s[%s]\\n' "$NUMERO" "$ENTRADA" >> "$ENTRADA_LOG"
 MODO="$(eval echo "\\$MODO_$NUMERO")"
 [ -n "$MODO" ] || MODO="$MODO_PADRAO"
 RESULTADO="relatório em docs/docs/doc_$NUMERO.md"
@@ -41,6 +46,7 @@ case "$MODO" in
   sem_manifesto) : ;;
   sem_push)      entregar ;;
   parou)         RESULTADO="PAROU: o brief $NUMERO parou de propósito neste teste" ;;
+  parou_com_pipe) RESULTADO="PAROU: motivo com barra vertical: veio \\`$NUMERO|sonnet|medium\\` no pedido" ;;
   erro)          ERRO=true; ASSUNTO=error_max_turns ;;
   para_voce)     entregar; {GIT_REAL} push -q origin main
                  RESULTADO="docs/docs/doc_$NUMERO.md
@@ -148,6 +154,7 @@ def ambiente(tmp_path: Path) -> dict[str, str]:
         "CHAMADAS_LOG": str(tmp_path / "chamadas.log"),
         "CAFFEINATE_LOG": str(tmp_path / "caffeinate.log"),
         "OSASCRIPT_LOG": str(tmp_path / "osascript.log"),
+        "ENTRADA_LOG": str(tmp_path / "entrada.log"),
         "MODO_PADRAO": "entrega",
     }
 
@@ -192,6 +199,34 @@ def test_dois_briefs_entregues_concluem_a_serie(repo: Path, ambiente: dict[str, 
     chamadas = _chamadas(ambiente)
     assert "/executar 080" in chamadas
     assert "/executar 081" in chamadas
+
+
+def test_lista_de_dois_da_duas_voltas(repo: Path, ambiente: dict[str, str]) -> None:
+    """A sessão do Claude Code lê a entrada padrão; se o laço da série for alimentado por ela, a
+    primeira sessão engole o resto da lista e a série roda um brief só (defeito visto em
+    2026-11-16)."""
+    resultado = _rodar(repo, ambiente, "080", "081")
+
+    assert resultado.returncode == 0, resultado.stdout + resultado.stderr
+    chamadas = [linha for linha in _chamadas(ambiente).splitlines() if "/executar" in linha]
+    assert len(chamadas) == 2, _chamadas(ambiente)
+
+
+def test_sessao_nao_recebe_o_resto_da_lista(repo: Path, ambiente: dict[str, str]) -> None:
+    _rodar(repo, ambiente, "080", "081")
+
+    entrada = _log(ambiente, "ENTRADA_LOG")
+    assert entrada.splitlines() == ["080[]", "081[]"], entrada
+
+
+def test_status_soma_o_custo_do_brief_que_parou(repo: Path, ambiente: dict[str, str]) -> None:
+    resultado = _rodar(repo, ambiente, "080", "081", extra={"MODO_080": "parou_com_pipe"})
+
+    assert resultado.returncode == 1
+    status = _status(repo)
+    # O separador decimal vem do idioma da máquina (`awk`): vírgula no Mac do Sidarta.
+    assert re.search(r"custo somado até aqui: US\$ 0[.,]5000", status), status
+    assert "veio `080|sonnet|medium` no pedido" in status
 
 
 def test_modelo_e_esforco_vem_do_cabecalho(repo: Path, ambiente: dict[str, str]) -> None:

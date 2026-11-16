@@ -10,6 +10,7 @@
 **Depende de:** brief 079 executado. Independente dos outros da série.
 **Ordem em série:** livre
 **Data:** 2026-11-08
+**Relatório 079 (autorização de Sidarta, 2026-11-16):** este brief pode atualizar a seção 6 (tabela de certificação: linha nova para arquivo que ele criar, contagem de linhas dos que ele alterar) e o apêndice A (destino das ocorrências novas da varredura) do relatório 079, só para os arquivos que ele mesmo criar ou alterar, sem criar ponto novo.
 
 ---
 
@@ -24,6 +25,8 @@ Nenhum texto some da coleta sem deixar rastro: o post longo é lido em pedaços,
 **2.2. O corte de 200.000 caracteres dentro do Chrome não muda de número, mas deixa de ser silencioso (P-013).** A extensão devolve também o tamanho original e se cortou; o programa registra uma linha de aviso em `chamadas_llm.jsonl` (padrão do brief 077) e mostra no resumo da leitura "página cortada em 200.000 de N caracteres". O corte do lado do programa (`extensao_backend.py`, mesmo teto) recebe o mesmo tratamento.
 
 **2.3. Item sem corpo não é julgado pela manchete (P-003).** Quando a extração do corpo falha, o item continua gravado (a manchete serve para contar e para o usuário ver), mas fica **marcado como sem corpo** — usando o que o esquema já permitir (por exemplo, corpo nulo); só se não houver como distinguir, uma coluna nova com migração segundo a convenção do projeto — e **não alimenta cartão, qualificação nem gancho**. O agrupamento por vetor de manchete **não muda** neste brief (ele é tratado na série futura sobre o corpo da notícia). O resumo da coleta passa a dizer quantos itens ficaram só com manchete. O corte do teaser mínimo de 400 caracteres (P-003, segunda parte) continua como está e aguarda decisão separada.
+
+**2.3b. O P-003 não é marcado como corrigido** (decisão de Sidarta, 2026-11-16). Ele tem duas partes e este brief conserta só a primeira, então o estado dele no relatório 079 continua `AGUARDANDO DECISÃO DE SIDARTA`: marcá-lo como corrigido o tiraria da fila de decisão e esconderia o corte do teaser de 400 caracteres, que ainda espera Sidarta. A parte corrigida é registrada em duas partes: no texto do próprio ponto P-003 (uma linha dizendo o que o brief 083 consertou e o que continua aberto, sem mexer no campo `Estado`) e na tabela `Ponto do 079 | O que mudou | Teste` do relatório `doc_083_...`. Os pontos P-004, P-013 e P-014 seguem a regra normal e passam a `CORRIGIDO (brief 083)`.
 
 **2.4. O filtro de patrocinado olha o texto todo (P-004).** As marcas de `_TERMOS_PATROCINADO` passam a ser procuradas em **todas as linhas** do corpo, mas uma marca só vale quando aparece numa linha **curta (até 80 caracteres)** — o formato de uma declaração ("Publicidade", "Conteúdo patrocinado", "Patrocinado por X"). Assim a palavra "publicidade" no meio de uma reportagem sobre o setor não derruba uma notícia boa, e um aviso no rodapé deixa de passar.
 
@@ -53,7 +56,7 @@ O vetor de manchete do item sem corpo; o teaser mínimo de 400; o teto de 5.000 
 
 ## 6. Passos de execução
 
-1. Conferir "Depende de". 2. Ler os arquivos-alvo inteiros; 3. testes; 4. implementar; 5. relatório `doc_083_...` com tabela `Ponto do 079 | O que mudou | Teste`; atualizar no relatório 079 os pontos P-003 (primeira parte), P-004, P-013 e P-014 para `CORRIGIDO (brief 083)`; 6. manifesto, PLAN; `scripts/agente_entregar.sh 083`; 7. três linhas finais. Mudança de JavaScript não testável aqui vai para "Para você: recarregar a extensão no Chrome e abrir uma página longa" se o executor não puder provar de outra forma.
+1. Conferir "Depende de". 2. Ler os arquivos-alvo inteiros; 3. testes; 4. implementar; 5. relatório `doc_083_...` com tabela `Ponto do 079 | O que mudou | Teste`; atualizar no relatório 079 os pontos P-004, P-013 e P-014 para `CORRIGIDO (brief 083)` e, no P-003, acrescentar a linha do item 2.3b **sem** mudar o `Estado`, que continua `AGUARDANDO DECISÃO DE SIDARTA`; 6. manifesto, PLAN; `scripts/agente_entregar.sh 083`; 7. três linhas finais. Mudança de JavaScript não testável aqui vai para "Para você: recarregar a extensão no Chrome e abrir uma página longa" se o executor não puder provar de outra forma.
 
 ## 7. Critérios de aceite
 
