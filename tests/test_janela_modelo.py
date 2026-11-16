@@ -165,6 +165,25 @@ def test_prompt_estimado_acima_do_num_ctx_e_recusado_antes_de_chamar_o_servidor(
     assert fila_revisao.obter(conexao_bd, erro.value.fila_revisao_id) is not None
 
 
+def test_prompt_que_so_passa_do_num_ctx_com_2_0_e_recusado_em_voz_alta(tmp_path: Path) -> None:
+    """Brief 098: 0,6 × num_ctx palavras curtas passava com 1,4 (0,84 × num_ctx) e agora, com 2,0
+    tokens por palavra, estoura: o cliente recusa antes de chamar o servidor, em vez de o modelo cortar."""
+    num_ctx = _num_ctx("qualificar")
+    palavras = int(num_ctx * 0.6)
+    prompt = " ".join(["a"] * palavras)
+    assert palavras * 1.4 < num_ctx < palavras * 2.0
+    servidor = _Contador({"response": json.dumps({"ok": True})})
+    cliente, _conexao, caminho_log = _ollama(tmp_path, servidor)
+
+    with pytest.raises(FalhaJanela) as erro:
+        cliente.gerar_json("qualificar", prompt, _EsquemaTeste)
+
+    assert servidor.chamadas == 0
+    assert erro.value.motivo == "prompt_estimado_acima_da_janela"
+    assert erro.value.tokens_estimados == palavras * 2
+    assert len(_linhas_janela(caminho_log)) == 1
+
+
 def test_estimativa_igual_ao_num_ctx_nao_bloqueia(tmp_path: Path) -> None:
     """Só bloqueia quando passa do `num_ctx` (2.2); a decisão final é a medida do servidor."""
     num_ctx = _num_ctx("qualificar")
@@ -178,8 +197,8 @@ def test_estimativa_igual_ao_num_ctx_nao_bloqueia(tmp_path: Path) -> None:
 
 
 def test_estimativa_e_o_maior_entre_palavras_e_caracteres() -> None:
-    assert estimativa_tokens.estimar_tokens(" ".join(["a"] * 100)) == 140
-    assert estimativa_tokens.estimar_tokens_conservador(" ".join(["a"] * 100)) == 140
+    assert estimativa_tokens.estimar_tokens(" ".join(["a"] * 100)) == 200
+    assert estimativa_tokens.estimar_tokens_conservador(" ".join(["a"] * 100)) == 200
     assert (
         estimativa_tokens.estimar_tokens_conservador("paralelepípedo " * 10)
         == len("paralelepípedo " * 10) // 3

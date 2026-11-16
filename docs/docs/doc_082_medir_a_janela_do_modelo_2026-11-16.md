@@ -167,3 +167,9 @@ rc=0
 | 4 | Não está provado se o `prompt_eval_count` do Ollama exclui os tokens que vêm do cache (`prompt_eval_cached_count`, que deu 0 nas duas medições). Se excluir, a medida depois da chamada conta menos que o real, e só a estimativa antes da chamada pega o estouro | dívida | nice |
 | 5 | `cartao`, `cruzar_por_que` e `avaliar_relacao_objetivo` repetem a chamada quando recebem `FalhaJsonInvalido`, então um estouro de janela vira até `_MAX_TENTATIVAS` linhas na `fila_revisao` (a recusa pela estimativa não chama o servidor). É o mesmo desenho de antes para qualquer falha (2.3 manda não mudá-lo); o brief 088, que captura `JanelaEstourada`, é o lugar de tratar | backlog | nice |
 | 6 | No relatório 079, o texto do P-033 ainda aponta o estimador em `redigir_ganchos.py` ("l. 93", "`:93`"), que agora está em `agente_nw/nucleo/estimativa_tokens.py:15`. As tabelas das seções 5.b e 7 ainda dizem que não há conferência. A autorização deste brief cobre só a seção 6, o apêndice A e o estado dos quatro pontos | dívida | nice |
+
+---
+
+## Adendo do brief 098 (2026-11-16): o 2,0 entra no código
+
+A medição da seção 3 (razão real 2,001 tokens por palavra no `qwen2.5:14b`, contra 1,4 no código) foi aplicada pelo brief 098: `_TOKENS_POR_PALAVRA` em `agente_nw/nucleo/estimativa_tokens.py` passou de 1.4 para 2.0, por decisão de Sidarta. A regra da decisão 2.2 não mudou (o estimador devolve o maior entre palavras × fator e caracteres ÷ 3), nem o `num_ctx` de nenhuma tarefa. Resolve a Lacuna 1 deste relatório no que diz respeito ao fator; o corte do P-033 passa a agir em tokens reais perto de `0,73 × num_ctx`. Continua sem medição no `qwen3:4b` do `air16` (pendência de máquina). Nenhuma linha anterior deste relatório foi reescrita.

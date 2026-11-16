@@ -94,8 +94,8 @@ def test_o_exemplo_nao_usa_nomes_dos_testes() -> None:
         assert nome not in prompt._EXEMPLO
 
 
-def test_estimativa_e_palavras_vezes_um_virgula_quatro() -> None:
-    assert prompt.estimar_tokens(" ".join(["a"] * 100)) == 140
+def test_estimativa_e_palavras_vezes_dois() -> None:
+    assert prompt.estimar_tokens(" ".join(["a"] * 100)) == 200
 
 
 def test_o_contexto_da_relacao_aparece_no_bloco_da_pessoa() -> None:

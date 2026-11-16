@@ -928,7 +928,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | agente_nw/nucleo/database/queries/redes_sociais.py | 42/42 | CERTIFICADO | Só links de rede do contato, gravados e lidos inteiros, sem limite. | — |
 | agente_nw/nucleo/database/queries/sistema.py | 63/63 | CERTIFICADO | Não manipula texto de conteúdo: versão de esquema, progresso, bloqueio por host e termo buscado (chave = prefixo + valor inteiro). | — |
 | agente_nw/nucleo/database/queries/temas.py | 105/105 | CERTIFICADO | Nome, descrição e sinônimos gravados e lidos inteiros; `listar_com_embedding` devolve **todos** os temas com vetor do modelo atual. | — |
-| agente_nw/nucleo/estimativa_tokens.py | 24/24 | CERTIFICADO | só conta palavras e caracteres do texto que recebe para estimar tokens (brief 082); não corta nem devolve texto | — |
+| agente_nw/nucleo/estimativa_tokens.py | 28/28 | CERTIFICADO | só conta palavras e caracteres do texto que recebe para estimar tokens (brief 082); não corta nem devolve texto | — |
 | agente_nw/nucleo/fluxo.py | 504/504 | CORTA | fluxo do pedido (status, perguntas, retomada); não lê texto de conteúdo, mas é aqui que nasce o orçamento de prompt `num_ctx * 0,73` que corta o prompt da redação | P-033 |
 | agente_nw/nucleo/historico.py | 97/97 | CORTA | o histórico que vai ao prompt `redigir_ganchos` leva a mensagem entregue cortada em 100 caracteres (o comentário do usuário entra inteiro desde o brief 081), e só as 5 consultas mais recentes | P-028, NA-001 |
 | agente_nw/nucleo/llm.py | 971/971 | CERTIFICADO | o prompt e o texto de embedding chegam e saem inteiros; desde o brief 082 o cliente confere a janela (estimativa antes, `prompt_eval_count` e motivo de parada depois) e recusa o que não cabe em vez de deixar o modelo responder sobre texto cortado; desde o brief 088, `num_ctx` expõe a janela da tarefa a quem divide o texto e `embeddar_em_partes` (l. 952) embedda em partes que cobrem o texto todo e devolve a média ponderada, nunca um vetor parcial; desde o brief 089, `modelo_embedding` leva a versão do critério do vetor (l. 54-64) | P-040, P-042 |
@@ -1135,7 +1135,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | tests/test_inferencia_temas.py | 158/158 | CERTIFICADO | Exercita `atualizar_temas_do_usuario`/decaimento (30/90/180 dias); termos de 1 palavra. | — |
 | tests/test_inicio_lista_contatos.py | 101/101 | CERTIFICADO | Exercita tela inicial; DOCUMENTA `listar_para_inicio(conn,"",20)` (25 contatos, só 20 voltam) — apresentação (ver bloco). | — |
 | tests/test_itens_agrupamento.py | 154/154 | CERTIFICADO | Exercita queries de `item`; texto do item fixado em "Texto de exemplo." (nunca testa corpo de notícia); `listar_sem_assunto(conn, 10)` documenta parâmetro de limite. | — |
-| tests/test_janela_modelo.py | 396/396 | CERTIFICADO | Testa a conferência de janela com `MockTransport` e banco em `tmp_path`: prompts sintéticos ("palavra" repetida, "a" repetido) e respostas falsas; nada vai a modelo real nem é cortado | — |
+| tests/test_janela_modelo.py | 415/415 | CERTIFICADO | Testa a conferência de janela com `MockTransport` e banco em `tmp_path`: prompts sintéticos ("palavra" repetida, "a" repetido) e respostas falsas; nada vai a modelo real nem é cortado | — |
 | tests/test_lacunas.py | 31/31 | CERTIFICADO | Exercita `campos_faltando` do perfil; sem texto. | — |
 | tests/test_lint_arquivo.py | 63/63 | CERTIFICADO | Testa hook `lint_arquivo.py`; só infraestrutura. | — |
 | tests/test_listas_parse.py | 225/225 | CERTIFICADO | Exercita parsing de listas de rede social; DOCUMENTA `maximo_entradas` truncando a leitura (`truncada is True`) (ver bloco); página fake com `texto="x"*600`. | — |
@@ -1704,14 +1704,14 @@ tests/test_janela_modelo.py:1 tests/test_janela_modelo.py:2 tests/test_janela_mo
 tests/test_janela_modelo.py:101 tests/test_janela_modelo.py:102 tests/test_janela_modelo.py:104 tests/test_janela_modelo.py:114
 tests/test_janela_modelo.py:119 tests/test_janela_modelo.py:120 tests/test_janela_modelo.py:125 tests/test_janela_modelo.py:126
 tests/test_janela_modelo.py:128 tests/test_janela_modelo.py:150 tests/test_janela_modelo.py:151 tests/test_janela_modelo.py:152
-tests/test_janela_modelo.py:164 tests/test_janela_modelo.py:168 tests/test_janela_modelo.py:169 tests/test_janela_modelo.py:170
-tests/test_janela_modelo.py:171 tests/test_janela_modelo.py:172 tests/test_janela_modelo.py:173 tests/test_janela_modelo.py:205
-tests/test_janela_modelo.py:239 tests/test_janela_modelo.py:280 tests/test_janela_modelo.py:283 tests/test_janela_modelo.py:285
-tests/test_janela_modelo.py:301 tests/test_janela_modelo.py:304 tests/test_janela_modelo.py:315 tests/test_janela_modelo.py:316
-tests/test_janela_modelo.py:319 tests/test_janela_modelo.py:322 tests/test_janela_modelo.py:328 tests/test_janela_modelo.py:330
-tests/test_janela_modelo.py:335 tests/test_janela_modelo.py:337 tests/test_janela_modelo.py:339 tests/test_janela_modelo.py:346
-tests/test_janela_modelo.py:357 tests/test_janela_modelo.py:367 tests/test_janela_modelo.py:368 tests/test_janela_modelo.py:379
-tests/test_janela_modelo.py:380 tests/test_janela_modelo.py:383
+tests/test_janela_modelo.py:164 tests/test_janela_modelo.py:187 tests/test_janela_modelo.py:188 tests/test_janela_modelo.py:189
+tests/test_janela_modelo.py:190 tests/test_janela_modelo.py:191 tests/test_janela_modelo.py:192 tests/test_janela_modelo.py:224
+tests/test_janela_modelo.py:258 tests/test_janela_modelo.py:299 tests/test_janela_modelo.py:302 tests/test_janela_modelo.py:304
+tests/test_janela_modelo.py:320 tests/test_janela_modelo.py:323 tests/test_janela_modelo.py:334 tests/test_janela_modelo.py:335
+tests/test_janela_modelo.py:338 tests/test_janela_modelo.py:341 tests/test_janela_modelo.py:347 tests/test_janela_modelo.py:349
+tests/test_janela_modelo.py:354 tests/test_janela_modelo.py:356 tests/test_janela_modelo.py:358 tests/test_janela_modelo.py:365
+tests/test_janela_modelo.py:376 tests/test_janela_modelo.py:386 tests/test_janela_modelo.py:387 tests/test_janela_modelo.py:398
+tests/test_janela_modelo.py:399 tests/test_janela_modelo.py:402
 ```
 
 descartada: declaração ou repasse de num_ctx/num_predict (a ausência de conferência é P-040/P-042) — 35 ocorrência(s):
@@ -2040,6 +2040,13 @@ agente_nw/nucleo/llm.py:375 agente_nw/nucleo/llm.py:510 agente_nw/nucleo/llm.py:
 agente_nw/nucleo/llm.py:631 agente_nw/nucleo/llm.py:634 agente_nw/nucleo/llm.py:636 agente_nw/nucleo/llm.py:639
 agente_nw/nucleo/llm.py:641 agente_nw/nucleo/llm.py:646 agente_nw/nucleo/llm.py:654 agente_nw/nucleo/llm.py:730
 agente_nw/nucleo/llm.py:731 agente_nw/nucleo/llm.py:942
+```
+
+**Brief 098 (sem ponto novo)** — 6 ocorrência(s), todas descartadas. O brief 098 trocou o fator do estimador de 1,4 para 2,0 e pôs um teste novo em `tests/test_janela_modelo.py` (o prompt que só passa do `num_ctx` com 2,0 é recusado antes da chamada). As ocorrências são a palavra "janela"/`num_ctx` no nome e no texto do teste e uma comparação de estimativa; nenhuma fatia texto, o teste confere a recusa em voz alta. As linhas deslocadas das ocorrências antigas do mesmo arquivo foram renumeradas (+19).
+
+```
+tests/test_janela_modelo.py:168 tests/test_janela_modelo.py:169 tests/test_janela_modelo.py:170 tests/test_janela_modelo.py:171
+tests/test_janela_modelo.py:172 tests/test_janela_modelo.py:174
 ```
 
 **Brief 091 (sem ponto novo)** — 25 linha(s) citada(s), todas descartadas. O brief 091 tirou o corte de 300 caracteres dos fatos dos termos de busca (P-027), o de 600 caracteres dos fatos da redação, que agora entram inteiros e, se o prompt estoura, ficam os 4 mais recentes com o resto listado no aviso (P-026), e fez `termo_evitado` procurar também na manchete e no resumo de todos os itens do assunto (P-012); as linhas deslocadas das citações antigas de `redacao.py`, `prompts/redigir_ganchos.py`, `relevancia/candidatos.py`, `termos_contato.py` e `tests/test_redacao_prompt.py` foram renumeradas pela correspondência entre a versão anterior e a atual, e só as que nasceram com o brief ficam aqui. Nenhuma corta texto do usuário nem de fonte externa:

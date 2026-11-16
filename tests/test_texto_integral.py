@@ -150,7 +150,7 @@ class _ClienteExtracaoFalso(ProvenienciaFalsa):
 
 
 @pytest.mark.parametrize("nome", list(TEXTOS_DE_COBERTURA))
-@pytest.mark.parametrize("orcamento", [1, 40, 700, 3000])
+@pytest.mark.parametrize("orcamento", [2, 40, 700, 3000])
 def test_reconstruir_as_partes_reproduz_o_original_byte_a_byte(nome: str, orcamento: int) -> None:
     texto = TEXTOS_DE_COBERTURA[nome]
 
