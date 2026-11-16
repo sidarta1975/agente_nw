@@ -116,12 +116,15 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
 
 ## 1. Resumo para Sidarta
 
-Li **todos os 317 arquivos de código do projeto, do início ao fim** (315 que já existiam, mais os 2
-criados por este brief): 15.288 linhas em `agente_nw/`, 2.903 em `cli.py`/console/ponte, 1.551 em
-`scripts/`, `config/` e `extensao/`, e 21.323 nos 158 arquivos de teste — 38.289 linhas no total.
+Li **todos os 319 arquivos de código do projeto, do início ao fim** (315 que já existiam, mais os 2
+criados por este brief e os 2 que o brief 086 criou depois, `scripts/executar_serie.sh` e
+`tests/test_executar_serie.py`, recertificados pelo brief 080): 15.288 linhas em `agente_nw/`, 2.903 em `cli.py`/console/ponte, 1.551 em
+`scripts/`, `config/` e `extensao/`, e 21.323 nos 158 arquivos de teste — 38.289 linhas no total (medidas em 2026-11-08; os dois arquivos
+do brief 086 somam 683 linhas, e as duas contagens corrigidas na seção 6 mudaram em 142).
 Nenhum arquivo ficou `NÃO CONFERIDO`.
 
-O princípio não está sendo cumprido em **45 lugares**, e nenhum deles tem aprovação sua registrada.
+O princípio não está sendo cumprido em **45 lugares**, e nenhum deles tinha aprovação sua registrada.
+Em 2026-11-08 você aprovou a exceção de 19 deles (brief 080); **26 continuam sem aprovação**.
 Os cinco mais graves, em uma linha cada:
 
 1. **P-013 — a página da rede social é cortada na origem, dentro do seu Chrome** (`extensao/conteudo.js:199`,
@@ -141,8 +144,8 @@ Os cinco mais graves, em uma linha cada:
 Além dos 45, há 7 cortes que **não** alimentam análise (data, log, tela) na seção 4, com a prova de
 cada um; se você discordar de qualquer linha dessa seção, ela volta para a seção 3.
 
-O verificador (`scripts/verificar_auditoria_texto.py`) confere que nada ficou fora: 317 arquivos na
-tabela, um por arquivo, com a contagem de linhas batendo com o disco; 1.272 ocorrências da varredura
+O verificador (`scripts/verificar_auditoria_texto.py`) confere que nada ficou fora: 319 arquivos na
+tabela, um por arquivo, com a contagem de linhas batendo com o disco; 1.275 ocorrências da varredura
 mecânica, todas com destino; e nenhuma exceção aprovada por quem não pode. Saída dele:
 
 ```
@@ -150,7 +153,8 @@ mecânica, todas com destino; e nenhuma exceção aprovada por quem não pode. S
 1272 ocorrência(s) da varredura mecânica, todas com destino no relatório
 ```
 
-**O que você decide:** cada ponto da seção 3 tem, em branco, a linha `Decisão de Sidarta: ____`.
+**O que você decide:** cada um dos 26 pontos ainda em aberto da seção 3 tem, em branco, a linha
+`Decisão de Sidarta: ____`.
 Aprovar a exceção significa escrever a linha correspondente em `docs/EXCECOES_TEXTO_INTEGRAL.md`;
 mandar corrigir significa pedir um brief. O executor não pode fazer nem um nem outro.
 
@@ -165,7 +169,7 @@ e o `manifest.json`, os `*.py` da raiz (não há nenhum) e `tests/**/*.py`. Fica
 `node_modules/`, `__pycache__/`, `dados/`, `logs/`, `docs/` e `.git/`. Duas inclusões vão além da
 letra do brief, de propósito, porque cobrir mais nunca cobre menos: `agente_nw/**/*.yaml` (por causa
 de `nucleo/prompts/exemplos_conversavel.yaml`, que é dado de prompt) e o `extensao/manifest.json`
-(citado no próprio item 3.7). Deu **317** arquivos. Ficaram fora da tabela, por serem dados e não
+(citado no próprio item 3.7). Deu **317** arquivos em 2026-11-08 e **319** depois do brief 086. Ficaram fora da tabela, por serem dados e não
 código: os templates HTML do console (18 arquivos, só apresentação) e as 8 fixturas de dados de
 `tests/fixtures/` — estas estão cobertas na linha de certificação do teste que as lê.
 
@@ -222,7 +226,9 @@ tocado por isso. Apagar esse arquivo é operação sua, se incomodar.
 
 ## 3. Pontos que cortam o texto — aguardando decisão
 
-45 pontos. Todos nascem com o estado `AGUARDANDO DECISÃO DE SIDARTA`: o executor não aprova exceção.
+45 pontos. Todos nasceram com o estado `AGUARDANDO DECISÃO DE SIDARTA`: o executor não aprova exceção.
+Em 2026-11-08 Sidarta aprovou 19 (brief 080: estado `EXCEÇÃO APROVADA`, com a linha no registro);
+26 aguardam.
 A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 
 ### 3.a. Notícia (coleta por RSS)
@@ -244,8 +250,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `9098879`
 - Justificativa existente: o comentário de `leitor.py:321` — "O mesmo título aparece em várias buscas: checa pelo título antes de qualquer pedido de rede". É explicação (economia de rede e de bloqueio), não aprovação.
 - Proposta do executor: a justificativa é forte — pedir a página para descobrir que é duplicata custa uma requisição e aumenta o risco de 429, e o brief 045 existe por causa disso. Proponho manter, registrando a exceção. Corrigir custaria um brief e abriria o risco de bloqueio que o 045 fechou.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `agente_nw/coleta/rss/leitor.py:320` (a checagem), `agente_nw/coleta/rss/leitor.py:329` (a segunda, já com a URL canônica).
 
 #### P-003 — agente_nw/coleta/rss/leitor.py:338 — `_processar_fonte`, e `rss/ruido.py:51`
@@ -276,8 +282,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `5e3af5b`
 - Justificativa existente: sim, e é a mais sólida do projeto: o AGENTS §6 e o brief 045 dizem que a coleta é resiliente a bloqueio e que "cada pedido faz poucas buscas". Os números estão em `config/limiares.yaml` com comentário em cada chave.
 - Proposta do executor: manter e registrar a exceção em bloco. É teto de custo e de bloqueio, não corte de um texto: nenhuma notícia coletada é analisada pela metade por causa dele. O que vale pedir é que a tela diga quando a coleta parou por teto (hoje o `preparar` já avisa quando passou do tempo).
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `agente_nw/coleta/rss/leitor.py:275`, `:280`, `:362`; `agente_nw/coleta/rss/google_news.py:24,59,60,61,72`; `agente_nw/nucleo/consulta.py:172`; `config/limiares.yaml:29,30,35,36,37,40,41`.
 
 #### P-006 — agente_nw/nucleo/relevancia/qualificador.py:43 — `_itens_recentes_resumidos`
@@ -309,8 +315,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `06ba8e0`
 - Justificativa existente: nenhuma linha de código, mas o ADR escrito por `_escrever_adr` registra a composição da amostra e a acurácia, o que mostra desenho amostral deliberado.
 - Proposta do executor: é amostragem declarada para calibrar um limiar, e amostra é o método certo aqui — provavelmente a exceção mais defensável do projeto. Proponho aprovar com a ressalva de que o trecho de 2.000 caracteres seja o mesmo valor do P-001 (hoje os dois são 2.000 por coincidência, não por vínculo no código).
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `agente_nw/nucleo/agrupamento/calibracao.py:103`, `:108`.
 
 #### P-009 — agente_nw/nucleo/relevancia/candidatos.py:31 — afunilamento dos assuntos
@@ -320,8 +326,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `f9a1e53`
 - Justificativa existente: parcial — a docstring de `selecionar_por_consulta` explica que os evitados saem antes do corte "para não ocupar vaga", o que reconhece o corte; os números têm comentário em `limiares.yaml`.
 - Proposta do executor: o teto do menu é decisão de produto (quantos ganchos uma pessoa quer ver) e eu a aprovaria. O teto de 10 candidatos é diferente: ele decide, por cosseno, o que o modelo nunca vai julgar — e o brief 049 existe porque o cosseno erra. Proponho manter 5 no menu e revisar o 10 de candidatos com medição (quantos dos 10 passam o gate hoje). Custo: um brief de medição, sem risco.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `agente_nw/nucleo/relevancia/candidatos.py:83`; `agente_nw/nucleo/relevancia/cruzamento.py:272`, `:481`; `agente_nw/nucleo/database/queries/assuntos.py:179`, `:254`; `agente_nw/nucleo/consulta.py:204`; `agente_nw/cli.py:442`; `config/limiares.yaml:10,18,19,46`.
 
 #### P-010 — agente_nw/nucleo/relevancia/cruzamento.py:155 — `_aplicar_gate_objetivo`
@@ -341,8 +347,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `f9a1e53`
 - Justificativa existente: sim, e é deliberada: o comentário das l. 52-53 — "O 'por quê' recebe só o título do assunto e os temas: qualquer posição do contato ('ele apoia X') é invenção do modelo". É uma restrição de verdade, não de custo.
 - Proposta do executor: aprovar. Aqui o corte é a própria proteção do AGENTS §4 (a redação nunca afirma sobre a pessoa o que ela não disse); dar mais texto ao modelo aumentaria a chance de ele inferir posição. É o único ponto desta auditoria em que o corte é o recurso, não o defeito.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `agente_nw/nucleo/relevancia/cruzamento.py:488`.
 
 #### P-012 — agente_nw/nucleo/relevancia/candidatos.py:41 — `termo_evitado`
@@ -386,8 +392,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `c6e0969`
 - Justificativa existente: parcial e boa — o AGENTS §6 manda respeitar pausa entre páginas e não agir na rede; as listas têm `truncada` justamente para dizer que o teto bateu. Os comentários de `conteudo.js:66-69` explicam a paginação do Instagram.
 - Proposta do executor: manter e registrar. Rolar indefinidamente numa rede social é o caminho mais curto para um bloqueio de conta, que é um risco maior do que ler 5 telas em vez de 10. O que proponho pedir: que o `truncada` das listas apareça na tela do usuário (hoje ele existe no modelo e morre ali).
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `extensao/conteudo.js:130`, `:108`; `agente_nw/coleta/capturas/listas.py:369`; `config/limiares.yaml:48,54`.
 
 #### P-016 — agente_nw/coleta/capturas/leitor.py:136 — `ler_redes_sociais_do_contato`
@@ -397,8 +403,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `9a8bb96`
 - Justificativa existente: sim, no comentário das l. 27-29 ("cada um custa uma chamada ao modelo") e na chave do `limiares.yaml:42`. É justificativa de custo, escrita.
 - Proposta do executor: manter. Cada bloco é uma chamada de LLM local; 10 publicações recentes é o que uma leitura sob demanda suporta sem virar lote de 10 minutos. Registre a exceção com o número à vista, para que mudá-lo seja decisão sua, não ajuste de código.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `agente_nw/coleta/capturas/leitor.py:143`; `config/limiares.yaml:42`; `agente_nw/nucleo/consulta.py:147`.
 
 #### P-017 — agente_nw/coleta/capturas/navegador.py:61 — quantas imagens são descritas
@@ -408,8 +414,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `657edaa`
 - Justificativa existente: sim: as chaves do YAML têm comentário ("abaixo disso é ícone ou foto de perfil, não publicação") e cada descrição é uma chamada de modelo de visão, a mais caro do produto.
 - Proposta do executor: manter. O corte por largura é um filtro de qualidade com justificativa técnica clara, e 8 imagens já é meio minuto de modelo de visão no Air.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `extensao/conteudo.js:185`, `:189`; `extensao/background.js:120`; `config/limiares.yaml:43,44`.
 
 #### P-018 — agente_nw/coleta/capturas/imagens.py:43 — `construir_prompt`
@@ -419,8 +425,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `657edaa`
 - Justificativa existente: sim, e é de produto, não de custo: o AGENTS §3 manda não gravar a imagem, só a descrição.
 - Proposta do executor: aprovar. É o desenho do produto, decidido por você, e a alternativa (guardar a imagem) é justamente o que o AGENTS proíbe. O que caberia pedir num brief futuro é descrição mais longa quando a imagem tem texto legível.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 
 #### P-019 — agente_nw/coleta/capturas/extrator.py:68 — `extrair`
 - Classe: P
@@ -439,8 +445,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `834f742`
 - Justificativa existente: nenhuma explícita. A confirmação humana obrigatória (brief 037) é a compensação desenhada para isso.
 - Proposta do executor: manter o recorte, porque o cartão da busca não tem mais do que isso e o usuário confirma. O que proponho pedir: que a tela de confirmação mostre o cabeçalho inteiro que a rede deu (hoje mostra as 3 linhas) e que a dúvida continue sempre indo para você — é o que o AGENTS §6 já exige.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `agente_nw/coleta/capturas/listas.py:251`, `:254`; `agente_nw/nucleo/localizacao.py:104`.
 
 #### P-021 — agente_nw/nucleo/localizacao.py:259 — quantas candidatas aparecem
@@ -450,8 +456,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `657edaa`
 - Justificativa existente: os números estão em `limiares.yaml` com nome claro; nenhuma justificativa escrita.
 - Proposta do executor: manter: cinco opções numa pergunta é desenho de tela, e a sexta candidata quase sempre é homônimo distante. O teto de 200 na deduplicação merece um olhar num brief de manutenção (um contato com mais de 200 fatos pode receber fato de lista repetido).
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `agente_nw/nucleo/localizacao.py:376`; `agente_nw/nucleo/confirmacao.py:182`; `agente_nw/nucleo/database/queries/listas.py:138`; `config/limiares.yaml:52`.
 
 ### 3.c. Conversa do WhatsApp
@@ -463,8 +469,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `4366f01`
 - Justificativa existente: sim, a chave do YAML tem comentário e o brief 061 trata a conversa como fonte de fatos recentes e de tom.
 - Proposta do executor: manter. Fato de 5 anos entra marcado `[antigo]` e vale pouco para a redação; extrair 6 anos de conversa é um lote longo de LLM. O número está num lugar visível e é seu para mudar.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `agente_nw/coleta/whatsapp/importador.py:51`; `config/limiares.yaml:71`.
 
 #### P-023 — agente_nw/nucleo/database/queries/conversa.py:46 — `ultimas_trocas`
@@ -474,8 +480,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `4366f01`
 - Justificativa existente: sim, declarada no brief 061 e na docstring ("para o tom da redação").
 - Proposta do executor: aprovar. Dez trocas bastam para o tom e é o bloco que `cortar_por_tamanho` sacrifica primeiro quando o prompt estoura (P-033) — o que é coerente: tom é o que menos se perde.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `agente_nw/nucleo/redacao.py:242`; `config/limiares.yaml:73`.
 
 #### P-024 — agente_nw/coleta/whatsapp/leitor.py:102 — o que da exportação é lido
@@ -485,8 +491,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `4366f01`
 - Justificativa existente: sim, tudo declarado em docstring e no brief 061 (uma conversa por vez, um contato por vez; mídia não tem texto para analisar).
 - Proposta do executor: aprovar. A perda é de mensagens sem texto (mídia) e a recusa é explícita para o usuário, não silenciosa — o oposto do P-014.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `agente_nw/coleta/whatsapp/leitor.py:89`; `agente_nw/console/app.py:465`, `:474`.
 
 ### 3.d. Fatos e perfil do contato
@@ -584,8 +590,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `ea26737`
 - Justificativa existente: sim: a docstring da função, o comentário de `redacao.py:308` (quando o molde sai, a proveniência não é gravada) e a declaração de que a contagem é aproximada.
 - Proposta do executor: aprovar o mecanismo — é o que impede o estouro de janela na única tarefa em que alguém olhou para isso — e pedir duas coisas num brief: que a estimativa de 1,4 token por palavra seja conferida contra o tokenizador real uma vez (um erro de 20% aqui é um prompt cortado em silêncio) e que a ordem de sacrifício fique documentada na ARQUITETURA, porque é decisão de produto: hoje o projeto prefere perder histórico e fatos a perder molde e tom.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `agente_nw/nucleo/prompts/redigir_ganchos.py:294`, `:93`; `agente_nw/cli.py:921`; `agente_nw/nucleo/fluxo.py:364`; `agente_nw/console/app.py:164`.
 
 ### 3.e. O que o próprio usuário escreve
@@ -640,8 +646,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `21349f6`
 - Justificativa existente: nenhuma.
 - Proposta do executor: o formulário mostra 5 campos e não dá para digitar 21 na tela atual, então o risco prático é nulo hoje; é dívida de forma. Proponho aprovar e deixar registrado, ou corrigir de graça num brief que já toque o console.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 
 #### P-039 — agente_nw/nucleo/relevancia/cruzamento.py:407 — ponto de apoio da consulta
 - Classe: C
@@ -697,8 +703,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `4a38842`
 - Justificativa existente: sim, o AGENTS §6 ("idempotência e retomada") e o próprio desenho da fila.
 - Proposta do executor: aprovar. É paginação de lote, não corte de análise — registro aqui só porque a varredura mecânica os encontra e o princípio pede que nada fique sem resposta.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `agente_nw/nucleo/database/queries/itens.py:68`; `agente_nw/nucleo/database/queries/fontes.py:70`.
 
 #### P-044 — agente_nw/perfil/agenda_google_csv.py:37 — importação da agenda
@@ -708,8 +714,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `aa0f235`
 - Justificativa existente: nenhuma.
 - Proposta do executor: é dado de identificação, não texto analisado, mas o efeito (contato duplicado) é real. Proponho aprovar como está e lembrar que `unir-contatos` existe para isso; corrigir pede coluna nova e migração.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `agente_nw/perfil/agenda_macos.py:91`.
 
 #### P-045 — agente_nw/nucleo/database/queries/listas.py:75 — busca na lista pelo primeiro nome
@@ -719,8 +725,8 @@ A linha `Decisão de Sidarta: ____` fica em branco de propósito.
 - Commit que introduziu: `7fd4c59`
 - Justificativa existente: a docstring de `buscar_por_nome` explica a regra ("O primeiro nome precisa bater por inteiro"); é desenho declarado.
 - Proposta do executor: aprovar. É heurística de nome, com confirmação humana depois, e afrouxá-la aumenta o número de homônimos que você tem de resolver — que é o custo que o brief 037 tentou reduzir.
-- Estado: AGUARDANDO DECISÃO DE SIDARTA
-- Decisão de Sidarta: ____
+- Estado: EXCEÇÃO APROVADA
+- Decisão de Sidarta: aprovar exceção (2026-11-08), alcance conforme o registro
 - Onde mais aparece: `agente_nw/nucleo/database/queries/perfis.py:453`.
 ---
 
@@ -858,7 +864,7 @@ YAML. Essa é a chamada que eu mediria primeiro se você aprovar o P-040.
 
 ## 6. Certificação por arquivo
 
-Os 317 arquivos do universo, um por linha, na ordem do caminho. `Linhas lidas/total` foi conferido
+Os 319 arquivos do universo, um por linha, na ordem do caminho. `Linhas lidas/total` foi conferido
 com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pontos das seções 3 e 4.
 
 | Arquivo | Linhas lidas/total | Resultado | Evidência (uma linha) | Ponto |
@@ -996,9 +1002,10 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | extensao/conteudo.js | 203/203 | CORTA | corta o `innerText` da página no `maximo` recebido (l. 199), limita imagens por `maximo`/`largura_minima` (l. 181-195) e a leitura da lista por orçamento de tempo e de páginas (l. 108, 130) | P-013, P-015, P-017 |
 | extensao/manifest.json | 44/44 | CERTIFICADO | não manipula texto de conteúdo: manifesto MV3 (permissões, service worker, `externally_connectable`); `host_permissions` é escopo de origem, não corte de texto — é a origem do descarte listado em A4-032. | — |
 | extensao/ponte_conteudo.js | 18/18 | CERTIFICADO | repassa a tarefa e a resposta inteiras entre a página-ponte e a extensão (`sendMessage`/`postMessage`), sem ler, cortar ou reescrever campo nenhum. | — |
-| scripts/agente_entregar.sh | 136/136 | NÃO ANALÍTICO | ferramenta de entrega (manifesto, gate, commit, push); os únicos cortes são de log na tela (`tail -n 5`, `tail -n 3`) e o descarte do prefixo de 3 caracteres do `git status --porcelain`. | NA-006 |
+| scripts/agente_entregar.sh | 146/146 | NÃO ANALÍTICO | ferramenta de entrega (manifesto, gate, commit, push); os únicos cortes são de log na tela (`tail -n 5`, `tail -n 3`) e o descarte do prefixo de 3 caracteres do `git status --porcelain`. | NA-006 |
 | scripts/agente_lacunas.py | 133/133 | NÃO ANALÍTICO | copia a tabela `## Lacunas` do relatório para o PLAN; corta só coleções de documentação (primeiro relatório do glob, última seção `## Lacunas`), nada vai a LLM, embedding ou filtro do produto. | NA-006 |
 | scripts/commitar.sh | 83/83 | NÃO ANALÍTICO | `git add` arquivo por arquivo e `git commit -F`; o único corte é `git log --oneline -3`, saída de tela. | NA-006 |
+| scripts/executar_serie.sh | 279/279 | CERTIFICADO | não manipula texto de conteúdo: roda `claude -p "/executar NNN"` por brief e confere a entrega; lê só os rótulos `Modelo`, `Esforço` e `Ordem em série` do cabeçalho (regex sobre o brief inteiro, l. 93-95), e os três cortes (`sys.argv[1:]`, l. 107, a lista de números; `.split()[0]`, l. 121 e 123, a primeira palavra do rótulo) não são texto de conteúdo; o brief vai inteiro ao `/executar`, que abre o arquivo. | — |
 | scripts/instalar_macos.sh | 40/40 | CERTIFICADO | não manipula texto de conteúdo: `brew install`, `ollama pull`, venv, `mkdir`; nenhum texto de conteúdo passa por aqui. | — |
 | scripts/migracoes/001_inicial.sql | 160/160 | CERTIFICADO | todas as colunas de conteúdo são `TEXT` sem limite (`item.texto`, `fato.conteudo`, `fila_extracao.texto`, `assunto.justificativa`, `tema.descricao`); os `CHECK` são enumerações (`tipo`, `status`, `origem`) e faixas numéricas (`peso`, `confiabilidade`), nunca `length(...)`; sem view e sem `LIMIT`. | — |
 | scripts/migracoes/002_coleta_historico.sql | 9/9 | CERTIFICADO | só contagem por fonte e data (`n_itens_novos INTEGER`); nenhuma coluna de texto de conteúdo. | — |
@@ -1092,6 +1099,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | tests/test_cruzar_por_que_nao_atribui.py | 62/62 | CERTIFICADO | Exercita prompt `cruzar_por_que` (regra de não atribuir posição); títulos curtos, não há texto de notícia no prompt. | — |
 | tests/test_divisao.py | 37/37 | CERTIFICADO | Exercita `dividir` de agrupamento com vetores 2D; sem texto. | — |
 | tests/test_evitar_implicito.py | 174/174 | CERTIFICADO | Exercita "não me interessa" virando evitar; casa só pelo TÍTULO do assunto ("Política fiscal..."); assunto sem corpo. | — |
+| tests/test_executar_serie.py | 404/404 | CERTIFICADO | Testa `scripts/executar_serie.sh` com `claude`, `pmset`, `caffeinate` e `osascript` falsos num repositório git temporário; o único texto que passa é cabeçalho fictício de brief e o JSON de teste, nada vai a modelo, embedding ou filtro. | — |
 | tests/test_extensao_backend.py | 207/207 | CERTIFICADO | Exercita `PaginaExtensao`; DOCUMENTA corte do texto da página em `maximo_caracteres_pagina` e `maximo_entradas`/`maximo` de imagens (ver bloco). | — |
 | tests/test_extensao_manifest.py | 79/79 | CERTIFICADO | Confere manifest.json e background.js da extensão; só infraestrutura. | — |
 | tests/test_extrator.py | 91/91 | CERTIFICADO | Teste `llm_real` do extrator com texto de ~230 caracteres (cabe em qualquer corte); não testa texto longo. | — |
@@ -1103,7 +1111,7 @@ com `wc -l` pelo verificador, arquivo por arquivo. A coluna `Ponto` cita os pont
 | tests/test_gate_zera_menu.py | 165/165 | CERTIFICADO | Exercita gate que reprova tudo (menu zera); títulos curtos, mock devolve `relaciona=False` para N candidatos. | — |
 | tests/test_google_news.py | 47/47 | CERTIFICADO | Exercita `gerar_consultas` por tema; DOCUMENTA limite de 4 termos por tema (ver bloco). | — |
 | tests/test_google_news_consulta.py | 75/75 | CERTIFICADO | Exercita `selecionar_termos`/`gerar_consultas_da_consulta`; DOCUMENTA teto de termos (ver bloco). | — |
-| tests/test_guarda_comando.py | 134/134 | CERTIFICADO | Testa hook `guarda_comando.py` (bloqueios de git/rm/agente_nw); só infraestrutura. | — |
+| tests/test_guarda_comando.py | 266/266 | CERTIFICADO | Testa hook `guarda_comando.py` (bloqueios de git/rm/agente_nw); só infraestrutura. | — |
 | tests/test_historico_formatar.py | 130/130 | CERTIFICADO | Exercita `historico.formatar`/`historico_recente_para_prompt`; DOCUMENTA "padrão de cinco" consultas no histórico do prompt (ver bloco). | — |
 | tests/test_imagens.py | 63/63 | CERTIFICADO | Exercita `imagens.descrever` com visão fake; descrição curta devolvida inteira (só `strip`); descrição de qualquer tema é mantida. | — |
 | tests/test_importador.py | 86/86 | CERTIFICADO | Exercita importador CSV da agenda; nota da agenda ("Gosta de futebol e viagens.") curta, vai inteira à fila de extração. | — |
@@ -1214,8 +1222,9 @@ perdido, mas o modelo não enxerga a conversa inteira de uma vez.
 
 ## 8. Apêndice A — varredura mecânica, com o destino de cada ocorrência
 
-Os padrões do passo 3 do brief, aplicados pelo verificador aos 317 arquivos do universo (a lista
-exata está em `scripts/verificar_auditoria_texto.py`, `PADROES_VARREDURA`). **1.272 ocorrências**,
+Os padrões do passo 3 do brief, aplicados pelo verificador aos 319 arquivos do universo (a lista
+exata está em `scripts/verificar_auditoria_texto.py`, `PADROES_VARREDURA`). **1.275 ocorrências** (1.272 em 2026-11-08, mais as 3 de
+`scripts/executar_serie.sh`),
 todas com destino. O comando e a saída crua:
 
 ```
@@ -1686,11 +1695,11 @@ descartada: extração do corpo da notícia, sem teto (ver P-003) — 1 ocorrên
 agente_nw/coleta/rss/leitor.py:13
 ```
 
-descartada: fatia a partir de índice fixo (nome, palavra ou tabela), sem texto de conteúdo — 7 ocorrência(s):
+descartada: fatia a partir de índice fixo (nome, palavra ou tabela), sem texto de conteúdo — 8 ocorrência(s):
 
 ```
 agente_nw/cli.py:196 agente_nw/nucleo/confirmacao.py:101 agente_nw/nucleo/database/queries/perfis.py:462 agente_nw/nucleo/pedido.py:122
-agente_nw/nucleo/redacao.py:111 agente_nw/nucleo/texto.py:42 scripts/agente_lacunas.py:66
+agente_nw/nucleo/redacao.py:111 agente_nw/nucleo/texto.py:42 scripts/agente_lacunas.py:66 scripts/executar_serie.sh:107
 ```
 
 descartada: fatia de lista ou texto já coberta pelo ponto do arquivo — 8 ocorrência(s):
@@ -1807,13 +1816,14 @@ extensao/conteudo.js:146 extensao/conteudo.js:181 extensao/conteudo.js:197 exten
 extensao/conteudo.js:96
 ```
 
-descartada: split de URL, nome ou linha de formato, não de texto de conteúdo — 16 ocorrência(s):
+descartada: split de URL, nome ou linha de formato, não de texto de conteúdo — 18 ocorrência(s):
 
 ```
 agente_nw/coleta/capturas/busca.py:104 agente_nw/coleta/capturas/busca.py:108 agente_nw/coleta/capturas/leitor.py:36 agente_nw/coleta/capturas/listas.py:175
 agente_nw/coleta/capturas/listas.py:176 agente_nw/coleta/capturas/listas.py:192 agente_nw/coleta/capturas/listas.py:195 agente_nw/coleta/capturas/listas.py:212
 agente_nw/coleta/capturas/listas.py:218 agente_nw/coleta/capturas/listas.py:263 agente_nw/coleta/capturas/navegador.py:53 agente_nw/nucleo/database/queries/perfis.py:35
 agente_nw/nucleo/localizacao.py:62 agente_nw/nucleo/relevancia/cartoes.py:40 extensao/conteudo.js:187 scripts/agente_lacunas.py:118
+scripts/executar_serie.sh:121 scripts/executar_serie.sh:123
 ```
 
 descartada: é a própria lista de padrões da varredura (este verificador) — 13 ocorrência(s):
